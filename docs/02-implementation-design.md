@@ -37,9 +37,9 @@ LLM --tool_call--> [Gateway proxy] --(if allowed)--> real MCP server / tool --> 
 ```
 Technically the gateway is a reverse proxy for the tool transport: for HTTP/SSE-based MCP it terminates the agent's connection and holds upstream connections to the real servers; for stdio MCP it sits as a middleware process. Each intercepted tool call is **mapped to an ACP action** via a per-tool mapping (`tool name + args  →  kind/resource/action/data`).
 
-> **Design note.** Interception's coverage is only as good as the mapping and the routing. Two failure modes to engineer against: (1) a tool the gateway doesn't know about (unmapped) — policy: **unmapped ⇒ deny** by default, never pass-through; (2) network paths that bypass the proxy — must be closed at deployment (egress policy / the agent runtime only has the gateway endpoint). We should ship a "coverage check" that fails startup if the agent has any configured tool endpoint that isn't the gateway.
+> **Design note.** Interception's coverage is only as good as the mapping and the routing. Two failure modes to engineer against: (1) a tool the gateway doesn't know about (unmapped) — policy: **unmapped ⇒ deny** by default, never pass-through; (2) network paths that bypass the proxy — must be closed at deployment (egress policy / the agent runtime only has the gateway endpoint). There should be a "coverage check" that fails startup if the agent has any configured tool endpoint that isn't the gateway.
 
-> **Design note.** Be explicit in the product: interception gives "stop/bound/log any action that flows through us"; it does **not** give the SIF-native "no escape hatch" property, because a mapped tool could itself be a raw `run_sql`. The mapping layer should flag tools whose arguments are free-form strings as *high-risk pass-throughs* and require explicit acknowledgement.
+> **Design note.** Be explicit in the product: interception gives "stop/bound/log any action that flows through the gateway"; it does **not** give the SIF-native "no escape hatch" property, because a mapped tool could itself be a raw `run_sql`. The mapping layer should flag tools whose arguments are free-form strings as *high-risk pass-throughs* and require explicit acknowledgement.
 
 ---
 
@@ -100,7 +100,7 @@ Key implementation points:
 - The function is total: every path ends in an audited terminal decision (RFC §11 requires a record for *every* outcome, including refusals).
 - `terminal(...)` and `hold(...)` both write the audit record before returning.
 
-> **Design note.** The ordering of step 4 vs 5 matters. Killing *before* gates would waste no work, but killing *after* gates means the audit shows "this would have passed/failed, and then was halted," which is better forensics. Compromise we adopted: a **cheap global kill pre-check** at the very top (is the whole agent/session killed?) to short-circuit, plus the **authoritative per-action kill check at step 5** and again at dispatch. So kill is effectively checked three times; that's deliberate (see §8.4).
+> **Design note.** The ordering of step 4 vs 5 matters. Killing *before* gates would waste no work, but killing *after* gates means the audit shows "this would have passed/failed, and then was halted," which is better forensics. The adopted compromise: a **cheap global kill pre-check** at the very top (is the whole agent/session killed?) to short-circuit, plus the **authoritative per-action kill check at step 5** and again at dispatch. So kill is effectively checked three times; that's deliberate (see §8.4).
 
 ---
 
@@ -138,7 +138,7 @@ sql = scope.applyTo(sql, actor);                    // appends AND owner_id = :p
 return jdbc.query(sql, bind(actor));
 ```
 
-> **Design note.** Scope on **reads** (`observe`) is a query filter, which is clean. Scope on **effects** is different — there's often nothing to "filter," the scope is really an authorization predicate ("may this actor act on this resolved target?"). Implementation: for effects, resolve the target first (a scoped `observe` under the hood), and if the target isn't in the actor's scoped set, DENY before dispatch. So scope-for-effects = a pre-resolution check, not a WHERE clause. We should state that explicitly; the RFC currently blurs it.
+> **Design note.** Scope on **reads** (`observe`) is a query filter, which is clean. Scope on **effects** is different — there's often nothing to "filter," the scope is really an authorization predicate ("may this actor act on this resolved target?"). Implementation: for effects, resolve the target first (a scoped `observe` under the hood), and if the target isn't in the actor's scoped set, DENY before dispatch. So scope-for-effects = a pre-resolution check, not a WHERE clause. This should be stated explicitly; the RFC currently blurs it.
 
 ---
 
@@ -171,7 +171,7 @@ Two gates need special implementation care:
 
 **`contentCheck` is the only gate that calls out synchronously.** That makes it the latency and availability risk. Implementation: bounded timeout; on timeout/error apply `failureMode` (closed ⇒ treat as block). Cache verdicts by content hash where safe.
 
-> **Design note.** From a product view, `contentCheck` and `requireApproval` are the two gates that can make the agent feel slow or stuck. We should make both **async-friendly** (see §7) so the agent's turn doesn't block a UI thread, and surface "pending DLP / pending approval" states rather than spinning.
+> **Design note.** From a product view, `contentCheck` and `requireApproval` are the two gates that can make the agent feel slow or stuck. Both should be **async-friendly** (see §7) so the agent's turn doesn't block a UI thread, surfacing "pending DLP / pending approval" states rather than spinning.
 
 ---
 
@@ -237,10 +237,10 @@ IF kill_matches(row) THEN
    COMMIT;  -- never dispatched
 ELSE
    UPDATE pending_actions SET state='DISPATCHING' WHERE id=:id;
-   COMMIT;  -- now we own the send
+   COMMIT;  -- now this worker owns the send
 END IF;
 ```
-After the row is `DISPATCHING`, the worker calls the connector. Because the kill check and the state change are in one locked transaction, a kill either (a) is seen first ⇒ `CANCELLED`, or (b) arrives after `DISPATCHING` ⇒ the send is already committed. There is no in-between where we both "passed kill" and "haven't decided to send."
+After the row is `DISPATCHING`, the worker calls the connector. Because the kill check and the state change are in one locked transaction, a kill either (a) is seen first ⇒ `CANCELLED`, or (b) arrives after `DISPATCHING` ⇒ the send is already committed. There is no in-between where an action has both "passed kill" and "not yet been sent."
 
 An **idempotency key** on each pending row makes the connector send safe under worker retries and guarantees a `CANCELLED` row can never later dispatch.
 
@@ -273,9 +273,9 @@ gateway: cancel in-flight handle; if SMTP already accepted ──▶ stage compe
 ### 8.9 Latency & failure
 The in-memory set check is sub-microsecond. The transactional check is one indexed read inside a transaction the worker already runs. If the **kill store is unreachable**, the gateway treats kill as *possibly active for effects* and fails **closed** for irreversible actions (configurable) — a kill you can't read must not be assumed absent.
 
-> **Design note.** §8.4 + §8.5 is exactly the honesty we need in the product: "we guarantee no *new* or *un-dispatched* action after kill; for in-flight we cancel what's cancellable and compensate what's declared; we never claim to reverse a committed external effect." That sentence is defensible to an auditor. "Big red stop button that undoes everything" is not, and we should never imply it.
+> **Design note.** §8.4 + §8.5 is exactly the honesty the product needs: "no *new* or *un-dispatched* action proceeds after kill; in-flight calls are cancelled where cancellable and compensated where declared; a committed external effect is never claimed to be reversed." That sentence is defensible to an auditor. "Big red stop button that undoes everything" is not, and it should never be implied.
 
-> **Design note.** One more: kill of a `GLOBAL` scope across many instances needs the pub/sub to be reliable. We should not rely on pub/sub alone — every instance also re-reads the `kill_epoch` on each request from its local cache and does a periodic authoritative reload, so a dropped invalidation message self-heals within the reload interval. Pub/sub for speed, polling for safety.
+> **Design note.** One more: kill of a `GLOBAL` scope across many instances needs the pub/sub to be reliable. Pub/sub alone is not enough — every instance also re-reads the `kill_epoch` on each request from its local cache and does a periodic authoritative reload, so a dropped invalidation message self-heals within the reload interval. Pub/sub for speed, polling for safety.
 
 ---
 

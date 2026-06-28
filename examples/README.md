@@ -2,7 +2,7 @@
 
 This guide reads one policy end to end so you can read any of them, and — importantly — it marks **what the gateway provides for you** versus **what you must implement or register** to make a policy actually run.
 
-We use [`ward-nurse.acp.yaml`](ward-nurse.acp.yaml). The same structure applies to every example here.
+This walkthrough uses [`ward-nurse.acp.yaml`](ward-nurse.acp.yaml). The same structure applies to every example here.
 
 ## Legend — where each referenced name comes from
 
