@@ -69,6 +69,20 @@ Companies are stuck: AI agents are capable enough to do real work, but most firm
 
 One honest caveat worth stating plainly: this **bounds what the AI is able to do, and proves it — it does not make the AI's choices correct.** A permitted-but-wrong action is still possible. It's containment, not omniscience. That's exactly why the human-approval steps and the audit trail matter.
 
+## See it run
+
+A runnable proof-of-concept lives in [`demo/`](demo/): a **real LLM agent** (Claude by default) doing accounts-payable work behind the gateway. The agent reads an invoice inbox and submits a payment intent for each invoice; the gateway allows the routine one, holds the mid-size one for a human, and refuses the one to a sanctioned-country vendor — every decision shown live and recorded.
+
+![Gateway enforcing a real agent's payment intents](docs/img/demo-gateway-on.png)
+
+*Gateway **ON**: the agent's raw intents on the left, the gateway's live decisions on the right — **$800 allowed** and paid, **$6,000 held** for approval, **$500 to a sanctioned vendor denied** (`denylist`). Each trace entry is tagged with the pipeline stage that produced it (`EXECUTE` / `GATES` / `DISPATCH`).*
+
+![Raw intents and the agent's own summary](docs/img/demo-gateway-on-detail.png)
+
+*The same run, scrolled: the exact `submit_intent` JSON the model emitted and the gateway's raw verdict for each — ending with the agent's own plain-English recap (approved / held / denied).*
+
+Run it yourself with Docker and an API key — see [`demo/README.md`](demo/README.md).
+
 ## Learn more
 
 - **[Specification](docs/01-RFC-agent-control-policy.md)** — the rulebook language, with worked examples across five domains.
