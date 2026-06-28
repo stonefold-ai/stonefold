@@ -81,16 +81,6 @@ A runnable proof-of-concept lives in [`demo/`](demo/): a **real LLM agent** (Cla
 
 *The same run, scrolled: the exact `submit_intent` JSON the model emitted and the gateway's raw verdict for each — ending with the agent's own plain-English recap (approved / held / denied).*
 
-A **held** payment waits for a person — the agent can't release its own money:
-
-![Approvals inbox — a held payment awaiting a human](docs/img/demo-approvals-held.png)
-
-*The $6,000 held at `requireApproval` sits in the approvals inbox with **Approve** / **Reject** and the required approver role (`role:payments-manager`).*
-
-![Approved — the held payment is released and executed](docs/img/demo-approvals-approved.png)
-
-*After a human clicks **Approve**, the inbox clears and the live trace shows `DISPATCH money moved $6,000` — only now does the payment leave.*
-
 **Now flip the gateway off** — the same agent, the same intents, but nothing in the path to check them:
 
 ![Gateway off — every payment bypassed](docs/img/demo-gateway-off.png)
@@ -100,6 +90,16 @@ A **held** payment waits for a person — the agent can't release its own money:
 ![The bypassed run's summary](docs/img/demo-gateway-off-detail.png)
 
 *The agent's recap of the ungoverned run: all three "Approved (Bypassed)", **$7,300 sent** — the two the gateway would have stopped, gone. That gap is the product.*
+
+Back with the gateway on, a **held** payment waits for a person — the agent can't release its own money:
+
+![Approvals inbox — a held payment awaiting a human](docs/img/demo-approvals-held.png)
+
+*The $6,000 held at `requireApproval` sits in the approvals inbox with **Approve** / **Reject** and the required approver role (`role:payments-manager`).*
+
+![Approved — the held payment is released and executed](docs/img/demo-approvals-approved.png)
+
+*After a human clicks **Approve**, the inbox clears and the live trace shows `DISPATCH money moved $6,000` — only now does the payment leave.*
 
 Run it yourself with Docker and an API key — see [`demo/README.md`](demo/README.md).
 
