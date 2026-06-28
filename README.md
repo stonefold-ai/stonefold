@@ -81,6 +81,16 @@ A runnable proof-of-concept lives in [`demo/`](demo/): a **real LLM agent** (Cla
 
 *The same run, scrolled: the exact `submit_intent` JSON the model emitted and the gateway's raw verdict for each — ending with the agent's own plain-English recap (approved / held / denied).*
 
+**Now flip the gateway off** — the same agent, the same intents, but nothing in the path to check them:
+
+![Gateway off — every payment bypassed](docs/img/demo-gateway-off.png)
+
+*Gateway **OFF**: every intent is `executed — no gateway` (`bypassed`) and all three payments leave directly — including the $6,000 that was held and the $500 to the sanctioned vendor that was denied. Note the **live trace is empty**: the gateway never saw them, so there's no enforcement and no record.*
+
+![The bypassed run's summary](docs/img/demo-gateway-off-detail.png)
+
+*The agent's recap of the ungoverned run: all three "Approved (Bypassed)", **$7,300 sent** — the two the gateway would have stopped, gone. That gap is the product.*
+
 Run it yourself with Docker and an API key — see [`demo/README.md`](demo/README.md).
 
 ## Learn more
