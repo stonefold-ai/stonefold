@@ -1,0 +1,31 @@
+apiVersion: acp/v0.1
+agent: support-assistant
+defaults: { failureMode: closed, audit: full }
+killable: true
+
+allow:
+  - observe:    [Customer, Order, Invoice]
+  - record:     [Note]
+  - effect:     [sendEmail]
+  - transition: { Order: [confirm] }
+deny:
+  - effect:     [refund, exportData]
+  - transition: { Order: [cancel] }
+
+scope:
+  Customer: assignedToCurrentUser
+  Order:    customerAssignedToCurrentUser
+
+gates:
+  sendEmail:
+    rate: 20/hour
+    allowlist:    { field: data.recipientDomain, set: corporate-domains }
+    contentCheck: dlp.basic
+  Order.confirm:
+    precondition: { from: [pending_confirmation] }
+  '*':
+    requireApproval:
+      when: "action.reversibility == irreversible"
+      approvers: role:support-supervisor
+      timeout: 30m
+      onTimeout: deny

@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://acp.dev/schema/v1.0/registry.schema.json",
+  "title": "Registry (Domain Model) v1.0",
+  "description": "Schema for a registry/domain-model document. Semantics in docs/06-registry-domain-model.md. Structural checks only; cross-reference checks are performed by the linter.",
+  "type": "object",
+  "required": ["domain", "entities"],
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": { "type": "string" },
+    "domain": { "type": "string", "minLength": 1 },
+    "connectors": {
+      "type": "object",
+      "additionalProperties": { "type": "object", "properties": { "type": { "type": "string" } }, "additionalProperties": true }
+    },
+    "scopePredicates": { "type": "array", "items": { "type": "string" } },
+    "preconditionChecks": { "type": "array", "items": { "type": "string" } },
+    "handlers": { "type": "array", "items": { "type": "string" } },
+    "hooks": { "type": "array", "items": { "type": "string" } },
+    "sinks": { "type": "array", "items": { "type": "string" } },
+    "namedSets": {
+      "type": "object",
+      "additionalProperties": { "type": "object", "properties": { "source": { "type": "string" }, "values": { "type": "array", "items": { "type": "string" } } }, "additionalProperties": true }
+    },
+    "valueSets": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } },
+    "entities": { "type": "object", "minProperties": 1, "additionalProperties": { "$ref": "#/$defs/entity" } }
+  },
+  "$defs": {
+    "attrValue": {
+      "oneOf": [
+        { "type": "string" },
+        { "type": "object", "required": ["derived"], "additionalProperties": false, "properties": { "derived": { "type": "string" } } }
+      ]
+    },
+    "entity": {
+      "type": "object",
+      "required": ["properties"],
+      "additionalProperties": false,
+      "properties": {
+        "label": { "type": "string" },
+        "dataSource": { "type": "string" },
+        "table": { "type": "string" },
+        "collection": { "type": "string" },
+        "properties": { "type": "object", "additionalProperties": { "$ref": "#/$defs/property" } },
+        "actions": { "type": "object", "additionalProperties": { "$ref": "#/$defs/action" } }
+      }
+    },
+    "property": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": { "type": "string" },
+        "values": { "type": "array", "items": { "type": "string" } },
+        "required": { "type": "boolean" },
+        "derived": { "type": "string" },
+        "label": { "type": "string" }
+      },
+      "anyOf": [ { "required": ["type"] }, { "required": ["values"] } ]
+    },
+    "action": {
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "enum": ["observe", "assess", "record", "effect", "transition"] },
+        "attributes": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "reversibility": { "$ref": "#/$defs/attrValue" },
+            "emission": { "$ref": "#/$defs/attrValue" },
+            "operativeForce": { "$ref": "#/$defs/attrValue" },
+            "resultSensitivity": { "$ref": "#/$defs/attrValue" },
+            "explainability": { "$ref": "#/$defs/attrValue" }
+          }
+        },
+        "data": { "type": "object", "additionalProperties": { "$ref": "#/$defs/property" } },
+        "resolve": { "type": "object", "additionalProperties": { "type": "object", "required": ["entity"], "additionalProperties": true, "properties": { "entity": { "type": "string" } } } },
+        "connector": { "type": "string" },
+        "preconditions": { "type": "array", "items": { "type": "string" } },
+        "postActions": { "type": "array", "items": { "type": "string" } },
+        "from": { "type": "array", "items": { "type": "string" } },
+        "to": { "type": "string" },
+        "label": { "type": "string" }
+      }
+    }
+  }
+}

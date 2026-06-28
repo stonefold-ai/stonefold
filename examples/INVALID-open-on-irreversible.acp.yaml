@@ -1,0 +1,15 @@
+# INTENTIONALLY INVALID — the linter MUST reject this file.
+# Violations (see RFC §13):
+#   - failureMode: open on an agent that allows an irreversible effect (§13.5) -> ERROR
+#   - transition 'engage' referenced with no declared from-states in registry (§13.3) -> ERROR (if registry lacks it)
+#   - '*' grant -> WARN (§13.6)
+#   - irreversible effect 'wipeDisk' with no approval/precondition (§13.4) -> WARN
+# Use this fixture to prove the validator fails closed and reports each issue.
+apiVersion: acp/v0.1
+agent: bad-agent
+defaults: { failureMode: open, audit: basic }
+killable: false
+
+allow:
+  - effect: '*'
+  - effect: [wipeDisk]      # assume registry: reversibility == irreversible

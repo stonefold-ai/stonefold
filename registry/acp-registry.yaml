@@ -1,0 +1,201 @@
+# ACP model registry — the declared catalogue the gateway knows about (RFC §2,
+# design §2). Every resource/action/scope-predicate/hook/check/set/sink that any
+# example policy references is declared here, so the linter's §13.1 existence
+# check passes. Governance attributes (RFC §5) are listed only when they differ
+# from the safe defaults: reversibility=reversible, emission=none,
+# operativeForce=none, resultSensitivity=internal, explainability=none.
+#
+# A transition action MUST declare its legal `from` states (RFC §4.5, §13.3).
+
+connectors: [in_memory, sql, http, email]
+
+scopePredicates:
+  - assignedToCurrentUser
+  - customerAssignedToCurrentUser
+  - inWard
+  - forPatientInWard
+  - inCompartment
+  - tenantOf
+  - clientOf
+  - forMatterOfClient
+
+contentHooks:
+  - dlp.basic
+
+preconditionChecks:
+  - fiveRightsVerified
+  - notDiscontinued
+  - emconAuthorized
+  - deconflicted
+  - positiveIdentification
+  - payeeCoolingOffElapsed
+  - surroundingsClear
+  - withinPostedLimit
+  - withinTractionLimits
+
+sets:
+  corporate-domains: [acme.example, acme.test, acme.internal]
+  sanctioned-list: [KP, IR, SY, CU]
+  approved-court-systems: [ecf-federal, state-superior]
+
+sinks: [careTeam]
+
+resources:
+  # --- customer support / business ---
+  Customer:
+    connector: sql
+    actions:
+      read: { kind: observe }
+      exportData: { kind: effect, reversibility: irreversible }   # alias-ish; real one is Export.exportData
+  Order:
+    connector: sql
+    actions:
+      read: { kind: observe }
+      confirm: { kind: transition, from: [pending_confirmation] }
+      cancel: { kind: transition, from: [pending_confirmation, confirmed] }
+      sign: { kind: transition, from: [draft] }   # ward-nurse: sign a draft order
+  Invoice:
+    connector: sql
+    actions:
+      read: { kind: observe }
+      send: { kind: transition, from: [draft] }
+      markPaid: { kind: transition, from: [sent] }
+  Note:
+    connector: sql
+    actions:
+      read: { kind: observe }
+      create: { kind: record }
+  Email:
+    connector: email
+    actions:
+      sendEmail: { kind: effect, reversibility: compensable }
+  Export:
+    connector: in_memory
+    actions:
+      exportData: { kind: effect, reversibility: irreversible }
+
+  # --- payments / finance ---
+  Account:
+    connector: sql
+    actions:
+      read: { kind: observe }
+  Payment:
+    connector: sql
+    actions:
+      read: { kind: observe }
+      pay: { kind: effect, reversibility: compensable }
+      refund: { kind: effect, reversibility: compensable }
+  Payee:
+    connector: sql
+    actions:
+      read: { kind: observe }
+  LedgerEntry:
+    connector: sql
+    actions:
+      read: { kind: observe }
+      create: { kind: record }
+
+  # --- healthcare ---
+  Patient:
+    connector: sql
+    actions:
+      read: { kind: observe }
+      readSealed: { kind: observe, resultSensitivity: restricted }
+      triage: { kind: assess, explainability: required }
+      administer: { kind: effect, reversibility: irreversible, operativeForce: high }
+  Medication:
+    connector: sql
+    actions:
+      read: { kind: observe }
+      prescribe: { kind: transition, from: [draft] }
+  Prescribing:
+    connector: in_memory
+    actions:
+      # irreversible effect with a declared compensation (auto-staged on a failed
+      # dispatch, RFC §8.5 / design §9).
+      prescribe:
+        kind: effect
+        reversibility: irreversible
+        compensation: { resource: Prescribing, action: discontinue }
+      discontinue: { kind: effect, reversibility: irreversible }
+  Observation:
+    connector: sql
+    actions:
+      read: { kind: observe }
+      create: { kind: record }
+  Encounter:
+    connector: sql
+    actions:
+      discharge: { kind: transition, from: [admitted] }
+  Page:
+    connector: email
+    actions:
+      pageOnCall: { kind: effect, reversibility: compensable }
+
+  # --- defence: air/maritime track operator ---
+  Track:
+    connector: in_memory
+    actions:
+      read: { kind: observe, resultSensitivity: confidential }
+      identify: { kind: transition, from: [unidentified] }
+      designate: { kind: transition, from: [identified] }
+      radarSweep: { kind: effect, emission: emits }
+      engage: { kind: effect, reversibility: irreversible }
+      combatId: { kind: assess, explainability: required }
+      collateralEstimate: { kind: assess }
+  IntelRecord:
+    connector: in_memory
+    actions:
+      read: { kind: observe, resultSensitivity: secret }
+  TrackAnnotation:
+    connector: sql
+    actions:
+      read: { kind: observe }
+      create: { kind: record }
+
+  # --- cyber-physical: vehicle ---
+  Vehicle:
+    connector: in_memory
+    actions:
+      read: { kind: observe }
+      update: { kind: record }
+      applySpeed: { kind: effect, reversibility: reversible }
+      start: { kind: transition, from: [stopped] }
+      stop: { kind: transition, from: [moving, idle] }
+  Sensor:
+    connector: in_memory
+    actions:
+      read: { kind: observe }
+
+  # --- legal matter ---
+  Matter:
+    connector: sql
+    actions:
+      read: { kind: observe }
+      engage: { kind: transition, from: [conflict_check] }
+      close: { kind: transition, from: [active] }
+      deleteMatter: { kind: effect, reversibility: irreversible }
+  TimeEntry:
+    connector: sql
+    actions:
+      read: { kind: observe }
+      create: { kind: record }
+  Task:
+    connector: sql
+    actions:
+      read: { kind: observe }
+      create: { kind: record }
+  Staff:
+    connector: sql
+    actions:
+      read: { kind: observe }
+  CourtFiling:
+    connector: http
+    actions:
+      eFile: { kind: effect, reversibility: irreversible }
+
+  # --- the INVALID fixture's irreversible effect ---
+  Disk:
+    connector: in_memory
+    actions:
+      wipeDisk: { kind: effect, reversibility: irreversible }

@@ -1,0 +1,26 @@
+apiVersion: acp/v0.1
+agent: legal-matter-assistant
+defaults: { failureMode: closed, audit: full }
+killable: true
+
+allow:
+  - observe:    [Matter, TimeEntry, Task, Staff]
+  - record:     [TimeEntry, Task]
+  - effect:     [sendEmail, eFile]
+  - transition: { Matter: [engage, close] }
+deny:
+  - effect:     [deleteMatter]
+
+scope:
+  Matter:    clientOf(actor)
+  TimeEntry: forMatterOfClient(actor)
+
+gates:
+  Matter.engage:
+    precondition: { from: [conflict_check] }   # refuses from 'active', etc.
+  eFile:
+    allowlist:    { field: data.court, set: approved-court-systems }
+    requireApproval: { approvers: role:supervising-partner }
+  sendEmail:
+    contentCheck: dlp.basic
+    rate: 30/hour

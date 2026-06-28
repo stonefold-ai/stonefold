@@ -1,0 +1,37 @@
+apiVersion: acp/v0.1
+agent: track-operator-assistant
+defaults: { failureMode: closed, audit: full }
+killable: true
+
+allow:
+  - observe:    [Track, IntelRecord]          # passive
+  - assess:     [combatId, collateralEstimate]
+  - record:     [TrackAnnotation]
+  - effect:     [radarSweep]                   # emits
+  - transition: { Track: [identify, designate] }
+deny:
+  - effect:     [engage]                       # default-denied; only 'standing' enables
+
+standing:
+  - name: weapons-free
+    when: "context.roeState == 'weapons_free'"
+    enables: { effect: [engage] }
+
+scope:
+  Track:       inCompartment(actor.clearance)
+  IntelRecord: inCompartment(actor.clearance)
+
+gates:
+  observe:
+    disclosure: { maxClassification: actor.clearance }
+  radarSweep:                                  # emitting effect
+    emissionControl: { checks: [emconAuthorized, deconflicted] }
+  combatId:                                    # assess
+    requireExplanation: true
+    requireApproval: { mode: confirm, approvers: role:tactical-officer }
+  Track.designate:
+    precondition: { from: [identified] }
+  engage:                                      # effect, irreversible, kinetic
+    precondition:       [positiveIdentification]
+    valueLimit:         { field: data.collateralEstimate, max: 1 }
+    dualAuthorization:  { approvers: role:weapons-release-authority }

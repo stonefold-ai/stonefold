@@ -1,0 +1,78 @@
+# The Accounts-Payable demo stack (docs/05-demo-spec.md).
+#   gateway  - the real ACP product (FastAPI) + the demo UI, served at :8088
+#   postgres - the fake ledger AND the gateway's audit / outbox / kill tables
+#              (Postgres specifically: the kill no-race demo needs SELECT ... FOR UPDATE)
+#   redis    - rate/spend counters + kill propagation
+#   agent    - the real-LLM agent runner, launched on demand (profile "tools")
+#
+# Build context is the repo root (..) so the images get src/, examples/, registry/,
+# schema/ and demo/. Bring it up with `make up`; everything else via the Makefile.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: acp
+      POSTGRES_PASSWORD: acp
+      POSTGRES_DB: acp
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U acp -d acp"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  gateway:
+    build:
+      context: ..
+      dockerfile: demo/gateway/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://acp:acp@postgres:5432/acp
+      REDIS_URL: redis://redis:6379/0
+      LLM_PROVIDER: ${LLM_PROVIDER:-auto}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    ports:
+      - "8088:8088"
+    volumes:
+      # serve the UI + source live from the host so tweaks need only a restart
+      - ./ui:/app/demo/ui:ro
+      - ../src:/app/src:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  agent:
+    build:
+      context: ..
+      dockerfile: demo/agent/Dockerfile
+    environment:
+      GATEWAY_URL: http://gateway:8088
+      DATABASE_URL: postgresql://acp:acp@postgres:5432/acp
+      REDIS_URL: redis://redis:6379/0
+      LLM_PROVIDER: ${LLM_PROVIDER:-auto}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    volumes:
+      - ../src:/app/src:ro   # use host source so edits need no rebuild
+    depends_on:
+      - gateway
+    profiles: ["tools"]   # launched on demand via `docker compose run`, not `up`
+
+volumes:
+  pgdata:

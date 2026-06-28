@@ -1,0 +1,69 @@
+# ---------------------------------------------------------------------------
+# Secrets / local environment  — NEVER commit real API keys
+# (demo/.env holds the ANTHROPIC_API_KEY; only .env.example is tracked)
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg
+*.egg-info/
+.eggs/
+build/
+dist/
+pip-wheel-metadata/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Tooling caches / coverage
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.dmypy.json
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+
+# ---------------------------------------------------------------------------
+# Editors / IDEs
+# ---------------------------------------------------------------------------
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ---------------------------------------------------------------------------
+# OS cruft
+# ---------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---------------------------------------------------------------------------
+# AI-assisted build scaffolding — kept locally, NOT part of the published repo.
+# These guide an AI agent building the project (and some are now build-time /
+# outdated). Remove the lines below if you'd rather publish them.
+# ---------------------------------------------------------------------------
+/.claude/
+/CLAUDE.md
+/START-HERE.md
+
+# ---------------------------------------------------------------------------
+# Logs / scratch
+# ---------------------------------------------------------------------------
+*.log

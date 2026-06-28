@@ -1,0 +1,208 @@
+# Registry (Domain Model) — Specification v1.0
+
+*The registry is where a domain is **declared**: its entities, their properties, the actions you can take on them (each with a **kind** and governance **attributes**), lifecycle states, value sets, and the connectors/predicates the gateway uses. SIF draws the agent's vocabulary from it; ACP reads attributes from it; the gateway validates every intent against it.*
+
+**Status:** Draft v1.0. **Foundational layer** — read alongside the SIF RFC ([`00`](00-RFC-sif-intent-format.md)); ACP ([`01`](01-RFC-agent-control-policy.md)) and the policies reference the names declared here.
+
+### Conventions
+Keywords per RFC 2119. The registry is YAML. Every name a policy or SIF intent references (entity, action, transition, field, value set, scope predicate, hook, named set, connector) **MUST** be declared here, or the policy fails to load (ACP §13.1).
+
+---
+
+## 1. Why it exists
+
+A policy says *"the agent may `effect: pay`"* — but what **is** `pay`? What fields does a `Payment` have? Is `pay` reversible? Which connector actually moves the money? None of that belongs in the policy (which is about *permission*) or in SIF (which is about *intent shape*). It belongs in the **registry** — the single declaration of the domain that both layers build on.
+
+Think of it as the typed schema of your world: like a database schema or a set of TypeScript types, but it also records each action's *kind*, its *governance attributes*, and its *lifecycle*.
+
+---
+
+## 2. Top-level structure
+
+```yaml
+apiVersion: registry/v1.0
+domain: payments
+
+connectors:        { … }   # named effect bindings / data sources
+scopePredicates:   [ … ]   # names the gateway implements (e.g. tenantOf)
+preconditionChecks:[ … ]   # named deterministic checks (e.g. payeeCoolingOffElapsed)
+hooks:             [ … ]   # named content hooks (e.g. dlp.basic)
+sinks:             [ … ]   # named disclosure sinks (e.g. careTeam)
+namedSets:         { … }   # allow/deny lists (e.g. sanctioned-list)
+valueSets:         { … }   # reusable enums
+entities:          { … }   # the domain itself
+```
+
+`connectors`, `scopePredicates`, `preconditionChecks`, `hooks`, `sinks` are **declarations of names the integrator implements in code** — listing them here lets the linter verify policies and tells implementers exactly what to build (the `[REGISTER]` items from `examples/README.md`).
+
+---
+
+## 3. Entities
+
+Each entity declares its properties, optional lifecycle states, its storage/connector mapping, and its actions.
+
+```yaml
+entities:
+  Payment:
+    label: "An outbound payment"
+    dataSource: ledger-sql          # which connector serves observe/record/transition
+    table: payments                 # storage mapping (connector-specific)
+    properties:
+      amount:             { type: decimal, required: true }
+      currency:           { type: string }
+      destinationCountry: { type: string }
+      newPayee:           { type: boolean }
+      payee:              { type: Payee }          # reference to another entity
+      currentState:       { values: [pending, dispatching, done, failed, cancelled] }
+    actions:
+      pay: { … }                     # see §4
+```
+
+- **`properties`** — `name: { type, required?, … }`. Types are primitives (`string`, `decimal`, `int`, `boolean`, `dateTime`), another entity (a reference), or `{ values: [...] }` for an inline enum. A `currentState` property with `values` declares the lifecycle's states.
+- **`dataSource` / `table`** — the connector that serves reads/records/transitions for this entity, and its storage handle.
+
+---
+
+## 4. Actions (name → kind + attributes)
+
+Actions are declared **under their entity**. This is where `kind` and `attributes` live.
+
+```yaml
+    actions:
+      pay:
+        kind: effect
+        attributes:
+          reversibility: irreversible
+          operativeForce: high
+        connector: ledger-pay        # the effect binding that performs it
+        data:                        # parameters the agent supplies (validated)
+          amount:   { type: decimal, required: true }
+          currency: { type: string }
+        resolve:                     # references the agent fills by lookup
+          payee: { entity: Payee }
+```
+
+For a **transition**, declare its legal states:
+```yaml
+      markPaid:
+        kind: transition
+        from: [sent]
+        to: paid
+```
+
+Rules:
+- `kind` is one of `observe / assess / record / effect / transition` (SIF §2).
+- **`observe` and `record` are implicit per entity** — declaring an entity makes it readable/writable; you only declare explicit `observe`/`record` actions to name a special query or restrict them. A policy grants them by **listing the entity** (`observe: [Payment]`).
+- **`assess`, `effect`, `transition` MUST be explicitly declared** as named actions; a policy grants them by **action name** (`effect: [pay]`) or via the map form (`transition: { Invoice: [markPaid] }`).
+- **`attributes`** are the five governance attributes (ACP §5). Any not declared default to the safe end (`reversibility: irreversible`, `operativeForce: none`, `emission: none`, `explainability: none`).
+- `resultSensitivity` is often **per-record**, not per-action; declare a default on the action/entity and/or a derivation (e.g. `resultSensitivity: { derived: record.confidentialFlag }`) so the `disclosure` gate's pre-check/post-check (ACP §7.12) can resolve it.
+- An action MAY declare **intrinsic `preconditions`** (named checks that must pass for *anyone*, always) and **`postActions`** (named handlers that run after it succeeds). These differ from ACP policy gates — see §6.
+
+---
+
+## 5. Supporting declarations
+
+```yaml
+connectors:
+  ledger-sql: { type: sql }                 # serves observe/record/transition
+  ledger-pay: { type: method }              # the effect binding for `pay`
+scopePredicates:   [ tenantOf ]             # implemented in the gateway
+preconditionChecks:[ payeeCoolingOffElapsed ]  # named checks (pass/fail)
+handlers:          [ recordLedgerEntry ]       # named post-action handlers
+hooks:             [ dlp.basic ]               # named content hooks
+sinks:             [ ]                          # named disclosure sinks
+namedSets:
+  sanctioned-list: { source: "sets/sanctioned-countries.txt" }
+```
+
+These names are exactly what a policy or an action references (`scope: { Payment: tenantOf(actor) }`, `denylist: { set: sanctioned-list }`, `precondition: [payeeCoolingOffElapsed]`, `postActions: [recordLedgerEntry]`). The registry declares them so they can be validated and so implementers have a checklist. Each is a function the integrator implements (see §6).
+
+---
+
+## 6. Preconditions, post-actions & handlers — what's automatic vs. what you implement
+
+A common question: do `preconditions` / `postActions` generate code skeletons, or are they enforced automatically? **Both ideas apply, to different things.** Split them into two buckets.
+
+**Bucket A — declarative, enforced automatically (no code).** The framework enforces these entirely from the declaration:
+- transition **`from`-states**, enum/value membership, `valueLimit`, `allowlist`/`denylist` (against `namedSets`), `rate`/`quota`/`quantityCap`, `window`, and the **approval mechanism** itself (`requireApproval`/`dualAuthorization`).
+You write the declaration; the gateway enforces it. No handler exists.
+
+**Bucket B — named functions you implement; the framework invokes them.** The framework guarantees **when** they run and treats their result deterministically, but the **body is your code**:
+- **precondition checks** (`payeeCoolingOffElapsed`, `fiveRightsVerified`) — run before execution; any failure ⇒ DENY,
+- **content hooks** (`dlp.basic`) — return pass/block,
+- **scope predicates** (`tenantOf`) — return a filter / authorization decision,
+- **post-actions / effect handlers** — the `connector` and any `postActions` — run after the action passes all gates; they perform the effect and may set derived fields.
+
+So: **invocation and ordering are automatic; the logic is hand-written.** The framework cannot know what "five rights verified" means — you implement it.
+
+**Skeletons.** From the names declared in the registry, the build can **generate handler skeletons/interfaces** the developer fills in (this is what the original OntoCortex did with its `_generated/` stubs). It's optional DX, not part of enforcement — the contract is simply "register a function with this name and signature; the framework calls it." Suggested signatures:
+
+| Kind | Signature (illustrative) | Must be |
+|---|---|---|
+| precondition check | `bool check(Context ctx)` → pass/fail (+reason) | pure / deterministic, no side effects |
+| content hook | `Verdict hook(Content c)` → pass/block | deterministic verdict |
+| scope predicate | `Filter\|Authz scope(Actor a)` | deterministic |
+| post-action / effect handler | `Result handle(ResolvedAction a, Context ctx)` | may call external systems; runs after gates, in the staged dispatch |
+
+**Where they live — registry vs. policy.** Both can carry checks/handlers, and the gateway runs both:
+- **Registry (intrinsic):** truths that must hold for *everyone*, always — a transition's `from`-states, a domain safety invariant, a mandatory `postAction`. Declared on the action.
+- **ACP policy (imposed):** per-agent / per-deployment gates — *this* agent needs approval over $10k, or must pass `fiveRightsVerified`. Declared as gates.
+
+Order at runtime: registry intrinsic preconditions and policy precondition-gates must **all** pass before execution; post-actions/handlers run **after** the action succeeds (for effects, via the staged dispatch). Same recoverable-error path on any failure.
+
+### Registered functions reference
+
+The five kinds of named function the registry can declare. Each: what it is · what it receives → returns · when it fires · example.
+
+**Scope predicate** — declared in `scopePredicates`.
+- *What:* limits **which records** an actor may touch (access scope).
+- *Receives → returns:* the actor (identity + claims) → a **filter** (for reads/writes) or an **authorization decision** (for effects).
+- *When:* the scope-injection step, before execution — injected below the model so the agent can't widen it. For effects, a pre-resolution check on the target.
+- *Example:* `tenantOf(actor)` → SQL filter `tenant_id = :actorTenant`; `inWard(actor.ward)` → `ward_id = 'Ward-3B'`. Referenced by `scope: { Account: tenantOf(actor) }`.
+
+**Precondition check** — declared in `preconditionChecks`; referenced by an action's `preconditions` or an ACP `precondition` gate.
+- *What:* a deterministic yes/no test that must hold before an action runs.
+- *Receives → returns:* the resolved action + target + data + actor (a context) → **pass / fail(reason)**.
+- *When:* the gate step, before execution; any fail ⇒ DENY.
+- *Example:* `payeeCoolingOffElapsed(ctx)` → false when the payee was created < 24h ago. Must be pure/deterministic, no side effects.
+
+**Content hook** — declared in `hooks`; referenced by an ACP `contentCheck` gate.
+- *What:* inspects the **payload/content** of an action and returns a verdict (DLP, PII, classification scan).
+- *Receives → returns:* the action's content/data → **pass / block**.
+- *When:* the gate step, before execution (e.g. before an email is sent).
+- *Example:* `dlp.basic(emailBody)` → block if it contains card numbers or secrets. May call an external DLP service, but returns a deterministic verdict.
+
+**Disclosure sink** — declared in `sinks`; referenced by an ACP `disclosure` gate's `allowSink`.
+- *What:* a named **destination** a read's result is allowed to flow to; the gate checks the result's sensitivity against the allowed sinks.
+- *Receives → returns:* the result's classification + intended destination → **allowed / withhold**.
+- *When:* on a read — before execution if sensitivity is known from the registry (pre-check), else on the return path (post-check). See ACP §7.12.
+- *Example:* `careTeam` — a `restricted` patient record may only be returned to the care team; any other sink ⇒ result withheld.
+
+**Post-action / effect handler** — declared in `handlers` (and the action's `connector`); referenced by an action's `postActions` or `connector`.
+- *What:* the code that **actually performs** an effect, or a follow-up step after one.
+- *Receives → returns:* the resolved action + context → a **result** (success/failure); may set derived fields.
+- *When:* after the action passes all gates; for effects, inside the staged dispatch (outbox).
+- *Example:* the `ledger-pay` connector executes the wire; `recordLedgerEntry` writes the double-entry line afterward; `dispatchSMTP` sends the email. May call external systems.
+
+---
+
+## 7. How the three layers line up
+
+For the `pay` action:
+
+| Layer | What it says about `pay` |
+|---|---|
+| **Registry** (here) | `Payment.pay` is an `effect`, irreversible, high operative force, parameters `{amount, currency}`, resolves `payee`, served by the `ledger-pay` connector. |
+| **SIF** (intent) | the agent may emit `{ kind:"effect", entity:"Payment", action:"pay", data:{…}, resolve:{payee:…} }`. |
+| **ACP** (policy) | `allow: effect:[pay]` + gates (`valueLimit`, `dualAuthorization` over $10k, sanctions `denylist`, new-payee `precondition`). |
+
+One name, three concerns: *defined* in the registry, *expressed* via SIF, *governed* by ACP.
+
+---
+
+## 8. Validation
+A registry MUST pass `schema/registry.schema.json` (structure) plus these checks: every `type`/`entity` reference resolves; every `transition` has `from`/`to` within the entity's declared states; every `connector`/`scopePredicate`/`preconditionCheck`/`hook`/`sink`/`namedSet` referenced by an action or by a companion policy is declared; action `kind`s are valid; attribute values are in their allowed sets (SIF §2 / ACP §5).
+
+**Exception for `deny`.** A policy's `deny` rule MAY reference an action that the registry does not declare. Forbidding a capability that does not (yet) exist is safe and encouraged as defence-in-depth — so the "referenced names must exist" check (ACP §13.1) applies to `allow`, `scope`, and `gates`, **not** to `deny`. (This is why, e.g., a policy may `deny: transition: { Medication: [prescribe] }` even if no such transition is declared.)
+
+Worked registries: [`../examples/payments.registry.yaml`](../examples/payments.registry.yaml) (the demo domain) and [`../examples/ward-nurse.registry.yaml`](../examples/ward-nurse.registry.yaml). Each pairs with the policy of the same name.

@@ -1,0 +1,23 @@
+# Minimal registry fixture for M0 unit tests (resolve + value model).
+# The full example-covering registry lives at registry/acp-registry.yaml (M1).
+connectors: [in_memory, sql, email]
+scopePredicates: [assignedToCurrentUser]
+contentHooks: [dlp.basic]
+preconditionChecks: [fiveRightsVerified]
+sets:
+  corporate-domains: [acme.example, acme.test]
+sinks: [careTeam]
+resources:
+  Customer:
+    connector: sql
+    actions:
+      read: { kind: observe, resultSensitivity: internal }
+      readSealed: { kind: observe, resultSensitivity: restricted }
+  Email:
+    connector: email
+    actions:
+      sendEmail: { kind: effect, reversibility: compensable }
+  Order:
+    connector: sql
+    actions:
+      confirm: { kind: transition, from: [pending_confirmation] }

@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ACP - Accounts-Payable Gateway Demo</title>
+  <style>
+    :root{ --bg:#0f1419; --panel:#181f29; --line:#2a3340; --txt:#e6edf3; --mut:#8b98a9;
+           --allow:#2ea043; --deny:#d1242f; --hold:#bf8700; --halt:#8957e5; --eff:#1f6feb; }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.45 system-ui,Segoe UI,sans-serif}
+    header{padding:14px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:14px}
+    header h1{font-size:16px;margin:0;font-weight:600}
+    header .sub{color:var(--mut);font-size:12px}
+    header .prov{margin-left:auto;color:var(--mut);font-size:12px}
+    main{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;padding:16px 22px;align-items:start}
+    section{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:16px}
+    section h2{font-size:13px;margin:0 0 10px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+    button{background:#222b38;border:1px solid var(--line);color:var(--txt);padding:7px 12px;border-radius:7px;
+           cursor:pointer;font-size:13px}
+    button:hover{border-color:#3d4b5c}
+    button.primary{background:#1f6feb;border-color:#1f6feb}
+    .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    input,textarea{background:#0d1117;border:1px solid var(--line);color:var(--txt);border-radius:7px;padding:7px 9px;font:13px system-ui}
+    textarea{width:100%;resize:vertical;min-height:54px}
+    input{flex:1;min-width:120px}
+    .badge{display:inline-block;padding:1px 8px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase}
+    .stage{display:inline-block;padding:1px 7px;border-radius:5px;font-size:10px;font-weight:700;
+           letter-spacing:.05em;background:#21304a;color:#9fc1ff;border:1px solid #2e466e;cursor:help}
+    .b-allow{background:var(--allow)} .b-deny{background:var(--deny)} .b-hold{background:var(--hold)}
+    .b-halt{background:var(--halt)} .b-effect{background:var(--eff)} .b-bypassed{background:#6e7681}
+    .trace{max-height:62vh;overflow:auto;display:flex;flex-direction:column;gap:6px}
+    .ev{border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:#0d1117}
+    .ev .top{display:flex;gap:8px;align-items:center}
+    .ev .meta{color:var(--mut);font-size:12px;margin-top:3px;word-break:break-word}
+    .ev.eff{border-color:#244a86}
+    .muted{color:var(--mut)} .mono{font-family:ui-monospace,Consolas,monospace;font-size:12px}
+    .list{display:flex;flex-direction:column;gap:8px}
+    .card{border:1px solid var(--line);border-radius:8px;padding:9px;background:#0d1117}
+    .grid2{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:12px}
+    .pill{font-size:11px;color:var(--mut);border:1px solid var(--line);border-radius:20px;padding:1px 8px}
+    a{color:#58a6ff}
+    .hint{font-size:12px;color:var(--mut);margin-top:6px}
+    .danger{color:#ff7b72}
+    /* gateway on/off toggle */
+    .gw{display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:8px 12px;
+        border:1px solid var(--line);border-radius:8px;background:#0d1117;flex-wrap:wrap}
+    .gw-label{font-weight:600}
+    .seg{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border:1px solid var(--line);
+         border-radius:20px;cursor:pointer;color:var(--mut);user-select:none}
+    .seg input{margin:0;accent-color:var(--allow)}
+    .seg.sel-on{border-color:var(--allow);color:#fff;background:#10331c}
+    .seg.sel-off{border-color:var(--deny);color:#fff;background:#33161a}
+    #runner.gwoff{border-color:var(--deny);box-shadow:0 0 0 1px var(--deny) inset}
+    #runner.gwoff .gw{border-color:var(--deny)}
+    /* agent transcript (what was actually sent) */
+    .transcript{margin-top:10px;display:flex;flex-direction:column;gap:8px}
+    .transcript .card pre{margin:6px 0 0;white-space:pre-wrap;font-size:12px;
+      background:#0b0f14;border-radius:6px;padding:6px 8px;overflow:auto;max-height:260px}
+    .lbl{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
+    details summary{cursor:pointer;color:var(--mut);font-size:12px}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>ACP &mdash; Accounts-Payable Gateway</h1>
+    <span class="sub">a deterministic control point between an AI agent and the money</span>
+    <span class="prov" id="provider">connecting&hellip;</span>
+  </header>
+  <main>
+    <div>
+      <section id="runner">
+        <h2>Run the agent</h2>
+        <div class="gw">
+          <span class="gw-label">ACP Gateway</span>
+          <label class="seg" id="seg-on"><input type="radio" name="gw" value="on" checked> ON &mdash; enforcing</label>
+          <label class="seg" id="seg-off"><input type="radio" name="gw" value="off"> OFF &mdash; bypassed</label>
+        </div>
+        <div class="row">
+          <button class="primary" data-run='{"scenario":"happy"}'>1 &middot; Pay Acme $800</button>
+          <button class="primary" data-run='{"scenario":"inbox"}'>2 &middot; Process the inbox</button>
+          <button class="primary" data-run='{"scenario":"approval"}'>3 &middot; Pay Globex $6,000 (needs approval)</button>
+          <button class="primary" data-run='{"scenario":"blocked"}'>4 &middot; Pay Initech $500 (sanctioned &rarr; refused)</button>
+        </div>
+        <div class="hint" id="gwhint"></div>
+        <div class="hint"><span id="runstatus"></span></div>
+        <div id="agentout" class="transcript"></div>
+      </section>
+    </div>
+
+    <div>
+      <section>
+        <h2>Approvals inbox</h2>
+        <div class="row"><button id="refreshApprovals">Refresh</button>
+          <input id="approver" placeholder="approver id (e.g. mgr-1)" value="mgr-1" /></div>
+        <div class="list" id="approvals" style="margin-top:10px"></div>
+      </section>
+
+      <section>
+        <h2>Live trace <span class="pill">live</span> &mdash; intent &rarr; decision &rarr; effect</h2>
+        <div class="trace" id="trace" style="max-height:56vh"></div>
+      </section>
+    </div>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>

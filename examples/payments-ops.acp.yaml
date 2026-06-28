@@ -1,0 +1,33 @@
+apiVersion: acp/v0.1
+agent: payments-ops-agent
+defaults: { failureMode: closed, audit: full }
+killable: true
+
+allow:
+  - observe:    [Account, Payment, Payee]
+  - record:     [LedgerEntry]
+  - effect:     [pay]
+  - transition: { Invoice: [send, markPaid] }
+deny:
+  - effect:     [exportData]
+
+scope:
+  Account: tenantOf(actor)
+  Payment: tenantOf(actor)
+
+gates:
+  pay:
+    denylist:   { field: data.destinationCountry, set: sanctioned-list }
+    valueLimit: { field: data.amount, max: 1000000, currency: USD }
+    rate:       { limit: 50/hour, per: resource.payeeId }
+    requireApproval:
+      when: "data.amount > 1000 and data.amount <= 10000"
+      approvers: role:payments-manager
+    dualAuthorization:
+      when: "data.amount > 10000"
+      approvers: role:treasury
+    precondition:
+      when: "exists data.newPayee"
+      checks: [payeeCoolingOffElapsed]        # new-payee hold
+  Invoice.markPaid:
+    precondition: { from: [sent] }
