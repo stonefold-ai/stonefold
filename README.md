@@ -117,12 +117,15 @@ Put simply: Cedar/OPA decide whether a request is allowed; ACP also controls wha
 
 The closest existing system is **AWS Bedrock AgentCore**, which already runs Cedar inside an agent runtime — intercepting tool calls through an MCP gateway, evaluating each before access (Cedar can inspect the argument values too), and adding human approval through a separate orchestration layer. Two things still differ. **How the action surface is modelled:** AgentCore also constrains the agent — it can only call registered tools, and MCP tools carry typed argument schemas — so this is a difference of abstraction, not capability. ACP generates the agent's whole intent vocabulary from one domain model, and its five action *kinds* plus governance attributes (reversibility, emission, operative force) let a policy reason about the *nature* of an action uniformly, where AgentCore reasons per-tool-name and per-argument. **Its shape:** in AgentCore, approval, orchestration, and audit are assembled from separate AWS services and coupled to AWS; in ACP, staging, approval, kill, and audit are first-class parts of one model, portable across any stack.
 
+The full version of this argument — the PDP/PEP category error, the four-verdict comparison table, how IAM/OPA/Cedar compose with the gateway through the authorization seam, and what those engines honestly do better — is [`docs/10-positioning-policy-engines.md`](docs/10-positioning-policy-engines.md).
+
 ## Learn more
 
 - **[Specification](docs/01-RFC-agent-control-policy.md)** — the rulebook language, with worked examples across five domains.
 - **[Implementation design](docs/02-implementation-design.md)** — how the gateway executes it, including the stop button in full.
 - **[Architecture decisions](docs/03-architecture-decisions.md)** — the chosen stack and structure.
-- **[Changelog v0.1 → v0.2](docs/RFC-changeset-v0.1-to-v0.2.md)**.
+- **[Positioning vs OPA / Cedar / IAM / AgentCore](docs/10-positioning-policy-engines.md)** — why a decision engine alone can't govern an agent, and how they compose.
+- **Changelogs:** [v0.1 → v0.2](docs/RFC-changeset-v0.1-to-v0.2.md) · [v0.2 → v0.3](docs/RFC-changeset-v0.2-to-v0.3.md).
 
 ## License
 
