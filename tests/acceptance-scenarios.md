@@ -65,6 +65,16 @@ Translate each scenario into an automated test **before** implementing the featu
 - When enforced
 - Then those payload fields are ignored; identity comes only from the authenticated session.
 
+**B4 — scope no-race on a transactional connector (v0.4 — PROPOSED, CS-018)**
+- Given a staged `pay` decided while the target account belonged to the actor's tenant, and a `transactional` connector
+- When the account is reassigned to another tenant before dispatch
+- Then the effect's write re-asserts the scope predicate inside its own transaction, affects zero rows, and settles `FAILED` with reason `scope-lost` — the effect never lands on un-authorized state.
+
+**B5 — residual window is declared, not hidden (v0.4 — PROPOSED, CS-018)**
+- Given the same reassignment race over a `window` connector (HTTP/email)
+- When the dispatch worker re-resolves the target under scope immediately before the call
+- Then the stale target is caught pre-dispatch; and the connector's declared residual window appears in the audit record.
+
 ---
 
 ## C. Gates (M2)
@@ -120,6 +130,16 @@ Translate each scenario into an automated test **before** implementing the featu
 **D4 — failed irreversible effect stages compensation**
 - Given an irreversible `effect` with a declared compensation that fails at the connector
 - When dispatched and it fails → a compensating effect is staged, and the failure is audited (not lost).
+
+**D5 — decision TTL cancels a stale staged effect (v0.4 — PROPOSED, CS-017)**
+- Given a staged irreversible effect with a short decision TTL
+- When the dispatch worker claims it after the TTL has lapsed (e.g. an approval arrives late)
+- Then the row settles `CANCELLED` with reason `stale-decision`, nothing is dispatched, the agent's ticket resolves to a recoverable refusal, and a late approval does not resurrect it.
+
+**D6 — volatile gates re-validated at dispatch (v0.4 — PROPOSED, CS-017)**
+- Given a staged `pay` that passed the sanctions `denylist` at decision time
+- When the destination is added to the denylist before dispatch
+- Then the dispatch-time re-validation (inside the claimed transaction, after the kill re-check) settles the row `CANCELLED` with reason `stale-guard:denylist`; counters/approvals/contentCheck are NOT re-run.
 
 ---
 
