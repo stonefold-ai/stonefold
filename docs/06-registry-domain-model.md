@@ -189,6 +189,14 @@ The five kinds of named function the registry can declare. Each: what it is · w
 - *When:* after the action passes all gates; for effects, inside the staged dispatch (outbox).
 - *Example:* the `ledger-pay` connector executes the wire; `recordLedgerEntry` writes the double-entry line afterward; `dispatchSMTP` sends the email. May call external systems.
 
+### Registered functions are part of the trust surface — conformance & review
+
+Bucket B is hand-written, security-critical code the gateway invokes on every matching action, so it gets the same treatment as a policy:
+
+1. **Prefer the stock factories.** The common shapes ship pre-written and pre-verified in `acp_gates.stock` — `resource_state_in` (state membership), `cooling_off_elapsed` (the new-payee pattern, RFC §14.4), `data_field_present` (explanation-required). Each is pure, deterministic, and **fails closed** (missing field / unparsable value / absent injected clock ⇒ `False`, never an exception). Most deployments should write no bespoke check code at all.
+2. **Run the conformance kit over anything bespoke.** `acp_gates.conformance` is a test-time harness (`check_precondition` / `check_content_hook` / `check_scope_predicate` + `assert_conformant`) that holds each function to the contract this section states: **deterministic** (same input ⇒ same result), **total** over its golden cases (an exception is a *dependency failure* that trips `failureMode` — never how a verdict is expressed), **read-only** (inputs are not mutated), and **golden-pinned** (the author declares expected results for known inputs). A deployment SHOULD keep a conformance test per registered function in its own suite.
+3. **Review and sign like a policy.** A registered function can widen scope or pass a gate just as surely as an `allow` line; where policy signing is enabled (docs/07 §5), the registered-function set SHOULD be part of the signed bundle, and a change to one SHOULD get the same review as a policy change.
+
 ---
 
 ## 7. How the three layers line up
