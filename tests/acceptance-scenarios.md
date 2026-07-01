@@ -31,6 +31,21 @@ Translate each scenario into an automated test **before** implementing the featu
 - When loaded and validated against `schema/acp.schema.json`
 - Then all load and validate with no errors.
 
+**A6 — standing cannot re-enable a deny (v0.3, CS-010; RFC §13 rule 11)**
+- Given a policy with `deny: effect:[engage]` AND a `standing` rule whose `enables` grants `effect:[engage]`
+- When the gateway loads it
+- Then the linter reports an ERROR (the standing grant is unsatisfiable — deny always wins) and the policy does not load.
+
+**A7 — ambiguous bare-name allow warns (v0.3, CS-012; RFC §13 rule 12)**
+- Given a registry that declares an `effect` named `exportData` on two resources, and a policy with `allow: effect:[exportData]`
+- When the policy is linted
+- Then a WARN is reported (the grant applies on every resource that declares the name); the `{ Entity: [names] }` map form lints clean.
+
+**A8 — dualAuthorization quorum below two is rejected (v0.3, CS-014; RFC §13 rule 13)**
+- Given a policy gate `dualAuthorization: { quorum: 1, approvers: role:treasury }`
+- When the gateway loads it
+- Then the linter reports an ERROR and the policy does not load.
+
 ---
 
 ## B. Scope injection (M3)

@@ -9,8 +9,9 @@ allow:
   - record:     [TrackAnnotation]
   - effect:     [radarSweep]                   # emits
   - transition: { Track: [identify, designate] }
-deny:
-  - effect:     [engage]                       # default-denied; only 'standing' enables
+# 'engage' is deliberately absent from allow AND deny: default-deny covers the
+# off state, and the 'weapons-free' standing rule below is its only way in.
+# (An explicit deny would beat the standing grant — RFC §7.15, §13 rule 11.)
 
 standing:
   - name: weapons-free

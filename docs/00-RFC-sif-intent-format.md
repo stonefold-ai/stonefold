@@ -84,6 +84,8 @@ Examples (one operation each):
   "filters": { "orderNo": "ORD-77" } }
 ```
 
+*(Operations are shown unwrapped for brevity. On the wire every intent — even a single operation — is a batch: `{ "operations": [ … ] }`; see §5 and `schema/sif.schema.json`.)*
+
 ---
 
 ## 4. Vocabulary and enum injection

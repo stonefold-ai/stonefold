@@ -19,8 +19,11 @@ scope:
 gates:
   sendEmail:
     rate: 20/hour
+    quota: 200/day
     allowlist:    { field: data.recipientDomain, set: corporate-domains }
     contentCheck: dlp.basic
+  effect:
+    spendLimit: 25/session          # cost ceiling on all effects; stops retry storms
   Order.confirm:
     precondition: { from: [pending_confirmation] }
   '*':

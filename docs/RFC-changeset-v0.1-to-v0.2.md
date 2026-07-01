@@ -1,8 +1,8 @@
 # ACP RFC — Change Set v0.1 → v0.2
 
-**Purpose.** This is the *delta* for an implementation that already builds RFC v0.1. Apply these items to reach v0.2. The full consolidated spec is `docs/01-RFC-agent-control-policy.md` (now v0.2, with a matching changelog); this document is the actionable work order.
+**Purpose.** This is the *delta* for an implementation that already builds RFC v0.1. Apply these items to reach v0.2. The full consolidated spec is `docs/01-RFC-agent-control-policy.md` (now v0.3; its "Changelog — v0.1 → v0.2" table matches this document); this is the actionable work order. To continue past v0.2, apply `docs/RFC-changeset-v0.2-to-v0.3.md` next.
 
-**Scope of the change.** All seven items are **semantic / behavioural** clarifications. **No policy-file syntax changed** — `apiVersion: acp/v0.1` files remain valid, `schema/acp.schema.json` and all `examples/*.acp.yaml` are unchanged. You are changing *gateway behaviour and tests*, not the language.
+**Scope of the change.** All nine items are **semantic / behavioural** clarifications. **No policy-file syntax changed** — `apiVersion: acp/v0.1` files remain valid, `schema/acp.schema.json` and all `examples/*.acp.yaml` are unchanged. You are changing *gateway behaviour and tests*, not the language. (CS-008 touches the **registry** side: a `compensation` declaration and a linter rule; CS-009 adds a field to the **audit record**.)
 
 **Precedence.** Where this Change Set conflicts with any older v0.1 wording, **the Change Set wins**.
 
@@ -21,6 +21,8 @@
 | CS-005 | ADDED | 8 | Condition path null/absent at runtime ⇒ gate fails closed | C8 |
 | CS-006 | ADDED | 11 | Audit write shares the transaction with the effect settle | F2 |
 | CS-007 | ADDED | 9 | Kill propagation prompt + self-healing; store down ⇒ fail closed | E3, E5 |
+| CS-008 | ADDED | 13 | Lint: `compensable` action with no resolvable `compensation` ⇒ error | A4 |
+| CS-009 | ADDED | 11 | Audit record gains `resultRefs` (list of downstream ids of a settled effect) | F1, F2 |
 
 *Not in this spec:* interception-mode coverage (unmapped tools deny; flag free-form-string tools) is a transport/architecture concern — see `docs/03-architecture-decisions.md`, key decision 1.
 
@@ -67,6 +69,18 @@
 - **Now:** A kill MUST take effect across **all** gateway instances **promptly and reliably** — fast notification (e.g. pub/sub) **plus** a self-healing authoritative re-read (e.g. an epoch counter) so a dropped notification self-corrects. Kill store unreachable ⇒ **fail closed** for irreversible effects.
 - **Impact:** Add the pub/sub invalidation + epoch poll to the kill-state cache (design §8.2, §8.9). Add the fail-closed-on-store-down path.
 - **Test:** **E3** (global kill propagates to a second instance; self-heal after a dropped message), **E5** (kill store down ⇒ fail closed for irreversible).
+
+## CS-008 — ADDED — §13 Compensable-needs-compensation lint
+- **Was:** §5 defined `compensable` as "a declared undo exists," but nothing enforced the declaration.
+- **Now:** The linter MUST reject a `compensable` action whose registry entry declares no resolvable `compensation`; and any declared `compensation` MUST name a resource+action that exists in the registry. `irreversible` actions MAY declare a `compensation` but are not required to. (RFC §13 rule 10.)
+- **Impact:** Registry action model gains a `compensation: { resource, action }` declaration; the load-time linter gains both checks (a failing policy/registry pair must not load).
+- **Test:** **A4** (validation rejects a bad policy at load — add the compensable-without-compensation and dangling-compensation variants).
+
+## CS-009 — ADDED — §11 `resultRefs` on the audit record
+- **Was:** The audit record identified the attempt, not the downstream artefact(s) the effect produced.
+- **Now:** The audit record gains `resultRefs` — a **list** of the connector-returned identifier(s) of the executed/settled effect's result (payment id, ledger-entry id, message id, …). Plural because one action may fan out to several records; it is the lineage/correlation key an external system uses to locate, reconcile, or compensate the effect. Populated for executed/settled effects; empty otherwise. The gateway records the refs; it does **not** perform reversals.
+- **Impact:** Connector result type carries the downstream id(s); the settle transaction writes them into the audit record (with CS-006's transactional guarantee).
+- **Test:** **F1**/**F2** (extend: a settled effect's audit record carries the connector-returned `resultRefs`; a refused/held action's record has them empty).
 
 ---
 

@@ -1,13 +1,25 @@
-# Agent Control Policy (ACP) — Specification v0.2
+# Agent Control Policy (ACP) — Specification v0.3
 
 *The policy language for the SIF gateway: the declarative file that decides, deterministically, what an AI agent is permitted to do, and what is recorded when it tries.*
 
 > **Layering.** ACP is the upper layer. The lower layer — **what the agent can express** (the five action kinds and the intent shape) — is defined in the **SIF RFC** ([`00-RFC-sif-intent-format.md`](00-RFC-sif-intent-format.md)). ACP references SIF for the kinds and the operation shape; it does not redefine them. SIF = *what can be said*; ACP = *what is allowed*.
 
-**Status:** Draft v0.2 (reference specification; supersedes v0.1). **Authors:** the agent-platform team.
+**Status:** Draft v0.3 (reference specification; supersedes v0.2). **Authors:** the agent-platform team.
 **Audience:** engineers implementing or writing policies, and reviewers (security, compliance) who must read and certify them.
 
-> **Compatibility:** v0.2 changes are **semantic/behavioural clarifications only — no policy-file syntax changed.** Existing `apiVersion: acp/v0.1` policy files remain valid as-is; the JSON Schema is unchanged. If you have already implemented v0.1, apply the focused **Change Set** (`docs/RFC-changeset-v0.1-to-v0.2.md`) rather than re-reading this whole document.
+> **Compatibility:** v0.3 fixes internal contradictions found in review — **no policy-file syntax changed**; `schema/acp.schema.json` is unchanged and existing `apiVersion: acp/v0.1` policy files remain valid as-is. The one grammar change (CS-013) *widens* what parses (it legalises an expression form the spec's own examples already used). Deltas: v0.1 → v0.2 is `docs/RFC-changeset-v0.1-to-v0.2.md`; v0.2 → v0.3 is `docs/RFC-changeset-v0.2-to-v0.3.md`.
+
+## Changelog — v0.2 → v0.3
+
+| ID | Type | §  | Summary |
+|----|------|----|---------|
+| CS-010 | FIXED | §7.15, §14.3, §13 | `standing` cannot re-enable an explicit `deny` — deny always wins (§6.2). §14.3 wrongly listed `engage` under `deny` while a standing rule enabled it; corrected to rely on **default**-deny. New lint rule 11: an action in both `deny` and a `standing` rule's `enables` ⇒ **error** (the grant is unsatisfiable). |
+| CS-011 | FIXED | §7.13 | `emissionControl` example syntax corrected to `{ checks: [...] }` — the previous `{ precondition: [...] }` spelling did not validate against `schema/acp.schema.json` (the fixtures already used `checks`). Also clarified when the gate resolves `hold` vs `fail`. |
+| CS-012 | CLARIFIED | §6.1, §13 | Bare-name grant resolution defined: a bare token under a kind matches the **resource** of that name (all of that kind's actions on it) or **any declared action of that kind with that name**, on every resource that declares it. New lint rule 12: a bare action name in `allow` that resolves on more than one resource ⇒ **warn** (use the map form). A bare-name `deny` deliberately matches them all. |
+| CS-013 | CHANGED | §8 | Grammar amendment: the right side of `in` / `not in` MAY be a function (e.g. `context.time in window("08:00-18:00")`), and string literals may be single- or double-quoted — legalising the form §7.15's example already used. No other operator/function change. |
+| CS-014 | ADDED | §13 | New lint rule 13: `dualAuthorization` with an explicit `quorum` < 2 ⇒ **error** (contradicts the gate's definition, §7.9). |
+| CS-015 | DOCS | — | Editorial: section numbering repaired (file structure is §3, kinds are §4; the `standing` row now points at §7.15); §4.3 lists all five `record` built-ins; §7 names the `Resource.action` gate-key form; §7.1's window note fixed; §14.1 gains `quota`/`spendLimit` and §14.5 `window`, so the worked examples now genuinely cover the full gate catalog; §14.3 aligned with its fixture. |
+| CS-016 | CLARIFIED | §13 | Rule 1 (every referenced name exists) applies to **`deny` too** — the Registry spec's former "exception for `deny`" (doc 06 §8, undeclared names allowed in `deny`) is removed. A deny of an unknown name is a security no-op (default-deny already refuses unknowns) and almost always a typo; to pre-forbid a capability, **declare** the action in the registry and deny it. |
 
 ## Changelog — v0.1 → v0.2
 
@@ -60,7 +72,32 @@ Five principles constrain the whole format. They are the reason the language sta
 
 ---
 
-## 3. Action kinds — full enumeration
+## 3. File structure — top-level keys
+
+### 3.1 Top-level keys
+
+A policy document is YAML. Top-level keys:
+
+| Key | Required | Purpose | Section |
+|---|---|---|---|
+| `apiVersion` | SHOULD | Spec version, e.g. `acp/v0.1`. | — |
+| `agent` | **MUST** | The agent identity this policy governs. | §2 |
+| `extends` | MAY | List of fragment policies to compose/inherit. | §3.2 |
+| `defaults` | MAY | Document-wide defaults (`failureMode`, `audit`, `killable`). | §9–§11 |
+| `allow` | **MUST** | Permissions: actions the agent MAY attempt, by kind. | §6 |
+| `deny` | MAY | Explicit prohibitions; override `allow`. | §6 |
+| `scope` | MAY | Per-resource scope predicates injected below the model. | §6.3 |
+| `gates` | MAY | Deterministic conditions per action / kind / `'*'`. | §7 |
+| `standing` | MAY | Time/quantity-conditioned authorizations (ROE, PRN). | §7.15 |
+| `killable` | SHOULD | Whether the agent/its actions can be halted live. | §9 |
+| `audit` | SHOULD | Audit level: `none` \| `basic` \| `full`. | §11 |
+
+### 3.2 Composition (`extends`)
+A policy MAY list fragments in `extends`; the gateway merges them in order, then applies this document last. Merge rules: `allow`/`deny`/`gates`/`scope` are **unioned**; on conflict, **`deny` always wins** and the **more restrictive** gate value wins (lower limit, narrower allowlist). Composition MUST NOT be able to *widen* a permission a fragment denied.
+
+---
+
+## 4. Action kinds — full enumeration
 
 The five kinds are defined canonically in the **SIF RFC** ([`00-RFC-sif-intent-format.md`](00-RFC-sif-intent-format.md) §2); this section describes their **policy relevance** (which gates matter, where severity comes from). Every action belongs to **exactly one** of these five kinds. The kind is declared in the registry, not chosen by the policy or the agent. The kind shapes which gates are meaningful; it does **not**, by itself, determine severity (that comes from attributes, §5).
 
@@ -77,7 +114,7 @@ Computing a decision, score, classification, or derived claim others rely on: a 
 - **Most relevant gates:** `requireExplanation`, `requireApproval` (`mode: confirm`), `dualAuthorization`, `disclosure`.
 
 ### 4.3 `record` — change facts the system owns
-Create / update / link / delete stored data (the classic CRUD), expressed as named actions.
+Create / update / delete / link / unlink stored data (the classic CRUD; the five built-ins of SIF §2), expressed as named actions.
 - **Primary risk:** a record with **operative force** (a DNR, a target designation, a signed diagnosis) is mechanically a `record` but governs real consequences — gate it by its `operativeForce` attribute, not by the kind.
 - **Most relevant gates:** `scope`, `precondition`, `valueLimit`, `requireApproval` (when `operativeForce == high`), `rate`/`quota`.
 
@@ -115,29 +152,6 @@ Domains MAY extend the *value sets* (e.g. add classification labels) but MUST NO
 
 ---
 
-## 6. File structure — top-level keys
-
-A policy document is YAML. Top-level keys:
-
-| Key | Required | Purpose | Section |
-|---|---|---|---|
-| `apiVersion` | SHOULD | Spec version, e.g. `acp/v0.1`. | — |
-| `agent` | **MUST** | The agent identity this policy governs. | §2 |
-| `extends` | MAY | List of fragment policies to compose/inherit. | §3.2 |
-| `defaults` | MAY | Document-wide defaults (`failureMode`, `audit`, `killable`). | §10, §11, §12 |
-| `allow` | **MUST** | Permissions: actions the agent MAY attempt, by kind. | §6 |
-| `deny` | MAY | Explicit prohibitions; override `allow`. | §6 |
-| `scope` | MAY | Per-resource scope predicates injected below the model. | §6.3 |
-| `gates` | MAY | Deterministic conditions per action / kind / `'*'`. | §7 |
-| `standing` | MAY | Time/quantity-conditioned authorizations (ROE, PRN). | §7.12 |
-| `killable` | SHOULD | Whether the agent/its actions can be halted live. | §9 |
-| `audit` | SHOULD | Audit level: `none` \| `basic` \| `full`. | §11 |
-
-### 3.2 Composition (`extends`)
-A policy MAY list fragments in `extends`; the gateway merges them in order, then applies this document last. Merge rules: `allow`/`deny`/`gates`/`scope` are **unioned**; on conflict, **`deny` always wins** and the **more restrictive** gate value wins (lower limit, narrower allowlist). Composition MUST NOT be able to *widen* a permission a fragment denied.
-
----
-
 ## 6. Authorization: `allow`, `deny`, `scope`
 
 ### 6.1 Syntax
@@ -158,6 +172,8 @@ deny:
 - A bare list under `assess` / `effect` / `transition` names **declared actions** (each bound to an entity in the registry), e.g. `effect: [pay]`.
 - A `{ Entity: [names] }` map grants only the **named** actions on that entity (works for any kind), e.g. `transition: { Invoice: [markPaid] }`.
 - `'*'` as the value grants the whole kind (use sparingly; the linter warns).
+
+**Bare-name resolution (CS-012).** A bare token under a kind matches either the **resource** of that name — granting *all* of that kind's actions on it, including explicitly declared ones (`observe: [Patient]` grants both the implicit `read` and a declared `readSealed`) — or **any declared action of that kind with that name**, on whichever resource declares it. Action names SHOULD therefore be unique per kind across the registry. If a name is declared by more than one resource, a bare-name `allow` grants it **everywhere it is declared** — the linter warns (§13 rule 12); use the `{ Entity: [names] }` map form to disambiguate. A bare-name `deny` deliberately matches every same-kind action with that name: a broad deny is the safe direction.
 
 ### 6.2 Precedence and defaults
 The gateway MUST evaluate authorization as:
@@ -188,7 +204,7 @@ Scope predicates are declared/registered in the gateway (not free expressions). 
 
 ## 7. Gate catalog — full enumeration
 
-Gates attach under `gates`, keyed by a **named action**, a **kind**, or `'*'` (all actions). All gates that match an action are combined with **AND** — every one MUST pass. Each gate resolves to `pass`, `fail` (⇒ DENY), or `hold` (⇒ await approval). Any gate value MAY be made conditional with `when:` (§8).
+Gates attach under `gates`, keyed by a **named action** (bare — `sendEmail` — or resource-qualified — `Order.confirm`), a **kind**, or `'*'` (all actions). All gates that match an action are combined with **AND** — every one MUST pass. Each gate resolves to `pass`, `fail` (⇒ DENY), or `hold` (⇒ await approval). Any gate value MAY be made conditional with `when:` (§8).
 
 ```yaml
 gates:
@@ -220,7 +236,7 @@ The complete gate set (unchanged in v0.2):
 | 14 | `requireExplanation` | pass/fail | Action must carry a recorded rationale (assess). |
 
 ### 7.1 `rate`
-`N/window` where window ∈ `second|minute|hour|day` (or `Ns/Nm/Nh/Nd`). Optional `per:` to scope the count.
+`N/window` where window ∈ `second|minute|hour|day`. (Duration-*valued* fields elsewhere — `requireApproval.timeout`, `quantityCap.window` — use the `Ns/Nm/Nh/Nd` shorthand instead; the two forms are not interchangeable.) Optional `per:` to scope the count.
 ```yaml
 sendEmail:
   rate: 20/hour
@@ -332,11 +348,12 @@ readIntel:
 **Two forms (CS-002).** `disclosure` is enforced in whichever form the data allows: a **pre-check** when the result's sensitivity is known from the registry (the read is **blocked before execution**), and a **post-check** when sensitivity is row-dependent (the read executes, but a disallowed result is **withheld on return** and the decision recorded as `deny` with "result withheld"). The gateway MUST use the pre-check form whenever it can determine sensitivity without executing.
 
 ### 7.13 `emissionControl`
-For `effect` actions with `emission == emits`: require deconfliction/authorization before the emission.
+For `effect` actions with `emission == emits`: require deconfliction/authorization before the emission. Its value takes the same shape as `precondition` (`checks:` / `when:`).
 ```yaml
 radarSweep:
-  emissionControl: { precondition: [emconAuthorized, deconflicted] }
+  emissionControl: { checks: [emconAuthorized, deconflicted] }
 ```
+A failed check resolves **fail** (⇒ DENY); the gate resolves **hold** only when the required authorization is a pending human/deconfliction decision rather than a failed deterministic check.
 
 ### 7.14 `requireExplanation`
 For `assess`: the action MUST produce a recorded rationale (and SHOULD pair with `requireApproval: {mode: confirm}` when high-stakes).
@@ -350,6 +367,8 @@ combatId:
 
 ### 7.15 `standing` (top-level conditional authorizations)
 `standing` declares grants that are *off by default* and switched on by context — ROE states, shift windows, PRN orders. They are evaluated as additional `allow` + gate conditions.
+
+**Standing never overrides `deny` (CS-010).** A standing grant is a *conditional allow* and is subject to the §6.2 precedence unchanged: an explicit `deny` beats it, always. To make an action available *only* under a standing rule, leave it **out of `allow`** (default-deny covers the off state) and do **not** list it in `deny` — a policy that lists the same action in both `deny` and a `standing` rule's `enables` is unsatisfiable and MUST be rejected by the linter (§13 rule 11).
 ```yaml
 standing:
   - name: weapons-free
@@ -372,7 +391,7 @@ orExpr     := andExpr ("or" andExpr)*
 andExpr    := unary ("and" unary)*
 unary      := "not" unary | comparison | "(" condition ")"
 comparison := operand op operand
-            | operand ("in" | "not in") list
+            | operand ("in" | "not in") (list | function)
             | "exists" path
 op         := "==" | "!=" | "<" | "<=" | ">" | ">=" | "matches"
 operand    := path | literal | function
@@ -394,6 +413,8 @@ list       := "[" [ literal ("," literal)* ] "]"
 | `context.*` | `context.now`, `context.time`, `context.roeState`, `context.sessionSpend` | Ambient state. |
 
 **Functions** (the complete set): `count(scope, window)`, `now()`, `window("HH:MM-HH:MM")`, `spend(window)`. No others.
+
+String literals may be single- or double-quoted. The right side of `in` / `not in` is a list literal or a function returning a collection/range — `context.time in window("08:00-18:00")` (CS-013; this legalises the form §7.15's example already used).
 
 **Runtime resolution (CS-005).** Unknown paths are rejected at policy load (§13.9). If a referenced path is **absent or null at runtime** (e.g. `resource.foo` is missing on the resolved target), the gate whose condition referenced it **fails closed** (resolves DENY) — this is distinct from the condition evaluating to `false`. A condition error MUST NOT silently pass a gate.
 
@@ -477,7 +498,7 @@ On any dependency error, apply `failureMode` (§10).
 ---
 
 ## 13. Validation rules (what the linter MUST check)
-1. Every resource/action/scope/hook name referenced exists in the registry.
+1. Every resource/action/scope/hook name referenced exists in the registry — **including names in `deny`** (CS-016). A deny of an undeclared name adds no protection (default-deny already refuses unknowns) and is almost always a typo that would otherwise silently arm itself as a no-op. To pre-forbid a capability, declare the action in the registry and deny it (the pattern the worked registries use for `prescribe`/`discontinue`).
 2. No `allow` and `deny` that *only* a human could disambiguate — `deny` always wins, but overlapping intent SHOULD warn.
 3. Every `transition` action referenced has declared `from` states.
 4. Actions with `reversibility == irreversible` and no `requireApproval`/`dualAuthorization`/`precondition` ⇒ **warn**.
@@ -486,7 +507,10 @@ On any dependency error, apply `failureMode` (§10).
 7. `assess` actions with `explainability: required` but no `requireExplanation` gate ⇒ **error**.
 8. Reads of `resultSensitivity > internal` with no `disclosure` gate ⇒ **warn**.
 9. Condition expressions parse against the grammar (§8) and reference only known namespaces/functions.
-10. A `compensable` action whose registry entry declares **no** `compensation` ⇒ **error** (the kind's definition, §5, is "a declared undo exists"); and any declared `compensation` that does **not** name a resource+action present in the registry ⇒ **error**. `irreversible` actions MAY declare a `compensation` but are not required to.
+10. A `compensable` action whose registry entry declares **no** `compensation` ⇒ **error** (the attribute value's definition, §5, is "a declared undo exists"); and any declared `compensation` that does **not** name a resource+action present in the registry ⇒ **error**. `irreversible` actions MAY declare a `compensation` but are not required to.
+11. An action listed in both `deny` and a `standing` rule's `enables` ⇒ **error** — deny always wins (§6.2), so the standing grant is unsatisfiable (§7.15, CS-010).
+12. A bare action name in `allow` that resolves to actions on more than one resource ⇒ **warn** — the grant applies everywhere the name is declared; use the `{ Entity: [names] }` map form to disambiguate (§6.1, CS-012).
+13. `dualAuthorization` with an explicit `quorum` < 2 ⇒ **error** (contradicts the gate's definition, §7.9).
 
 ---
 
@@ -495,7 +519,7 @@ On any dependency error, apply `failureMode` (§10).
 Each example exercises several kinds and gates. Together they cover all five kinds and the full gate catalog.
 
 ### 14.1 Customer support assistant (data / business)
-*All reads scoped to the user's own customers; may email within corporate domains under a rate limit and DLP; may never refund or export; anything **high-impact** needs a supervisor (approval keys on stakes — `operativeForce` — not reversibility; see §5 note).*
+*All reads scoped to the user's own customers; may email within corporate domains under rate, daily-quota, and DLP limits, with a session spend ceiling on all effects; may never refund or export; anything **high-impact** needs a supervisor (approval keys on stakes — `operativeForce` — not reversibility; see §5 note).*
 ```yaml
 apiVersion: acp/v0.1
 agent: support-assistant
@@ -518,8 +542,11 @@ scope:
 gates:
   sendEmail:
     rate: 20/hour
+    quota: 200/day
     allowlist:    { field: data.recipientDomain, set: corporate-domains }
     contentCheck: dlp.basic
+  effect:
+    spendLimit: 25/session          # cost ceiling on all effects; stops retry storms
   Order.confirm:
     precondition: { from: [pending_confirmation] }
   '*':
@@ -573,7 +600,7 @@ gates:
 ```
 
 ### 14.3 Air/maritime track operator (defence — observe vs emitting effect, assess, transition, gated kinetic effect)
-*Passive reads are clearance-scoped with disclosure control; an active radar sweep is an emitting `effect` needing deconfliction; combat-ID is an explained, dual-confirmed assessment; engagement is enabled only under a standing ROE state and requires positive ID, a collateral ceiling, and dual authorization — and is denied otherwise.*
+*Passive reads are clearance-scoped with disclosure control; an active radar sweep is an emitting `effect` needing deconfliction; combat-ID is an explained, dual-confirmed assessment; engagement is enabled only under a standing ROE state and requires positive ID, a collateral ceiling, and dual authorization — outside that state it falls to default-deny (deliberately **not** an explicit `deny`, which would beat the standing grant; §7.15, §13 rule 11).*
 ```yaml
 apiVersion: acp/v0.1
 agent: track-operator-assistant
@@ -586,8 +613,9 @@ allow:
   - record:     [TrackAnnotation]
   - effect:     [radarSweep]                     # emits
   - transition: { Track: [identify, designate] }
-deny:
-  - effect:     [engage]                         # default-denied; only 'standing' enables
+# 'engage' is deliberately absent from allow AND deny: default-deny covers the
+# off state, and the 'weapons-free' standing rule below is its only way in.
+# (An explicit deny would beat the standing grant — §7.15, §13 rule 11.)
 
 standing:
   - name: weapons-free
@@ -602,7 +630,7 @@ gates:
   observe:
     disclosure: { maxClassification: actor.clearance }
   radarSweep:                                   # emitting effect
-    emissionControl: { precondition: [emconAuthorized, deconflicted] }
+    emissionControl: { checks: [emconAuthorized, deconflicted] }
   combatId:                                     # assess
     requireExplanation: true
     requireApproval: { mode: confirm, approvers: role:tactical-officer }
@@ -612,7 +640,6 @@ gates:
     precondition:       [positiveIdentification]
     valueLimit:         { field: data.collateralEstimate, max: 1 }   # CDE threshold
     dualAuthorization:  { approvers: role:weapons-release-authority }
-    window:             { hours: "always" }
 ```
 
 ### 14.4 Payments operations agent (finance — tiered effects, dual-auth, sanctions, transition)
@@ -654,7 +681,7 @@ gates:
 ```
 
 ### 14.5 Legal matter assistant (data / business — ties to the repo demo)
-*Reads scoped to the client; time entries and tasks are routine records; the `Engage` transition is legal only from `conflict_check` (the exact behaviour the repo already demonstrates); e-filing is allow-listed to approved courts; email is DLP-checked.*
+*Reads scoped to the client; time entries and tasks are routine records; the `Engage` transition is legal only from `conflict_check` (the exact behaviour the repo already demonstrates); e-filing is allow-listed to approved courts, partner-approved, and confined to court hours; email is DLP-checked.*
 ```yaml
 apiVersion: acp/v0.1
 agent: legal-matter-assistant
@@ -679,6 +706,7 @@ gates:
   eFile:
     allowlist:    { field: data.court, set: approved-court-systems }
     requireApproval: { approvers: role:supervising-partner }
+    window:       { days: [Mon,Tue,Wed,Thu,Fri], hours: "08:00-17:00", tz: "America/New_York" }
   sendEmail:
     contentCheck: dlp.basic
     rate: 30/hour
@@ -716,4 +744,4 @@ gates:
 **Decisions:** `allow` · `hold` · `deny` · `halt`
 **Top-level keys:** `apiVersion` · `agent` · `extends` · `defaults` · `allow` · `deny` · `scope` · `gates` · `standing` · `killable` · `audit`
 **Precedence:** default deny → deny wins → most-specific allow → all matching gates AND → kill-switch → execute → record.
-**Frozen in v0.2:** the five kinds, the five attribute names, the fourteen gate types, and the condition operators/functions (unchanged from v0.1 — v0.2 adds no syntax). Growth is by adding resources, actions, scope predicates, named sets, and hooks — never new language constructs.
+**Frozen:** the five kinds, the five attribute names, the fourteen gate types, and the condition operators/functions (unchanged since v0.1; v0.3's only grammar change, CS-013, widens the right side of `in` to accept a function — no new operator or function). Growth is by adding resources, actions, scope predicates, named sets, and hooks — never new language constructs.

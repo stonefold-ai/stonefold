@@ -2,8 +2,15 @@
 # design §2). Every resource/action/scope-predicate/hook/check/set/sink that any
 # example policy references is declared here, so the linter's §13.1 existence
 # check passes. Governance attributes (RFC §5) are listed only when they differ
-# from the safe defaults: reversibility=reversible, emission=none,
-# operativeForce=none, resultSensitivity=internal, explainability=none.
+# from the benign defaults (docs/06 §4: danger is declared, never assumed):
+# reversibility=reversible, emission=none, operativeForce=none,
+# resultSensitivity=internal, explainability=none.
+#
+# NOTE (dialect): this file is the gateway loader's COMPACT dialect
+# (resources/sets/contentHooks, attributes inline). The registry/v1.x AUTHORING
+# format is schema/registry.schema.json + docs/06 (domain/entities/namedSets),
+# as used by examples/*.registry.yaml. Same vocabulary, two spellings;
+# unification is deferred — docs/03 → "Registry dialects".
 #
 # A transition action MUST declare its legal `from` states (RFC §4.5, §13.3).
 
@@ -115,7 +122,7 @@ resources:
     connector: in_memory
     actions:
       # irreversible effect with a declared compensation (auto-staged on a failed
-      # dispatch, RFC §8.5 / design §9).
+      # dispatch, design §8.5 / §9).
       prescribe:
         kind: effect
         reversibility: irreversible

@@ -14,7 +14,7 @@ ever (CLAUDE.md). The grammar (RFC §8 EBNF)::
     andExpr    := unary ("and" unary)*
     unary      := "not" unary | comparison | "(" condition ")"
     comparison := operand op operand
-                | operand ("in" | "not in") list
+                | operand ("in" | "not in") (list | function)
                 | "exists" path
     op         := "==" | "!=" | "<" | "<=" | ">" | ">=" | "matches"
     operand    := path | literal | function
@@ -278,9 +278,8 @@ class _Parser:
         )
 
     def _rhs_collection(self) -> Union[Literal, Operand]:
-        # RFC grammar says `in` takes a list; examples also use `in window(...)`.
-        # ACP-AMBIGUITY (RFC §8 vs §14.3): we accept a list literal OR an
-        # operand (e.g. a function) on the right of `in`.
+        # RFC §8 (v0.3, CS-013): the right side of `in` is a list literal OR a
+        # function returning a collection/range (e.g. `in window("08:00-18:00")`).
         if self._peek().type == "lbrack":
             return self._list()
         return self._operand()

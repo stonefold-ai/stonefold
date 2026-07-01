@@ -21,6 +21,7 @@ gates:
   eFile:
     allowlist:    { field: data.court, set: approved-court-systems }
     requireApproval: { approvers: role:supervising-partner }
+    window:       { days: [Mon,Tue,Wed,Thu,Fri], hours: "08:00-17:00", tz: "America/New_York" }
   sendEmail:
     contentCheck: dlp.basic
     rate: 30/hour

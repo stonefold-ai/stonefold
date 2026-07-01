@@ -111,4 +111,4 @@ Resolve (what is it? — registry) → Authorize (allowed? — ACP `allow`/`deny
 
 ## One-line map of the docs
 
-`00` SIF (what the agent says) · `01` ACP (what's allowed) · `02` implementation (how it runs) · `03` architecture (the stack) · `04` domains (it's not just databases) · `05` demo (the runnable money demo) · `06` registry (how to declare a domain) · `07` artifacts & schemas (how the pieces relate) · `08` this glossary.
+`00` SIF (what the agent says) · `01` ACP (what's allowed) · `02` implementation (how it runs) · `03` architecture (the stack) · `04` domains (it's not just databases) · `05` demo (the runnable money demo) · `06` registry (how to declare a domain) · `07` artifacts & schemas (how the pieces relate) · `08` this glossary · `09` mental models (the confusions, head-on) · `10` positioning (why not OPA/Cedar/IAM alone).

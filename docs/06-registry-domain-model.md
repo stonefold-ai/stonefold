@@ -2,7 +2,9 @@
 
 *The registry is where a domain is **declared**: its entities, their properties, the actions you can take on them (each with a **kind** and governance **attributes**), lifecycle states, value sets, and the connectors/predicates the gateway uses. SIF draws the agent's vocabulary from it; ACP reads attributes from it; the gateway validates every intent against it.*
 
-**Status:** Draft v1.0. **Foundational layer** — read alongside the SIF RFC ([`00`](00-RFC-sif-intent-format.md)); ACP ([`01`](01-RFC-agent-control-policy.md)) and the policies reference the names declared here.
+**Status:** Draft v1.1. **Foundational layer** — read alongside the SIF RFC ([`00`](00-RFC-sif-intent-format.md)); ACP ([`01`](01-RFC-agent-control-policy.md)) and the policies reference the names declared here.
+
+> **Changelog v1.0 → v1.1** (spec-review fixes, alongside ACP v0.3): attribute **defaults corrected** — undeclared attributes default to the *benign* end (`reversibility: reversible`), not the dangerous end as v1.0 stated (§4); `compensation` added to the action shape and to `schema/registry.schema.json` (§4); **action-name uniqueness** guidance and its lint consequence added (§8); scope-predicate **argument forms** defined (§5); the `derived` expression boundary made explicit (§4); the v1.0 "**exception for `deny`**" (undeclared names allowed in `deny`) **removed** — ACP §13.1 applies to `deny` too (ACP CS-016; the linter already enforced this).
 
 ### Conventions
 Keywords per RFC 2119. The registry is YAML. Every name a policy or SIF intent references (entity, action, transition, field, value set, scope predicate, hook, named set, connector) **MUST** be declared here, or the policy fails to load (ACP §13.1).
@@ -94,7 +96,9 @@ Rules:
 - `kind` is one of `observe / assess / record / effect / transition` (SIF §2).
 - **`observe` and `record` are implicit per entity** — declaring an entity makes it readable/writable; you only declare explicit `observe`/`record` actions to name a special query or restrict them. A policy grants them by **listing the entity** (`observe: [Payment]`).
 - **`assess`, `effect`, `transition` MUST be explicitly declared** as named actions; a policy grants them by **action name** (`effect: [pay]`) or via the map form (`transition: { Invoice: [markPaid] }`).
-- **`attributes`** are the five governance attributes (ACP §5). Any not declared default to the safe end (`reversibility: irreversible`, `operativeForce: none`, `emission: none`, `explainability: none`).
+- **`attributes`** are the five governance attributes (ACP §5). Any not declared default to the **benign** end: `reversibility: reversible`, `emission: none`, `operativeForce: none`, `resultSensitivity: internal`, `explainability: none`. **Danger is declared, never assumed:** an action that is in fact irreversible, emitting, or operative MUST declare it — it is the ACP linter (unguarded-irreversible §13.4, open-on-irreversible §13.5, compensable-needs-compensation §13.10), not a pessimistic default, that guards the dangerous end, and the linter can only see what is declared. (A worst-case default would drown every registry in irreversible-warnings and train authors to ignore them.)
+- An action MAY declare **`compensation: { resource, action }`** — the in-system undo the gateway can route to (auto-staged on a failed irreversible dispatch, design §9). **Required** when `reversibility: compensable` (ACP §13 rule 10); the named resource+action must exist in this registry.
+- **The `{ derived: … }` form is implementation-defined in this draft.** A derived attribute/property expression MUST be a pure, deterministic projection of the record/action context (no I/O, no side effects); it is **not** the ACP §8 condition grammar (note the ternary in the examples). A frozen derivation grammar is deferred — see `docs/03`.
 - `resultSensitivity` is often **per-record**, not per-action; declare a default on the action/entity and/or a derivation (e.g. `resultSensitivity: { derived: record.confidentialFlag }`) so the `disclosure` gate's pre-check/post-check (ACP §7.12) can resolve it.
 - An action MAY declare **intrinsic `preconditions`** (named checks that must pass for *anyone*, always) and **`postActions`** (named handlers that run after it succeeds). These differ from ACP policy gates — see §6.
 
@@ -159,6 +163,7 @@ The five kinds of named function the registry can declare. Each: what it is · w
 - *Receives → returns:* the actor (identity + claims) → a **filter** (for reads/writes) or an **authorization decision** (for effects).
 - *When:* the scope-injection step, before execution — injected below the model so the agent can't widen it. For effects, a pre-resolution check on the target.
 - *Example:* `tenantOf(actor)` → SQL filter `tenant_id = :actorTenant`; `inWard(actor.ward)` → `ward_id = 'Ward-3B'`. Referenced by `scope: { Account: tenantOf(actor) }`.
+- *Argument form:* predicates are declared and resolved by **bare name**; the parenthesised argument a policy writes (`tenantOf(actor)`, `inWard(actor.ward)`) selects the actor claim the predicate reads and MUST be `actor` or a dotted `actor.<claim>` path — never a free expression. The gateway supplies the actor itself; the argument is validated against the predicate's declared signature at load.
 
 **Precondition check** — declared in `preconditionChecks`; referenced by an action's `preconditions` or an ACP `precondition` gate.
 - *What:* a deterministic yes/no test that must hold before an action runs.
@@ -201,8 +206,10 @@ One name, three concerns: *defined* in the registry, *expressed* via SIF, *gover
 ---
 
 ## 8. Validation
-A registry MUST pass `schema/registry.schema.json` (structure) plus these checks: every `type`/`entity` reference resolves; every `transition` has `from`/`to` within the entity's declared states; every `connector`/`scopePredicate`/`preconditionCheck`/`hook`/`sink`/`namedSet` referenced by an action or by a companion policy is declared; action `kind`s are valid; attribute values are in their allowed sets (SIF §2 / ACP §5).
+A registry MUST pass `schema/registry.schema.json` (structure) plus these checks: every `type`/`entity` reference resolves; every `transition` has `from`/`to` within the entity's declared states; every `connector`/`scopePredicate`/`preconditionCheck`/`hook`/`sink`/`namedSet` referenced by an action or by a companion policy is declared; every declared `compensation` names a resource+action that exists (ACP §13 rule 10); action `kind`s are valid; attribute values are in their allowed sets (SIF §2 / ACP §5).
 
-**Exception for `deny`.** A policy's `deny` rule MAY reference an action that the registry does not declare. Forbidding a capability that does not (yet) exist is safe and encouraged as defence-in-depth — so the "referenced names must exist" check (ACP §13.1) applies to `allow`, `scope`, and `gates`, **not** to `deny`. (This is why, e.g., a policy may `deny: transition: { Medication: [prescribe] }` even if no such transition is declared.)
+**Action-name uniqueness.** Action names SHOULD be unique per kind across the registry. A name declared by more than one resource (e.g. an `effect` called `exportData` on two entities) makes a policy's bare-name grant apply everywhere the name is declared — which is what a bare-name `deny` wants, but makes a bare-name `allow` ambiguous (ACP §6.1 / lint rule 12); policies over such a registry should use the `{ Entity: [names] }` map form.
+
+**`deny` names must exist too (ACP §13.1, CS-016).** v1.0 carved out an exception letting `deny` reference undeclared actions ("forbid it before it exists"). It is removed: a deny of an unknown name adds no protection — default-deny already refuses anything undeclared — and is almost always a typo that would silently become a no-op. **You deny things that exist**: to pre-forbid a capability, declare the action in the registry and deny it in the policy (the pattern the worked registries use — `Prescribing.prescribe`/`discontinue` exist precisely so the ward-nurse policy can deny them). Adding a dangerous action to the registry then surfaces every policy that must be reviewed, instead of silently activating alongside a stale deny.
 
 Worked registries: [`../examples/payments.registry.yaml`](../examples/payments.registry.yaml) (the demo domain) and [`../examples/ward-nurse.registry.yaml`](../examples/ward-nurse.registry.yaml). Each pairs with the policy of the same name.

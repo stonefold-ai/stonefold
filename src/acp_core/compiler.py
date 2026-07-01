@@ -115,10 +115,11 @@ class CompiledPolicy:
 
         NOTE on ``standing`` (RFC §7.15): standing grants are conditional allows
         evaluated against context (M2). They are NOT applied here, so an action
-        in both ``deny`` and ``standing.enables`` (e.g. ``engage`` in the
-        track-operator example) stays denied — consistent with "deny always
-        wins" (RFC §6.2). ACP-AMBIGUITY: the example's narrative implies standing
-        re-enables a documentary deny, but the safer reading (deny-wins) governs.
+        in both ``deny`` and ``standing.enables`` stays denied — deny always
+        wins (RFC §6.2). RFC v0.3 (CS-010) made this explicit: a standing-only
+        action is left out of both ``allow`` and ``deny`` (default-deny covers
+        the off state), and the linter rejects the deny∩standing combination
+        as unsatisfiable (§13 rule 11).
         """
         if self._deny.match(a.kind, a.resource, a.action) is not None:
             return AuthzResult(allowed=False, rule="deny-rule")

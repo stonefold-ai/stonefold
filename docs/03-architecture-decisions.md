@@ -83,5 +83,10 @@ acp/
 - Audit write shares the transaction with the state change for executed/settled effects.
 - Kill propagation: pub/sub **and** epoch polling.
 
+## Registry dialects & derived attributes — deferred
+
+- **Two registry dialects exist today.** `schema/registry.schema.json` + `docs/06` define the **authoring format** (`domain`/`entities`/`namedSets`/`hooks`, attributes under `attributes:`) used by `examples/*.registry.yaml`; `registry/acp-registry.yaml` is the gateway loader's **compact internal dialect** (`resources`/`sets`/`contentHooks`, attributes inline) that the code and tests consume. Both declare the same vocabulary. Unifying them (teach the loader the v1.x authoring format, or generate the compact form from it) is **deferred**; until then the authoring format is the documented one and the compact file carries a header note.
+- **`derived` expression grammar is deferred.** Derived attributes/properties (`operativeForce: { derived: "isHighAlert ? 'high' : 'low'" }`) are implementation-defined: pure, deterministic, no I/O (docs/06 §4). Freezing a small derivation grammar (like the §8 condition grammar) is deferred.
+
 ## Out of scope for this concept
 Full domain-modeling/ontology authoring UX; `assess` explainability tooling beyond the `requireExplanation` gate; multi-agent orchestration / durable workflows; full RBAC/ABAC engine; SaaS multi-tenancy, billing, SSO; auto-generation of policy from a schema; production HA/throughput hardening.

@@ -1,4 +1,4 @@
-"""The semantic linter (RFC §13) — all nine validation checks.
+"""The semantic linter (RFC §13) — the rule-1..13 validation checks (v0.3).
 
 A policy that produces any ERROR-severity finding MUST NOT load: the gateway
 refuses to start rather than fall back to a permissive default (design §4 review
@@ -150,6 +150,9 @@ def lint(policy: Policy, registry: InMemoryRegistry) -> LintReport:
     _check_reads_disclosure(policy, registry, report)
     _check_conditions(policy, report)
     _check_compensable_has_compensation(policy, registry, report)
+    _check_standing_deny_conflict(policy, report)
+    _check_ambiguous_bare_allow(policy, registry, report)
+    _check_dual_auth_quorum(policy, report)
     return report
 
 
@@ -435,6 +438,102 @@ def _check_reads_disclosure(
                 f"observe {rname}.{aname} returns {adef.resultSensitivity!r} "
                 f"but has no disclosure gate",
             )
+
+
+def _check_standing_deny_conflict(policy: Policy, report: LintReport) -> None:
+    """§13.11 (v0.3, CS-010) — an action in both ``deny`` and a ``standing``
+    rule's ``enables`` is unsatisfiable (deny always wins, §6.2) ⇒ ERROR."""
+    deny_star: set[Kind] = set()
+    deny_tokens: dict[Kind, set[str]] = {}
+    deny_named: dict[Kind, set[tuple[str, str]]] = {}
+    for pmap in policy.deny:
+        for kind, target in pmap.items():
+            if target == "*":
+                deny_star.add(kind)
+            elif isinstance(target, list):
+                deny_tokens.setdefault(kind, set()).update(target)
+            elif isinstance(target, dict):
+                named = deny_named.setdefault(kind, set())
+                for rname, names in target.items():
+                    named.update((rname, aname) for aname in names)
+
+    def conflict(std_name: str, kind: Kind, what: str) -> None:
+        report.add(
+            "13.11",
+            Severity.ERROR,
+            f"standing[{std_name}] enables {kind.value} {what}, which deny "
+            f"covers — deny always wins (§6.2), so the grant is unsatisfiable",
+        )
+
+    for std in policy.standing:
+        for kind, target in std.enables.items():
+            tokens = deny_tokens.get(kind, set())
+            named = deny_named.get(kind, set())
+            if kind in deny_star:
+                conflict(std.name, kind, "(kind denied by '*')")
+                continue
+            if target == "*":  # enables the whole kind
+                if tokens or named:
+                    conflict(std.name, kind, "'*'")
+            elif isinstance(target, list):
+                for token in target:
+                    if token in tokens or any(a == token for _, a in named):
+                        conflict(std.name, kind, repr(token))
+            elif isinstance(target, dict):
+                for rname, names in target.items():
+                    for aname in names:
+                        if (
+                            (rname, aname) in named
+                            or aname in tokens
+                            or rname in tokens
+                        ):
+                            conflict(std.name, kind, f"{rname}.{aname}")
+
+
+def _check_ambiguous_bare_allow(
+    policy: Policy, registry: InMemoryRegistry, report: LintReport
+) -> None:
+    """§13.12 (v0.3, CS-012) — a bare action name in ``allow`` declared by more
+    than one resource applies everywhere it is declared ⇒ WARN (use the
+    ``{Entity: [names]}`` map form to disambiguate)."""
+    resources = registry.file.resources
+    for pmap in policy.allow:
+        for kind, target in pmap.items():
+            if not isinstance(target, list):
+                continue
+            for token in target:
+                if token in resources:
+                    continue  # a resource grant, not an action name
+                declaring = sorted(
+                    rname
+                    for rname, rdef in resources.items()
+                    if (cand := rdef.actions.get(token)) is not None
+                    and cand.kind == kind
+                )
+                if len(declaring) > 1:
+                    report.add(
+                        "13.12",
+                        Severity.WARN,
+                        f"{kind.value} {token!r} is declared by multiple resources "
+                        f"({', '.join(declaring)}); the bare-name allow grants all "
+                        f"of them — use the map form to disambiguate (§6.1)",
+                    )
+
+
+def _check_dual_auth_quorum(policy: Policy, report: LintReport) -> None:
+    """§13.13 (v0.3, CS-014) — ``dualAuthorization`` with an explicit
+    ``quorum`` < 2 contradicts the gate's definition (§7.9) ⇒ ERROR."""
+    for key, gateset in policy.gates.items():
+        cfg = gateset.get("dualAuthorization")
+        if isinstance(cfg, dict):
+            quorum = cfg.get("quorum")
+            if isinstance(quorum, int) and quorum < 2:
+                report.add(
+                    "13.13",
+                    Severity.ERROR,
+                    f"gates[{key}].dualAuthorization has quorum {quorum} — two "
+                    f"distinct identities are the gate's definition (§7.9)",
+                )
 
 
 def _check_conditions(policy: Policy, report: LintReport) -> None:

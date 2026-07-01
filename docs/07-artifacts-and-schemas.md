@@ -67,7 +67,7 @@ Dependency order to remember: **Registry → SIF (generated) → ACP (references
 
 **(a) Author / build time**
 - Write the **registry**; validate against `registry.schema.json`.
-- Write the **policy**; validate against `acp.schema.json`, then **lint against the registry** (every referenced name exists — except `deny`, which may forbid undeclared things).
+- Write the **policy**; validate against `acp.schema.json`, then **lint against the registry** (every referenced name exists, `deny` included — you deny things that exist; ACP §13.1).
 - Optionally **sign** the policy (+ registry bundle) so the gateway will only run approved versions.
 
 **(b) Startup / load**

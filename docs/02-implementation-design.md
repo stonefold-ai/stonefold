@@ -22,7 +22,7 @@ There are two integration modes (RFC §3). They differ entirely in *how the acti
 The agent is given exactly **one** tool, `submit_intent`, whose schema is generated from the registry (enum-injected resource/action names). The agent can emit nothing else. The gateway *is* the executor of that tool.
 
 ```
-LLM --tool_call: submit_intent({op, resource, action, data})--> Gateway --> connector
+LLM --tool_call: submit_intent({kind, entity, action, data})--> Gateway --> connector
                                                           (returns tool_result)
 ```
 Coverage is **structural**: there is no other tool, so there is no other path. This is the strong tier.

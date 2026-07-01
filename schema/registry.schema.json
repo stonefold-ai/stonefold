@@ -76,6 +76,16 @@
         },
         "data": { "type": "object", "additionalProperties": { "$ref": "#/$defs/property" } },
         "resolve": { "type": "object", "additionalProperties": { "type": "object", "required": ["entity"], "additionalProperties": true, "properties": { "entity": { "type": "string" } } } },
+        "compensation": {
+          "description": "Declared in-system undo action (ACP RFC section 13 rule 10 / CS-008). Required when reversibility is 'compensable'; the linter checks the target exists.",
+          "type": "object",
+          "required": ["resource", "action"],
+          "additionalProperties": false,
+          "properties": {
+            "resource": { "type": "string" },
+            "action": { "type": "string" }
+          }
+        },
         "connector": { "type": "string" },
         "preconditions": { "type": "array", "items": { "type": "string" } },
         "postActions": { "type": "array", "items": { "type": "string" } },
