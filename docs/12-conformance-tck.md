@@ -41,7 +41,7 @@ Certified profiles: core, lint, scope, staging, kill, audit
 
 A profile is **certified** only when every one of its checks passed. A check skipped for a missing capability leaves the profile *incomplete* — a skip is never a pass, so a certification claim is always exactly as strong as what actually ran.
 
-**The conformance claim format:** *"`<implementation>` certifies ACP TCK profiles `<list>` at RFC v0.3, kit version `<git ref>`."* Publish the rendered report alongside.
+**The conformance claim format:** *"`<implementation>` certifies ACP TCK profiles `<list>` at RFC `<version>`, kit version `<git ref>`."* Publish the rendered report alongside.
 
 ---
 
@@ -110,4 +110,4 @@ Rules: the harness is **test builds only**; every endpoint returns 200 with a JS
 
 ## 7. Versioning
 
-The kit certifies against the RFC version pinned in this repo (v0.3 today). When the RFC moves (e.g. the proposed v0.4, CS-017/018), new checks arrive under a new profile (`freshness`) — existing certifications stay meaningful because they name their profiles and kit version.
+The kit certifies against the RFC version pinned in this repo (v0.4 today; the current six profiles cover the v0.3 core semantics, which v0.4 leaves unchanged). When the RFC moves, new checks arrive under a new profile — a `freshness` profile for v0.4's CS-017/018 is the next planned addition — and existing certifications stay meaningful because they name their profiles and kit version.

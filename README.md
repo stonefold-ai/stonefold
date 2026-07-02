@@ -128,7 +128,7 @@ The full version of this argument — the PDP/PEP category error, the four-verdi
 - **[Registry & domain model](docs/06-registry-domain-model.md)** — how to declare your resources/actions, and the generator that drafts a registry from SQL DDL, OpenAPI, or an MCP tool list.
 - **[Positioning vs OPA / Cedar / IAM / AgentCore](docs/10-positioning-policy-engines.md)** — why a decision engine alone can't govern an agent, and how they compose.
 - **[Conformance TCK](docs/12-conformance-tck.md)** — certify a gateway in any language against the RFC: one small driver adapter (Python protocol or 14 JSON endpoints), one report, named profiles.
-- **Changelogs:** [v0.1 → v0.2](docs/RFC-changeset-v0.1-to-v0.2.md) · [v0.2 → v0.3](docs/RFC-changeset-v0.2-to-v0.3.md) · [v0.3 → v0.4 (proposed; CS-017 implemented)](docs/RFC-changeset-v0.3-to-v0.4.md).
+- **Changelogs:** [v0.1 → v0.2](docs/RFC-changeset-v0.1-to-v0.2.md) · [v0.2 → v0.3](docs/RFC-changeset-v0.2-to-v0.3.md) · [v0.3 → v0.4](docs/RFC-changeset-v0.3-to-v0.4.md) (decision freshness + scope no-race, both implemented).
 
 ## License
 

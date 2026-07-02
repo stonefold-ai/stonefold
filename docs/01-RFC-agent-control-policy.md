@@ -1,13 +1,20 @@
-# Agent Control Policy (ACP) — Specification v0.3
+# Agent Control Policy (ACP) — Specification v0.4
 
 *The policy language for the SIF gateway: the declarative file that decides, deterministically, what an AI agent is permitted to do, and what is recorded when it tries.*
 
 > **Layering.** ACP is the upper layer. The lower layer — **what the agent can express** (the five action kinds and the intent shape) — is defined in the **SIF RFC** ([`00-RFC-sif-intent-format.md`](00-RFC-sif-intent-format.md)). ACP references SIF for the kinds and the operation shape; it does not redefine them. SIF = *what can be said*; ACP = *what is allowed*.
 
-**Status:** Draft v0.3 (reference specification; supersedes v0.2). **Authors:** the agent-platform team.
+**Status:** Draft v0.4 (reference specification; supersedes v0.3). **Authors:** the agent-platform team.
 **Audience:** engineers implementing or writing policies, and reviewers (security, compliance) who must read and certify them.
 
-> **Compatibility:** v0.3 fixes internal contradictions found in review — **no policy-file syntax changed**; `schema/acp.schema.json` is unchanged and existing `apiVersion: acp/v0.1` policy files remain valid as-is. The one grammar change (CS-013) *widens* what parses (it legalises an expression form the spec's own examples already used). Deltas: v0.1 → v0.2 is `docs/RFC-changeset-v0.1-to-v0.2.md`; v0.2 → v0.3 is `docs/RFC-changeset-v0.2-to-v0.3.md`.
+> **Compatibility:** v0.4 promotes the two deferred timing guarantees (decision freshness, scope no-race) from *documented boundary* to *specified behaviour* — **no policy-file syntax changed**; `schema/acp.schema.json` is unchanged and existing `apiVersion: acp/v0.1` policy files remain valid as-is. CS-017 adds gateway behaviour + deployment configuration; CS-018 adds a declared connector capability (connector metadata, additive). Deltas: v0.1 → v0.2 is `docs/RFC-changeset-v0.1-to-v0.2.md`; v0.2 → v0.3 is `docs/RFC-changeset-v0.2-to-v0.3.md`; v0.3 → v0.4 is `docs/RFC-changeset-v0.3-to-v0.4.md`.
+
+## Changelog — v0.3 → v0.4
+
+| ID | Type | §  | Summary |
+|----|------|----|---------|
+| CS-017 | ADDED | §12, §4.4 | **Decision freshness.** Every staged effect carries a finite decision **TTL** stamped at staging from gateway configuration (never policy syntax; short for `irreversible` effects); a row claimed past it settles `CANCELLED`/`stale-decision`, and a late approval does not resurrect it. Inside the dispatch claim — after the §9 kill re-check, before the connector call — the gateway re-validates the **volatile** gates (`allowlist`/`denylist`, `window`, `precondition`, `emissionControl`); a failure settles `CANCELLED`/`stale-guard:<gate>`, audited, never a partial dispatch. Non-volatile gates (counters, `valueLimit`/`contentCheck`, approvals) are **not** re-run. |
+| CS-018 | ADDED | §6.3 | **Scope no-race.** Connectors declare a scope-reassertion capability, `transactional` \| `window`. A transactional connector re-asserts the scope predicate **inside the effect's own transaction** (zero rows affected ⇒ `FAILED`/`scope-lost`, audited — the write lands on authorized state or not at all). A window connector's target is re-resolved under scope immediately before dispatch, and its declared residual window is surfaced in the audit record. |
 
 ## Changelog — v0.2 → v0.3
 
@@ -123,6 +130,7 @@ Send, dispatch, actuate, pay, drive, transmit — anything reaching beyond the s
 - **Primary risk:** irreversibility and blast radius. This is the kind the product exists to govern.
 - **Most relevant gates:** all of them; especially `valueLimit`, `spendLimit`, `allowlist`, `precondition`, `contentCheck`, `requireApproval`, `dualAuthorization`, `window`, `quantityCap`, `emissionControl`.
 - **Durability rule (CS-003):** because an `effect` cannot be transactionally rolled back, effects are **staged by default**. The gateway **MUST** record the intent and commit it (atomically with any `record` ops in the same batch), return an *accepted/pending* result, then dispatch asynchronously and represent the outcome as a `transition` (`pending → done / failed`) with a declared compensation where one exists. Inline (synchronous) execution is an explicit opt-in permitted **only** for cancellable effects. Staging is also the substrate for approvals (§7.8) and the kill-switch (§9).
+- **Freshness rule (CS-017):** staging opens a decide→dispatch gap, so every staged action carries an **expiry (`expires_at`)** stamped at staging from gateway configuration — a decision TTL bounding how stale its decision may get before dispatch (§12). The default MUST be finite; for `irreversible` effects it SHOULD be short (minutes–hours, not days).
 
 ### 4.5 `transition` — advance a resource through its declared lifecycle
 Move a thing from one declared state to another (`draft → signed`, `conflict_check → active`, `identified → designated`).
@@ -198,7 +206,12 @@ Scope predicates are declared/registered in the gateway (not free expressions). 
 
 **Reads vs effects (CS-001).** For `observe`/`record`/`transition` that read or write owned data, the predicate is realised as a **filter** (e.g. an injected `WHERE` clause) applied by the connector below the gateway. For an `effect` — where there is nothing to "filter" — the same predicate is enforced as a **pre-resolution authorization check**: the gateway resolves the effect's target first, and if the target is not in the actor's scoped set the action is **DENIED before dispatch**. Either way the agent never supplies or sees its own scope.
 
-**TOCTOU note (scope-on-effect is a pre-check, not yet a no-race guarantee).** In this version the scope-on-effect check is a **decision-time pre-check**: the target is read and authorized, then the effect is committed in a **separate** operation, and the predicate is **not** re-asserted on the write. So if the authorizing state changes in the check→commit window (an account reassigned to another tenant) the effect can land on un-authorized state — a TOCTOU race, **widened by staging** (§4.4) when the effect is held/queued. The principled fix is a **scope no-race**, analogous to the kill no-race (§9): re-assert the scope predicate **inside the effect's transaction** (`… WHERE target.tenant = :actor_tenant`) so the write commits against authorized state or not at all. It is connector-dependent (clean for a transactional SQL connector; sometimes impossible for an HTTP/email connector, which must declare the residual window). This guarantee is **deferred** (see `docs/03`). Separately, **pure read staleness is out of scope**: the gateway guarantees scope/disclosure correctness *at read time*, not that the data stays current — and because every effect is re-authorized independently, a stale read cannot itself cause an unauthorized effect.
+**Scope no-race (CS-018).** The scope-on-effect check runs at decision time, and staging (§4.4) widens the check→commit window — so the authorizing state can change in between (an account reassigned to another tenant) and the effect would land on un-authorized state: a TOCTOU race. v0.4 closes it where it can be closed and prices it where it can't, keyed on a capability **each connector declares once** (connector metadata, additive — never policy syntax):
+
+- **`transactional`** (SQL-class): the gateway MUST re-assert the scope predicate **inside the effect's own transaction** — mechanically, the predicate's constraint is ANDed into the effect's write (`UPDATE … WHERE id = :target AND tenant_id = :actor_tenant`). Zero rows affected ⇒ the effect settles `FAILED` with reason `scope-lost` (audited); the write commits against authorized state **or not at all**. This is the same shape as the kill no-race (§9): the check and the commit share one transaction.
+- **`window`** (HTTP, email, device): the predicate cannot ride into the upstream's transaction, so the decision-time pre-check remains the guarantee. The gateway SHOULD re-resolve the target under scope **immediately before dispatch** (shrinking the window to connector latency; a vanished target settles `FAILED`/`scope-lost` with nothing sent), and the connector's **declared** residual window MUST be surfaced in the audit record — the residual risk is priced, not hidden.
+
+This is not dispatch-time re-authorization: `allow`/`deny` and the scope *decision* are not re-derived; only the already-decided predicate is re-asserted against current state. Separately, **pure read staleness is out of scope**: the gateway guarantees scope/disclosure correctness *at read time*, not that the data stays current — and because every effect is re-authorized independently, a stale read cannot itself cause an unauthorized effect.
 
 ---
 
@@ -464,7 +477,7 @@ Levels: `none` | `basic` (decisions only) | `full` (decisions + parameters + gat
 | `agent`, `actor` | Governing agent and the principal it acted for. |
 | `kind`, `resource`, `action` | The attempted action. |
 | `parameters` | Typed parameters supplied (subject to redaction policy). |
-| `scopeApplied` | Scope predicate(s) injected. |
+| `scopeApplied` | Scope predicate(s) injected. For a settled effect, also **which scope-reassertion form ran** (CS-018): `transactional`, or `window` with the connector's declared residual window. |
 | `gates` | Each gate evaluated and its result (pass/fail/hold). |
 | `decision` | `allow` \| `hold` \| `deny` \| `halt`, with the deciding rule/gate. |
 | `approval` | Approver(s), quorum, outcome, timing — if applicable. |
@@ -493,7 +506,12 @@ For each attempted action the gateway MUST proceed strictly in this order, stopp
 
 On any dependency error, apply `failureMode` (§10).
 
-**Decision-time validity.** This evaluation runs at **decision time**. For a staged effect (§4.4), the only check re-run at **dispatch** is the kill switch (§9); gates are **not** re-evaluated — so a staged `allow` remains valid *as of when it was decided*, and a fact that changes between decision and dispatch (a payee added to a denylist, a drained balance) is caught only by a kill. Bounding that staleness (a decision TTL, or dispatch-time re-validation of volatile gates) is **out of scope for this version** — see `docs/03`.
+**Decision freshness (CS-017).** This evaluation runs at **decision time**; for a staged effect (§4.4) the gateway MUST bound how stale that decision can get before dispatch, two ways:
+
+1. **Decision TTL.** Every staged action carries an expiry, set at staging from gateway configuration (deployment config, **not** policy syntax — the language stays frozen). The default MUST be finite; for `irreversible` effects it SHOULD be short (minutes–hours, not days). A row claimed at or after its TTL settles `CANCELLED` with reason `stale-decision` (audited; the agent's ticket resolves to a recoverable refusal). An approval that arrives after expiry does not resurrect the row — the intent must be re-submitted and re-decided.
+2. **Volatile-gate re-validation at dispatch.** Inside the dispatch claim — after the §9 kill re-check, before the connector call (order: **kill → TTL → volatile gates → connector**) — the gateway re-evaluates the action's **volatile** gates: `allowlist`/`denylist` (set membership changes), `window` (time has passed), `precondition`/`emissionControl` (world state changes), including registry-intrinsic preconditions. It MUST do so for `irreversible` effects and SHOULD for all staged effects. A dispatch-time failure settles `CANCELLED` with reason `stale-guard:<gate>` (audited), never a partial dispatch.
+
+**Non-volatile gates are NOT re-run**, by definition: `valueLimit` and `contentCheck` judge the staged payload, which is frozen; the counters (`rate`/`quota`/`quantityCap`/`spendLimit`) were consumed at decision time — re-running them double-counts; and a `requireApproval`/`dualAuthorization` grant *is* the release — its freshness is bounded by the TTL (rule 1), not by re-asking. This is **not dispatch-time re-authorization**: `allow`/`deny` and scope *decisions* are not re-derived, approvals are not re-requested; the TTL bounds how stale any decision may get, and re-validation covers only the gate classes whose facts move independently of the agent. The kill switch remains the authoritative dispatch check (§9); CS-017's checks run inside the same claimed transaction, after it.
 
 ---
 

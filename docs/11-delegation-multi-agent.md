@@ -48,6 +48,6 @@ The key observation: **ACP already has this operation.** `extends` composition (
 2. Do child-declared **standing** rules survive the meet, or is context-conditional authority a root-only construct?
 3. May a child policy *add* gates and denies freely (surely yes — restriction is always safe) while adding `allow` lines is meaningless under the meet — and should the linter say so?
 4. What does `spawnAgent`'s **reversibility** mean — is "kill the subtree" its declared compensation?
-5. How does a **decision TTL** (CS-017, proposed) interact with long-lived delegated sessions?
+5. How does a **decision TTL** (CS-017, v0.4) interact with long-lived delegated sessions?
 
 *See also:* RFC §3.2 (`extends` — the merge this reuses), §9 (kill scopes), §11 (`correlationId`); [`10-positioning-policy-engines.md`](10-positioning-policy-engines.md) (why the machinery, not the decision language, is the product).
