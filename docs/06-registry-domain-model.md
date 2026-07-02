@@ -28,6 +28,7 @@ domain: payments
 connectors:        { … }   # named effect bindings / data sources
 scopePredicates:   [ … ]   # names the gateway implements (e.g. tenantOf)
 preconditionChecks:[ … ]   # named deterministic checks (e.g. payeeCoolingOffElapsed)
+handlers:          [ … ]   # named post-action / effect handlers (e.g. recordLedgerEntry)
 hooks:             [ … ]   # named content hooks (e.g. dlp.basic)
 sinks:             [ … ]   # named disclosure sinks (e.g. careTeam)
 namedSets:         { … }   # allow/deny lists (e.g. sanctioned-list)
@@ -35,7 +36,7 @@ valueSets:         { … }   # reusable enums
 entities:          { … }   # the domain itself
 ```
 
-`connectors`, `scopePredicates`, `preconditionChecks`, `hooks`, `sinks` are **declarations of names the integrator implements in code** — listing them here lets the linter verify policies and tells implementers exactly what to build (the `[REGISTER]` items from `examples/README.md`).
+`connectors`, `scopePredicates`, `preconditionChecks`, `handlers`, `hooks`, `sinks` are **declarations of names the integrator implements in code** — listing them here lets the linter verify policies and tells implementers exactly what to build (the `[REGISTER]` items from `examples/README.md`).
 
 ---
 
@@ -99,7 +100,7 @@ Rules:
 - **`attributes`** are the five governance attributes (ACP §5). Any not declared default to the **benign** end: `reversibility: reversible`, `emission: none`, `operativeForce: none`, `resultSensitivity: internal`, `explainability: none`. **Danger is declared, never assumed:** an action that is in fact irreversible, emitting, or operative MUST declare it — it is the ACP linter (unguarded-irreversible §13.4, open-on-irreversible §13.5, compensable-needs-compensation §13.10), not a pessimistic default, that guards the dangerous end, and the linter can only see what is declared. (A worst-case default would drown every registry in irreversible-warnings and train authors to ignore them.)
 - An action MAY declare **`compensation: { resource, action }`** — the in-system undo the gateway can route to (auto-staged on a failed irreversible dispatch, design §9). **Required** when `reversibility: compensable` (ACP §13 rule 10); the named resource+action must exist in this registry.
 - **The `{ derived: … }` form is implementation-defined in this draft.** A derived attribute/property expression MUST be a pure, deterministic projection of the record/action context (no I/O, no side effects); it is **not** the ACP §8 condition grammar (note the ternary in the examples). A frozen derivation grammar is deferred — see `docs/03`.
-- `resultSensitivity` is often **per-record**, not per-action; declare a default on the action/entity and/or a derivation (e.g. `resultSensitivity: { derived: record.confidentialFlag }`) so the `disclosure` gate's pre-check/post-check (ACP §7.12) can resolve it.
+- `resultSensitivity` is often **per-record**, not per-action; declare a default on the action/entity and/or a derivation (e.g. `resultSensitivity: { derived: record.confidentialFlag }`) so the `disclosure` gate's pre-check/post-check (ACP §7.12) can resolve it. A domain that substitutes its **own classification labels** MUST declare them as an **ordered** value set (order is list position, lowest first) — `disclosure.maxClassification` compares by that declared order, and a value missing from the order fails closed (ACP §7.12, CS-024). The built-in order is `public < internal < confidential < restricted`.
 - An action MAY declare **intrinsic `preconditions`** (named checks that must pass for *anyone*, always) and **`postActions`** (named handlers that run after it succeeds). These differ from ACP policy gates — see §6.
 
 ---
@@ -122,6 +123,8 @@ namedSets:
 ```
 
 These names are exactly what a policy or an action references (`scope: { Payment: tenantOf(actor) }`, `denylist: { set: sanctioned-list }`, `precondition: [payeeCoolingOffElapsed]`, `postActions: [recordLedgerEntry]`). The registry declares them so they can be validated and so implementers have a checklist. Each is a function the integrator implements (see §6).
+
+**Scope-reassertion capability (CS-018).** Besides its registry declaration, each connector declares its scope-reassertion capability — `transactional` or `window` (ACP §6.3) — **in gateway code, alongside the connector implementation**, the same way scope-predicate bindings are registered. It is deliberately *not* a registry-YAML field: the capability is a property of the connector's code and is reviewed with that code. An implementation that declares nothing is treated as `window:undeclared` — fail-safe, and labelled honestly in the audit record.
 
 **Digest pinning (`digest`, optional).** A connector MAY pin the artifact that implements it by content digest (`sha256:…` over the connector's code artifact, as built/deployed). When a digest is declared, the gateway MUST verify the loaded implementation against it **at policy load and at dispatch**; a mismatch is a dependency failure under the policy's `failureMode` rules (ACP §10) — fail closed by default, with an audit record. The point: the registry already declares *what* a connector does; the digest declares *which code* is trusted to do it, so silently replacing a connector's implementation stops being invisible — changing connector code requires a registry change, which is a reviewed, versioned artifact. Production deployments handling irreversible effects SHOULD pin their effect connectors. How the digest is computed and artifacts are signed is deployment tooling, not registry semantics — the registry only carries the declaration. (Trust boundary discussion: docs/13.)
 

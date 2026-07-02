@@ -85,6 +85,8 @@ Dependency order to remember: **Registry → SIF (generated) → ACP (references
 
 Steps 1–2 are "is this *valid* SIF for this domain?" (registry + SIF). Steps 3–5 are "is it *allowed*?" (ACP). That clean split — **valid vs. allowed** — is exactly why the schemas are separate.
 
+**Policy signing (status: seam, deferred — this paragraph is its single home).** Where signing is enabled, the gateway verifies a signature over the **bundle** — the policy, the registry, and the registered-function set (docs/06 §6.3) — at load; a verification failure means the policy does not load (fail closed, like any load-time validation failure). Key management, signature format, and the approval workflow are deployment tooling, deliberately unspecified in this draft. Until a mechanism is specified, "signed" elsewhere in these docs means "went through your organisation's review-and-approve process, pinned in version control."
+
 ---
 
 ## 6. Summary

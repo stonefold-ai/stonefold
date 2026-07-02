@@ -18,7 +18,7 @@ report = run_conformance(MyDriver(), implementation="my-gateway 0.1")
 print(report.render())
 ```
 
-**If your gateway is Java / Go / Rust / anything else:** expose the **TCK harness API** (§6) in a *test build* of your gateway — fifteen small JSON endpoints — start it, and run:
+**If your gateway is Java / Go / Rust / anything else:** expose the **TCK harness API** (§6) in a *test build* of your gateway — fourteen small JSON endpoints — start it, and run:
 
 ```python
 from acp_tck import run_conformance
@@ -109,7 +109,7 @@ A certification claim therefore reads "certifies TCK profiles X, Y, Z" — never
 
 ## 6. The wire binding (multi-language)
 
-The harness API is the driver contract as fifteen JSON endpoints — the full table with request/response shapes is in `acp_tck/http_driver.py`'s module docstring, and `acp_tck/adapters/http_harness.py` is the golden FastAPI example serving the reference. A non-Python gateway implements the same endpoints in its test build; `HttpDriver` does the rest. The whole suite runs through this path in CI (`test_wire_binding_certifies_end_to_end`), so the wire protocol itself is conformance-tested.
+The harness API is the driver contract as fourteen JSON endpoints — the full table with request/response shapes is in `acp_tck/http_driver.py`'s module docstring, and `acp_tck/adapters/http_harness.py` is the golden FastAPI example serving the reference. A non-Python gateway implements the same endpoints in its test build; `HttpDriver` does the rest. The whole suite runs through this path in CI (`test_wire_binding_certifies_end_to_end`), so the wire protocol itself is conformance-tested.
 
 Rules: the harness is **test builds only**; every endpoint returns 200 with a JSON body; timestamps are ISO-8601; a capability you don't advertise may leave its endpoint unimplemented.
 

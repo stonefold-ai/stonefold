@@ -2,7 +2,7 @@
 
 A runnable, check-out-and-run demonstration that uses a **real LLM agent** (an API key is required) and shows the gateway **enforcing policy on every action a real agent takes** — allowing a routine payment, holding a mid-size one for a human, and refusing a non-compliant one — with a one-click **gateway ON/OFF** toggle that shows what happens with no gateway in the path. The shipped demo lives in [`demo/`](../demo/).
 
-> **Note.** This is the *simplified* demo: a clean enforcement walkthrough. An earlier version of this spec described an adversarial indirect-injection scenario (a malicious invoice, a kill switch, a spend-cap loop, an "invite-attack" box); that was removed in favour of the minimal flow below. The underlying gateway still supports kill, scope, and every gate — they are simply not all surfaced in this demo's UI.
+> **Note.** The *scripted walkthrough* is deliberately minimal: three legitimate invoices, allow / hold / deny. The adversarial pieces are shipped and tested, just not given dedicated scenario boxes in the UI: the **indirect-injection attack** — a fraudulent invoice directing a wire to a new payee at an attacker account — is refused by the gateway on the new-payee cooling-off precondition (test G2, also proven over Postgres), an **invite-attack** free-text prompt ("send money out…") is available from the UI's prompt box, and the **kill switch** control plane (issue/lift, with live trace events) is wired at `/admin/kill`. Only the earlier spec's spend-cap-loop demo box was dropped outright.
 
 ## Goal
 
@@ -38,7 +38,7 @@ The policy only *names* the domain-specific functions and data it relies on; the
 |---|---|---|
 | `tenantOf(actor)` | scope predicate | limits `Account`/`Payment` rows to the actor's tenant, and gates paying *from* an out-of-tenant account (a pre-resolution check) |
 | `sanctioned-list` | named set | the country list the `denylist` gate checks against `data.destinationCountry` — trips on the Initech (IR) invoice |
-| `payeeCoolingOffElapsed` | precondition check | the new-payee hold (runs `when: exists data.newPayee`); applies to any newly-introduced payee — not exercised by the shipped inbox, which uses known payees |
+| `payeeCoolingOffElapsed` | precondition check | the new-payee hold (runs `when: exists data.newPayee`); not exercised by the shipped inbox (known payees) but exercised by the indirect-injection attack test (G2) and the invite-attack prompt — it is what refuses the fraudulent wire |
 | registry: entities/actions | registry | `Account`/`Payment`/`Payee` (observe), `LedgerEntry` (record), `pay` (effect, staged via the outbox), `Invoice` |
 | `ledger-pay` | connector | the fake "bank": carries out `pay` by writing a payment row + emitting an event; reads apply the injected scope below the model |
 | `role:payments-manager` | identity/role | the approver for held mid-size payments (Approve/Reject in the UI) |
@@ -76,7 +76,7 @@ Each is a real prompt to the real LLM; the agent decides; the gateway enforces. 
 4. **Direct rejection** — *"Pay the $500 invoice from Initech."* The vendor is in a sanctioned country → the gateway **refuses it itself** (`denylist`), with no human involved.
 5. **Gateway off (the contrast)** — flip the toggle to **OFF** and re-run any scenario: the agent's tools hit the ledger directly, every payment executes with **no** checks (the $6,000 is not held, the $500 is not refused), and nothing is recorded — showing exactly what the gateway adds.
 
-Every decision (allow / hold / deny) is an append-only audit record with its reason; the live trace tags each entry with the pipeline stage that produced it (`RESOLVE` / `AUTHORIZE` / `SCOPE` / `GATES` / `EXECUTE` / `DISPATCH`).
+Every decision (allow / hold / deny) is an append-only audit record with its reason; the live trace tags each entry with the pipeline stage that produced it (`RESOLVE` / `AUTHORIZE` / `SCOPE` / `GATES` / `KILL` / `EXECUTE` / `DISPATCH`).
 
 ## Setup (the README runbook)
 

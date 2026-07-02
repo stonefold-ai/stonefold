@@ -198,18 +198,28 @@ chain. (RFC §9, §11; [`03`](03-architecture-decisions.md) → "Multi-effect & 
 
 ## 8. Advanced edges (skip on a first read)
 
-Two timing subtleties, here only so they don't surprise you later. Both are
-**known, deferred** boundaries, documented honestly rather than over-built:
+Two timing subtleties, here only so they don't surprise you later. Both were
+documented-but-open boundaries through v0.3 and are **specified and built since v0.4**
+(CS-017 / CS-018):
 
 - **Decision freshness.** A verdict is computed at *decision time*; a staged effect
-  dispatches later. Gates are **not** re-evaluated at dispatch — only the kill switch
-  is. So a fact that changes between approval and dispatch (a payee newly sanctioned)
-  is caught only by a kill. (RFC §12.)
-- **Scope no-race (TOCTOU).** `scope-on-effect` is a decision-time pre-check, not
-  re-asserted atomically at the write — so a change to the authorizing state in the
-  check→commit window is a known race. (RFC §6.3.)
+  dispatches later. v0.4 bounds that gap two ways: every staged effect carries a
+  decision **TTL** (an expired row settles `CANCELLED`/`stale-decision` — a late
+  approval cannot resurrect it), and the dispatch claim re-validates the **volatile**
+  gates (allow/denylists, windows, preconditions) — a payee sanctioned between
+  approval and dispatch settles `stale-guard:denylist` with nothing sent. Counters
+  and approval grants are deliberately *not* re-run (that would double-count / re-ask).
+  (RFC §12, §4.4.)
+- **Scope no-race (TOCTOU).** `scope-on-effect` is decided before staging, and the
+  target could change hands before the commit. v0.4 closes it where it can be closed:
+  a **transactional** (SQL-class) connector re-asserts the scope predicate *inside the
+  effect's own transaction* — the write lands on authorized state or not at all
+  (`scope-lost`); a connector that can't carry the predicate (HTTP, email, device)
+  re-resolves the target just before dispatch and its declared residual window is
+  written into the audit record — the leftover risk is priced, not hidden. (RFC §6.3.)
 
-See [`03`](03-architecture-decisions.md) → "Decision freshness" / "Scope no-race".
+See [`03`](03-architecture-decisions.md) → "Decision freshness" / "Scope no-race"
+(both marked BUILT), and `docs/02` §9.1–9.2 for the wiring.
 
 ---
 

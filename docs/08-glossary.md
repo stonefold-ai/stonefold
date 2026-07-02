@@ -98,7 +98,7 @@ The adapter that fulfils an action against a real substrate; the agent never see
 - **Approval / dual-authorization** — an action HOLDs as a staged row; a human (or two) releases it. *(`02` §7.)*
 - **Named sets** — reusable allow/deny lists referenced by gates. *Ex:* `sanctioned-list`, `corporate-domains`.
 - **Value sets** — reusable enums for properties. *Ex:* `currentState: [draft, sent, paid]`.
-- **Policy signing** — the gateway only runs policies signed off by an authority, so a tampered or self-modified rulebook can't take effect. *(See the governance discussion.)*
+- **Policy signing** — the gateway only runs policies signed off by an authority, so a tampered or self-modified rulebook can't take effect. *(Status and semantics: `07` §5 — the single home for signing.)*
 - **Agent Policy Officer** — the accountable person who reviews, tests, and signs off a policy before it runs.
 
 ---

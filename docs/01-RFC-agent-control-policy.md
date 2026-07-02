@@ -14,8 +14,12 @@
 | ID | Type | §  | Summary |
 |----|------|----|---------|
 | CS-019 | ADDED | §1 | **Trust boundary stated.** The gateway proves *intents conform to policy*; it does not prove the executing code does what it declares. Connectors, hooks, and the gateway are the trusted computing base; their integrity is a supply-chain property. Text only; non-normative discussion in docs/13. |
-| CS-020 | ADDED | registry §5; §10 | **Connector digest pinning.** A connector declaration MAY pin its implementing artifact by `sha256` digest; when declared, the gateway MUST verify at policy load and at dispatch — mismatch is a dependency failure under §10 (fail closed, audited). Additive; existing registries unaffected. Reference implementation pending. |
-| CS-021 | ADDED | arch. decision 11 | **Identity-provider seam.** The session's authenticated `actor:`/`agent:` identities come from an `IdentityProvider` protocol ahead of the pipeline; built-in default is the existing session/transport auth (no behavioural change). No credential scheme integrated or endorsed. Invariant 3 binds every provider. Reference implementation pending. |
+| CS-020 | ADDED | registry §5; §10 | **Connector digest pinning.** A connector declaration MAY pin its implementing artifact by `sha256` digest; when declared, the gateway MUST verify at policy load and at dispatch — mismatch is a dependency failure under §10 (fail closed, audited). Additive; existing registries unaffected. Reference implementation shipped (`acp_core.digest`). |
+| CS-021 | ADDED | arch. decision 11 | **Identity-provider seam.** The session's authenticated `actor:`/`agent:` identities come from an `IdentityProvider` protocol ahead of the pipeline; built-in default is the existing session/transport auth (no behavioural change). No credential scheme integrated or endorsed. Invariant 3 binds every provider. Reference implementation shipped (`acp_gateway.identity`). |
+| CS-022 | FIXED | §9 | **Kill wording reconciled with the two axes.** The operator hard-kill is unconditional — a policy cannot opt out; `killable` is a *manner-of-stopping* declaration that guards automated halts and informs, but never blocks, the operator. Replaces §9's opening and retires its UNDER-REVIEW note. Text only; the graceful-halt wiring stays deferred (docs/03). |
+| CS-023 | ADDED | §12; SIF §5 | **Batch decision semantics.** A SIF batch is decided atomically: every operation is decided first (each with its own audit record); any DENY/HALT refuses the whole batch before anything commits or stages; a HOLD stages per §4.4 and does not refuse the batch (committed `record` ops are not rolled back by a later reject/expiry). Reference implementation pending (the reference accepts single-operation intents today). |
+| CS-024 | CLARIFIED | §7.12; registry §4 | **Classification ordering.** `disclosure.maxClassification` compares by the classification set's **declared order**; the built-in `resultSensitivity` values are ordered `public < internal < confidential < restricted`; a domain substituting its own labels MUST declare them as an ordered value set in the registry. A value missing from the declared order fails closed (§8). |
+| CS-025 | DOCS | §6.2, §6.3, §7, §13 | Editorial/clarification batch: §6.2 rule 4 reworded (gates bind by their §7 keys; all matching gates AND — allow-match specificity does not select gates); CS-018's capability home named (gateway-code connector metadata, not registry YAML); `spendLimit` unit defined as gateway configuration; approver `role:` names resolve at the identity seam (§13 rule 1 exemption); `window` absolute `from`/`to` form documented; gate-table row 13 corrected to pass/fail/hold; catalog approval examples re-keyed on stakes per the §5 note; CS-020/021 changelog status corrected to shipped. |
 
 ## Changelog — v0.3 → v0.4
 
@@ -106,7 +110,7 @@ A policy document is YAML. Top-level keys:
 | `scope` | MAY | Per-resource scope predicates injected below the model. | §6.3 |
 | `gates` | MAY | Deterministic conditions per action / kind / `'*'`. | §7 |
 | `standing` | MAY | Time/quantity-conditioned authorizations (ROE, PRN). | §7.15 |
-| `killable` | SHOULD | Whether the agent/its actions can be halted live. | §9 |
+| `killable` | SHOULD | Manner-of-stopping declaration for automated halts (the operator hard-kill is unconditional). | §9 |
 | `audit` | SHOULD | Audit level: `none` \| `basic` \| `full`. | §11 |
 
 ### 3.2 Composition (`extends`)
@@ -199,7 +203,7 @@ The gateway MUST evaluate authorization as:
 1. **Default `deny`.** No match ⇒ refused.
 2. If any `deny` rule matches the action ⇒ **DENY** (deny always wins).
 3. Else if any `allow` rule matches ⇒ proceed to scope and gates.
-4. Among competing `allow` matches, the **most specific** (named action > resource > `'*'`) governs which gates apply.
+4. Multiple matching `allow` rules do not compete: any match admits the action, and the gates that then apply are selected by the **`gates` keys alone** (§7) — every gate whose key matches the action (named action, kind, or `'*'`) applies, combined with AND, regardless of which `allow` rule admitted it (CS-025).
 
 ### 6.3 `scope`
 `scope` maps a resource to a **named scope predicate** resolved by the gateway from the actor's identity and **injected after the model**. The agent cannot read or set it.
@@ -216,7 +220,7 @@ Scope predicates are declared/registered in the gateway (not free expressions). 
 
 **Reads vs effects (CS-001).** For `observe`/`record`/`transition` that read or write owned data, the predicate is realised as a **filter** (e.g. an injected `WHERE` clause) applied by the connector below the gateway. For an `effect` — where there is nothing to "filter" — the same predicate is enforced as a **pre-resolution authorization check**: the gateway resolves the effect's target first, and if the target is not in the actor's scoped set the action is **DENIED before dispatch**. Either way the agent never supplies or sees its own scope.
 
-**Scope no-race (CS-018).** The scope-on-effect check runs at decision time, and staging (§4.4) widens the check→commit window — so the authorizing state can change in between (an account reassigned to another tenant) and the effect would land on un-authorized state: a TOCTOU race. v0.4 closes it where it can be closed and prices it where it can't, keyed on a capability **each connector declares once** (connector metadata, additive — never policy syntax):
+**Scope no-race (CS-018).** The scope-on-effect check runs at decision time, and staging (§4.4) widens the check→commit window — so the authorizing state can change in between (an account reassigned to another tenant) and the effect would land on un-authorized state: a TOCTOU race. v0.4 closes it where it can be closed and prices it where it can't, keyed on a capability **each connector declares once** (connector metadata declared in gateway code alongside the connector implementation, like the scope-predicate bindings — not a registry-YAML field, never policy syntax; docs/06 §5):
 
 - **`transactional`** (SQL-class): the gateway MUST re-assert the scope predicate **inside the effect's own transaction** — mechanically, the predicate's constraint is ANDed into the effect's write (`UPDATE … WHERE id = :target AND tenant_id = :actor_tenant`). Zero rows affected ⇒ the effect settles `FAILED` with reason `scope-lost` (audited); the write commits against authorized state **or not at all**. This is the same shape as the kill no-race (§9): the check and the commit share one transaction.
 - **`window`** (HTTP, email, device): the predicate cannot ride into the upstream's transaction, so the decision-time pre-check remains the guarantee. The gateway SHOULD re-resolve the target under scope **immediately before dispatch** (shrinking the window to connector latency; a vanished target settles `FAILED`/`scope-lost` with nothing sent), and the connector's **declared** residual window MUST be surfaced in the audit record — the residual risk is priced, not hidden.
@@ -236,7 +240,7 @@ gates:
   effect:              # by kind (applies to all effects)
     spendLimit: 50/session
   '*':                 # global
-    requireApproval: { when: "action.reversibility == irreversible" }
+    requireApproval: { when: "action.operativeForce == high" }   # key on stakes, not reversibility (§5 note)
 ```
 
 The complete gate set (unchanged in v0.2):
@@ -255,7 +259,7 @@ The complete gate set (unchanged in v0.2):
 | 10 | `window` | pass/fail | Temporal allow (hours, date range). |
 | 11 | `quantityCap` | pass/fail | Per-subject cumulative cap (e.g. per patient). |
 | 12 | `disclosure` | pass/fail | Result classification ↔ allowed recipients/sinks (reads). |
-| 13 | `emissionControl` | pass/hold | Deconfliction/authorization for emitting effects. |
+| 13 | `emissionControl` | pass/fail/hold | Deconfliction/authorization for emitting effects. |
 | 14 | `requireExplanation` | pass/fail | Action must carry a recorded rationale (assess). |
 
 ### 7.1 `rate`
@@ -290,6 +294,7 @@ Cost ceiling for the agent's run; stops retry storms.
 effect:
   spendLimit: 25/session        # $ or token-cost units, gateway-configured
 ```
+The **unit** (currency or token-cost) and each action's cost assignment are **gateway configuration** (deployment config, like the decision TTLs of §12 — never policy syntax). A policy's number is denominated in the deployment's configured unit, so the figure is not portable across deployments, and a conformance claim does not compare it across gateways (CS-025).
 
 ### 7.5 `allowlist` / `denylist`
 Membership on a field. Lists MAY reference named sets (`allowlist:corporate-domains`).
@@ -327,13 +332,14 @@ Holds the action for a human. Fields: `when` (condition; default always), `appro
 ```yaml
 '*':
   requireApproval:
-    when: "action.reversibility == irreversible"
+    when: "action.operativeForce == high"    # key on stakes, not reversibility (§5 note)
     approvers: role:supervisor
     timeout: 30m
     onTimeout: deny
 refund:
   requireApproval: { approvers: role:finance-manager }
 ```
+`approvers` names (`role:…`) resolve against the **identity layer** — the session/`IdentityProvider` seam (architecture decision 11) — not the registry. They are the one referenced namespace §13 rule 1 does not lint: the registry declares the world the agent acts on; who may approve is an organisational fact the deployment owns (CS-025).
 
 ### 7.9 `dualAuthorization`
 Two **distinct** identities must approve (the actor cannot self-approve). Fields: `approvers`, `quorum: 2` implied, `distinctFrom: actor`.
@@ -345,10 +351,12 @@ wireTransfer:
 ```
 
 ### 7.10 `window`
-Temporal allow. A match outside the window ⇒ fail.
+Temporal allow. A match outside the window ⇒ fail. Two forms, combinable: **recurring** (`days` / `hours` / `tz`) and **absolute** (`from` / `to` dates — the catalog row's "date range"; CS-025).
 ```yaml
 deploy:
   window: { days: [Mon,Tue,Wed,Thu], hours: "09:00-16:00", tz: "Europe/Bratislava" }
+migrationWrite:
+  window: { from: "2026-07-01", to: "2026-07-31" }      # absolute date range
 ```
 
 ### 7.11 `quantityCap`
@@ -369,6 +377,8 @@ readIntel:
   disclosure: { maxClassification: actor.clearance }
 ```
 **Two forms (CS-002).** `disclosure` is enforced in whichever form the data allows: a **pre-check** when the result's sensitivity is known from the registry (the read is **blocked before execution**), and a **post-check** when sensitivity is row-dependent (the read executes, but a disallowed result is **withheld on return** and the decision recorded as `deny` with "result withheld"). The gateway MUST use the pre-check form whenever it can determine sensitivity without executing.
+
+**Classification ordering (CS-024).** `maxClassification` compares by the classification set's **declared order**: the built-in `resultSensitivity` values are ordered `public < internal < confidential < restricted`. A domain substituting its own labels (§5) MUST declare them as an **ordered** value set in the registry (docs/06 §4 — order is list position, lowest first). A classification value missing from the declared order makes the gate **fail closed** (the §8 runtime-resolution rule).
 
 ### 7.13 `emissionControl`
 For `effect` actions with `emission == emits`: require deconfliction/authorization before the emission. Its value takes the same shape as `precondition` (`checks:` / `when:`).
@@ -444,10 +454,12 @@ String literals may be single- or double-quoted. The right side of `in` / `not i
 ---
 
 ## 9. Kill-switch (`killable`)
-`killable: true` (default SHOULD be true for non-trivial agents) lets an operator issue a `halt` that:
+Two independent axes (CS-022). **The operator hard-kill is unconditional:** a human operator can always issue a `halt` for a scope — a policy cannot opt out, and `killable` never gates it (otherwise a compromised agent could declare itself un-killable; an operator can pull the process/credentials/network regardless, so an opt-out would be a false guarantee). A `halt`:
 - stops in-flight actions for an **action class**, a **session**, or the **agent**;
 - causes subsequent matched attempts to resolve `halt` (not `deny`) — a distinct, audited terminal state;
 - is itself an audited operator action (who halted, when, scope) and is reversible (the order can be lifted).
+
+**`killable`** (default SHOULD be true for non-trivial agents) is a separate, action-level declaration of the *manner of stopping under normal/automated operation*: `killable: false` means "a generic mid-flight freeze is unsafe for this action — stop it via its declared safe-stop/compensation." It guards **automated** halts and *informs* the operator hard-kill (a warning/confirmation when a hard-kill scope covers non-killable actions) — it never blocks it. `killable` is also distinct from `reversibility`: `killable` = *may a generic live-halt stop this at all?*; `reversibility` = *how much a kill can claw back once in motion* (the "scope of the guarantee" below). Granularity and the graceful-halt mechanism are design work in progress — see `docs/03` → "Kill is two axes".
 
 **No-race guarantee (CS-004).** A `halt` MUST take effect before the connector dispatch of any pending `effect`. The gateway MUST evaluate the kill at three points — entry (whole-agent/session short-circuit), per-action (pipeline step 5), and **at dispatch**, where the kill re-check and the staged action's `pending → dispatching` transition MUST occur in **one serialised transaction** (e.g. a row-locked update) so there is no window in which an action has both passed the kill check and remains un-dispatched. Each staged action carries an **idempotency key** so a cancelled action can never later dispatch.
 
@@ -457,11 +469,7 @@ String literals may be single- or double-quoted. The right side of `in` / `not i
 
 *Mechanism detail (state stores, the locked-transition transaction, in-flight cancellation) is in the implementation design §8.*
 
-> **Clarification — two axes; `killable` is not an operator veto (UNDER REVIEW).** The wording above (*"`killable: true` … lets an operator issue a `halt`"*) reads as if `killable` gates the operator. It does not. There are **two independent axes**:
-> 1. **Operator emergency hard-kill** — a human operator can **always** halt a scope (fleet/gateway/agent/session/action-class) immediately and resume after investigation. This is a hard safety/security backstop: it is **unconditional and independent of `killable`**, and a policy **cannot opt out** (otherwise a compromised agent could declare itself un-killable — and an operator can pull the process/credentials/network regardless, so an opt-out is a false guarantee).
-> 2. **`killable`** — an action-level declaration of *the manner of stopping under normal/automated operation* (a generic live-freeze vs a declared safe-stop/compensation). It **informs but never blocks** the operator hard-kill (it drives a warning/confirmation when a hard-kill scope covers non-killable actions, and it guards *automated* halts).
->
-> `killable` is also distinct from `reversibility`: `killable` = *may a generic live-halt stop this at all?*; `reversibility` = *how much can a kill claw back once it is in motion* (the "scope of the guarantee" above). The precise semantics, granularity, linter rule, and any reconciliation of the §9 wording are **open** — see `docs/03` → "Kill is two axes — operator hard-kill vs `killable`". Until they settle, treat the hard-kill as unconditional and `killable` as advisory.
+> *The former UNDER-REVIEW note reconciling `killable` with the operator hard-kill is retired: its content is now the section opening above (CS-022). Still open in `docs/03` → "Kill is two axes": graceful-halt as feature vs seam, per-action vs per-agent granularity, whether `killable: false` requires a declared safe-stop, and the one-bool-vs-split question.*
 
 ---
 
@@ -516,6 +524,8 @@ For each attempted action the gateway MUST proceed strictly in this order, stopp
 
 On any dependency error, apply `failureMode` (§10).
 
+**Batch decision semantics (CS-023).** A SIF batch (SIF §5) is decided **atomically** and executed per operation. The gateway runs steps 1–5 for **every** operation in the batch first (each operation gets its own audit record, §11); any DENY or HALT on any operation refuses the **whole batch** before anything commits or stages — no `record`/`transition` applies, no `effect` stages, and the structured error identifies the failing operation (SIF §6 pointer). A batch is a request for atomicity: an agent that wants independent outcomes submits independent intents. A HOLD does **not** refuse the batch: the batch commits with the held effect staged `PENDING_APPROVAL`, and per §4.4 any `record` ops in the batch commit atomically with that staging. A later rejection or TTL expiry (CS-017) of the held effect does not roll those committed ops back — each was independently authorized, and `correlationId` ties them together for downstream reconciliation (§11).
+
 **Decision freshness (CS-017).** This evaluation runs at **decision time**; for a staged effect (§4.4) the gateway MUST bound how stale that decision can get before dispatch, two ways:
 
 1. **Decision TTL.** Every staged action carries an expiry, set at staging from gateway configuration (deployment config, **not** policy syntax — the language stays frozen). The default MUST be finite; for `irreversible` effects it SHOULD be short (minutes–hours, not days). A row claimed at or after its TTL settles `CANCELLED` with reason `stale-decision` (audited; the agent's ticket resolves to a recoverable refusal). An approval that arrives after expiry does not resurrect the row — the intent must be re-submitted and re-decided.
@@ -526,7 +536,7 @@ On any dependency error, apply `failureMode` (§10).
 ---
 
 ## 13. Validation rules (what the linter MUST check)
-1. Every resource/action/scope/hook name referenced exists in the registry — **including names in `deny`** (CS-016). A deny of an undeclared name adds no protection (default-deny already refuses unknowns) and is almost always a typo that would otherwise silently arm itself as a no-op. To pre-forbid a capability, declare the action in the registry and deny it (the pattern the worked registries use for `prescribe`/`discontinue`).
+1. Every resource/action/scope/hook name referenced exists in the registry — **including names in `deny`** (CS-016). A deny of an undeclared name adds no protection (default-deny already refuses unknowns) and is almost always a typo that would otherwise silently arm itself as a no-op. To pre-forbid a capability, declare the action in the registry and deny it (the pattern the worked registries use for `prescribe`/`discontinue`). *(Approver `role:` names are exempt — they resolve at the identity seam, not the registry; §7.8, CS-025.)*
 2. No `allow` and `deny` that *only* a human could disambiguate — `deny` always wins, but overlapping intent SHOULD warn.
 3. Every `transition` action referenced has declared `from` states.
 4. Actions with `reversibility == irreversible` and no `requireApproval`/`dualAuthorization`/`precondition` ⇒ **warn**.

@@ -109,6 +109,7 @@ An agent MAY submit several operations as one **batch**:
 - A batch of `record`/`transition` operations is executed as **one transaction** — all commit or all roll back.
 - `resolve` references and ordering within a batch are honoured so later operations can use earlier results.
 - `effect` operations cannot be transactionally rolled back; the gateway stages them (commit the intent, then dispatch) and reports the outcome as a `transition` — see ACP §4.4 / the implementation design. SIF only requires that the agent express effects as ordinary operations; durability is the executor's concern.
+- Whether a batch is *permitted* is ACP's concern: ACP §12 defines the batch **decision** semantics (the batch is decided atomically — any deny/halt refuses the whole batch before anything commits or stages; a hold stages the effect and commits the batch per ACP §4.4). An agent that wants independent outcomes submits independent intents.
 
 ---
 
