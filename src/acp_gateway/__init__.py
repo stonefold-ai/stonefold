@@ -9,6 +9,13 @@ The ``Gateway`` chokepoint and the transport/coverage helpers depend only on
 
 from __future__ import annotations
 
+from acp_gateway.identity import (
+    Identity,
+    IdentityProvider,
+    IdentityRejected,
+    SessionIdentityProvider,
+    TransportCredential,
+)
 from acp_gateway.kill_service import KillService
 from acp_gateway.transport import (
     CoverageError,
@@ -29,4 +36,10 @@ __all__ = [
     "interception_coverage_check",
     "CoverageError",
     "KillService",
+    # identity seam (CS-021)
+    "IdentityProvider",
+    "SessionIdentityProvider",
+    "TransportCredential",
+    "Identity",
+    "IdentityRejected",
 ]

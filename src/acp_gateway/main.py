@@ -5,21 +5,29 @@
 UI (``admin_api``). Every route ends in the *same* ``Gateway.submit`` →
 ``enforce`` call (design §0) — the transports cannot diverge.
 
-Identity is taken from the **transport headers** (``X-Actor-Id`` /
-``X-Session-Id``), never from the request body (invariant 3: the agent cannot set
-its own scope). The body carries only ``resource``/``action``/``data``.
+Identity is resolved by the **``IdentityProvider`` seam** (CS-021,
+``acp_gateway.identity``) from the authenticated transport (the ``X-Actor-Id`` /
+``X-Session-Id`` headers by default), never from the request body (invariant 3: the
+agent cannot set its own scope). The body carries only ``resource``/``action``/
+``data``. The default provider is the standalone built-in; a credential verifier
+plugs into the same slot without touching the route.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from fastapi import FastAPI, Header
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
-from acp_core import Actor, Session
 from acp_gateway.admin_api import ReplayableAudit, create_admin_router
+from acp_gateway.identity import (
+    IdentityProvider,
+    IdentityRejected,
+    SessionIdentityProvider,
+    TransportCredential,
+)
 from acp_gateway.kill_api import create_kill_router
 from acp_gateway.kill_service import KillService
 from acp_gateway.transport import Gateway, SifNativeTransport
@@ -41,9 +49,15 @@ def create_app(
     kill_service: KillService | None = None,
     audit: ReplayableAudit | None = None,
     outbox: OutboxStore | None = None,
+    identity: IdentityProvider | None = None,
 ) -> FastAPI:
     app = FastAPI(title="ACP Gateway", version="0.1")
     sif = SifNativeTransport(gateway)
+    # CS-021: identity enters through the seam ahead of the pipeline. The default
+    # is the standalone built-in (transport-authenticated ids verbatim) — so an
+    # unconfigured gateway behaves exactly as before; a credential verifier plugs
+    # into the same slot without touching the route.
+    identity_provider: IdentityProvider = identity or SessionIdentityProvider()
 
     if kill_service is not None:
         app.include_router(create_kill_router(kill_service))
@@ -61,13 +75,23 @@ def create_app(
         x_actor_id: str = Header(..., alias="X-Actor-Id"),
         x_session_id: str = Header(..., alias="X-Session-Id"),
         x_correlation_id: str | None = Header(None, alias="X-Correlation-Id"),
+        authorization: str | None = Header(None, alias="Authorization"),
     ) -> dict[str, Any]:
-        # identity from the authenticated transport, NOT the body (invariant 3)
-        actor = Actor(id=x_actor_id)
-        session = Session(id=x_session_id, correlation_id=x_correlation_id or x_session_id)
+        # identity from the authenticated transport via the seam, NOT the body
+        # (invariant 3, binding on every provider — CS-021).
+        try:
+            who = identity_provider.identify(
+                TransportCredential(
+                    actor_id=x_actor_id, session_id=x_session_id,
+                    correlation_id=x_correlation_id or x_session_id,
+                    credential=authorization,
+                )
+            )
+        except IdentityRejected as exc:
+            raise HTTPException(status_code=401, detail=str(exc))
         result = sif.submit_intent(
             {"resource": body.resource, "action": body.action, "data": body.data},
-            actor=actor, session=session,
+            actor=who.actor, session=who.session,
         )
         return {
             "decision": result.decision.value,

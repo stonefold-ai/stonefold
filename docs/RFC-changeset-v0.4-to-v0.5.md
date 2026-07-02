@@ -64,4 +64,6 @@ Names the seam; changes nothing about how identity is used downstream. Invariant
 (identity never from the agent payload) is restated as binding on every provider.
 
 **Implementation impact:** protocol definition + the trivial built-in + fakes in tests
-(reference implementation: pending).
+(reference implementation: done — `acp_gateway.identity`, wired at the `submit_intent`
+route ahead of the pipeline; the built-in reproduces the prior transport-header
+behaviour, so the default is unchanged).
