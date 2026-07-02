@@ -22,6 +22,12 @@ are the ~4-chars/token estimate (not SDK usage). They are honest pilots, labelle
 such — not the publishable experiment. Findings + full context: docs/15 → "Pilot run
 record".
 
+**Reading the sub-100% cells:** haiku's misses on the MCP surface are *not* wrong-tool
+picks — in every one (grep `no_call` in the trials.jsonl files) the model declined to
+call **any** tool on the one vaguely-worded probe (`update-address`), while under SIF
+it committed to the right capability every time. No model ever selected a wrong tool
+or emitted an undeclared name on either surface in the fixed-surface runs.
+
 Graph: `trackR-pilot.svg` (regenerate with the cells.csv files; the generator script
 is committed alongside as `make_graph.py`).
 
