@@ -171,3 +171,47 @@ def test_cli_smoke_runs() -> None:
 
 def test_model_spec_label() -> None:
     assert ModelSpec(key="x", provider="fake").label == "x"
+
+
+# --- Track R reliability runner -------------------------------------------
+def test_reliability_surfaces_keep_capability_parity() -> None:
+    from acp_bench.reliability import MCP, MCP_RETRIEVAL, PROBES, SIF, RETRIEVAL_K, surface_for
+
+    probe = PROBES[1]  # pay-invoice
+    mcp = surface_for(MCP, 30, probe)
+    assert len(mcp.tools) == 30 and probe.mcp_tool in mcp.tool_names
+    sif = surface_for(SIF, 30, probe)
+    assert len(sif.tools) == 1 and len(sif.resources) == 30 and probe.resource in sif.resources
+    retr = surface_for(MCP_RETRIEVAL, 30, probe)
+    assert len(retr.tools) == RETRIEVAL_K
+
+
+def test_reliability_scoring() -> None:
+    from acp_ap_demo.llm import ToolCall
+    from acp_bench.reliability import (
+        CORRECT, HALLUCINATED, MALFORMED, MCP, PROBES, SIF, WRONG_TOOL, _score, surface_for,
+    )
+
+    probe = PROBES[0]  # account-balance -> read_account / Account.read
+    mcp = surface_for(MCP, 10, probe)
+    assert _score(MCP, mcp, probe, ToolCall("1", "read_account", {}))[0] == CORRECT
+    assert _score(MCP, mcp, probe, ToolCall("1", "send_email", {}))[0] == WRONG_TOOL
+    assert _score(MCP, mcp, probe, ToolCall("1", "nope_tool", {}))[0] == HALLUCINATED
+    assert _score(MCP, mcp, probe, None)[0] == "no_call"
+
+    sif = surface_for(SIF, 10, probe)
+    good = ToolCall("1", "submit_intent", {"resource": "Account", "action": "read"})
+    assert _score(SIF, sif, probe, good)[0] == CORRECT
+    assert _score(SIF, sif, probe, ToolCall("1", "submit_intent", {"resource": "Account"}))[0] == MALFORMED
+    bad = ToolCall("1", "submit_intent", {"resource": "Nonexistent", "action": "read"})
+    assert _score(SIF, sif, probe, bad)[0] == HALLUCINATED
+
+
+def test_reliability_matrix_and_runner_mechanics() -> None:
+    from acp_bench.reliability import MCP, SIF, reliability_matrix, run_reliability
+
+    trials = run_reliability((FAKE,), (10,), conditions=(MCP, SIF), reps=1)
+    assert len(trials) == 2 * len(__import__("acp_bench.reliability", fromlist=["PROBES"]).PROBES)
+    cells = reliability_matrix(trials)
+    assert {c.condition for c in cells} == {MCP, SIF}
+    assert all(0.0 <= c.correct <= 1.0 for c in cells)

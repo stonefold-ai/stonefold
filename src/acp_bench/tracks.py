@@ -62,12 +62,20 @@ def mcp_surface(caps: tuple[Capability, ...]) -> list[ToolDef]:
 
 def sif_surface(caps: tuple[Capability, ...]) -> list[ToolDef]:
     """The SIF condition: one ``submit_intent`` whose registry declares the same N
-    capabilities — resource/action enums injected (undeclared names cannot be emitted,
-    the structural-coverage property that also kills A6)."""
+    capabilities — the ``resource`` enum is injected and the valid ``resource.action``
+    pairs are named in the description (parity with the real ``submit_intent_schema``,
+    which carries the ``x-acp-actions`` catalogue). Undeclared resources cannot be
+    emitted — the structural-coverage property that also kills A6. Capability parity
+    with the MCP surface: the model sees the same N capabilities, just as one typed
+    tool rather than N tool names."""
     resources = sorted({c.resource for c in caps})
+    pairs = ", ".join(f"{c.resource}.{c.action}" for c in caps)
     return [ToolDef(
         name="submit_intent",
-        description="Submit one intended action for enforcement.",
+        description=(
+            "Submit one intended action for enforcement. Set `resource` and `action` to "
+            f"exactly one of the declared capabilities: {pairs}."
+        ),
         input_schema={
             "type": "object",
             "properties": {

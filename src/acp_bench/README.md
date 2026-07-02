@@ -12,15 +12,21 @@ equivalent (even gateway-defended) MCP tool surface* — into a measurement.
 ## Run it
 
 ```
-python -m acp_bench --smoke                      # deterministic fake LLM; no API key
-python -m acp_bench --smoke --out bench-out       # + write the raw JSONL log
+# Track S — security ablation S0->S3:
+python -m acp_bench --smoke                       # deterministic fake LLM; no API key
 python -m acp_bench --run --models small,mid --reps 5 --out DIR   # the author's run
+
+# Track R — reliability vs. tool count:
+python -m acp_bench --track r --smoke             # fake LLM; proves the runner works
+python -m acp_bench --track r --run --models small --reps 5 --out DIR
+
 python -m acp_bench                               # honesty banner + usage, does nothing
 ```
 
 The smoke proves the machinery runs end to end; its matrix is meaningless as a
 measurement (fake LLM). `--run` executes the real experiment with pinned models — the
-author's, with API keys.
+author's, with API keys. (In a TLS-intercepting network where `certifi` lacks the
+corporate CA, run under `truststore` so the SDK uses the OS trust store.)
 
 ## What it builds (all reusing the demo agent, `make demo` battery, and AP demo)
 
@@ -48,5 +54,9 @@ author's, with API keys.
   slots. A2 (invite-to-wire) is fully wired as the worked example.
 - **Real token usage** — `MeteredProvider` estimates tokens (~4 chars/token) so the
   matrix has a column on the fake path; a real run substitutes the SDK's `response.usage`.
-- **Track R task set + execution** — the surfaces and scorer are built; a real
-  reliability number needs a model choosing among N tools over a benign task set (§7).
+- **Track R at scale + fairness sign-off** — the task set (`reliability.PROBES`), the
+  three surfaces (MCP / retrieval / SIF at capability parity), the single-turn scorer,
+  and the `--track r` runner are built and runnable. What remains is the author's:
+  running the full multi-model, ≥5-rep sweep, signing off that the surfaces are a
+  good-faith comparison, and publishing (§4/§7). Real token usage still substitutes the
+  estimate on a published run.

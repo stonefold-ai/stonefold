@@ -68,3 +68,7 @@ files = ["src", "tests"]
 [[tool.mypy.overrides]]
 module = ["testcontainers.*", "jsonschema.*", "anthropic.*", "openai.*", "redis.*"]
 ignore_missing_imports = true
+# Treat the optional external SDKs as untyped whether or not they are installed, so the
+# type-check is identical with the demo extra present (the benchmark's real-model runs)
+# or absent (dev/CI). Their neutral-dict adapters (acp_ap_demo.llm) match at runtime.
+follow_imports = "skip"
