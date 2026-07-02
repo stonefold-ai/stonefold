@@ -12,7 +12,7 @@
 <text x="60" y="24" class="t">Giving a model N capabilities: as N separate MCP tools, or as one SIF intent tool?</text>
 <text x="60" y="41" class="st">Same tasks, same models (Claude Haiku 4.5, Sonnet 5, Opus 4.8), real API calls. Early pilot: small sample (2 repeats), token counts estimated.</text>
 <text x="60" y="72" class="t">How often the model picked the right capability</text>
-<text x="144" y="96" class="pt" text-anchor="middle">haiku</text>
+<text x="144" y="86" class="pt" text-anchor="middle">haiku</text>
 <line x1="60" y1="342.0" x2="228" y2="342.0" class="grid"/>
 <text x="54" y="345.5" class="ax" text-anchor="end">0%</text>
 <line x1="60" y1="282.5" x2="228" y2="282.5" class="grid"/>
@@ -25,20 +25,19 @@
 <text x="54" y="107.5" class="ax" text-anchor="end">100%</text>
 <text x="94.7" y="357" class="ax" text-anchor="middle">10</text>
 <rect x="77.7" y="127.8" width="15" height="214.2" fill="#e07b39"/>
-<text x="85.2" y="138.8" class="vlw" text-anchor="middle">90</text>
 <rect x="96.7" y="104.0" width="15" height="238.0" fill="#2b7de9"/>
+<text x="85.2" y="138.8" class="vlw" text-anchor="middle">90</text>
 <text x="104.2" y="115.0" class="vlw" text-anchor="middle">100</text>
 <text x="144.0" y="357" class="ax" text-anchor="middle">50</text>
 <rect x="127.0" y="115.9" width="15" height="226.1" fill="#e07b39"/>
-<text x="134.5" y="126.9" class="vlw" text-anchor="middle">95</text>
 <rect x="146.0" y="104.0" width="15" height="238.0" fill="#2b7de9"/>
+<text x="134.5" y="126.9" class="vlw" text-anchor="middle">95</text>
 <text x="153.5" y="115.0" class="vlw" text-anchor="middle">100</text>
 <text x="193.3" y="357" class="ax" text-anchor="middle">100</text>
 <rect x="176.3" y="104.0" width="15" height="238.0" fill="#e07b39"/>
-<text x="183.8" y="115.0" class="vlw" text-anchor="middle">100</text>
 <rect x="195.3" y="104.0" width="15" height="238.0" fill="#2b7de9"/>
-<text x="202.8" y="115.0" class="vlw" text-anchor="middle">100</text>
-<text x="346" y="96" class="pt" text-anchor="middle">sonnet</text>
+<text x="193.3" y="100.0" class="vl" text-anchor="middle">100</text>
+<text x="346" y="86" class="pt" text-anchor="middle">sonnet</text>
 <line x1="262" y1="342.0" x2="430" y2="342.0" class="grid"/>
 <line x1="262" y1="282.5" x2="430" y2="282.5" class="grid"/>
 <line x1="262" y1="223.0" x2="430" y2="223.0" class="grid"/>
@@ -46,20 +45,17 @@
 <line x1="262" y1="104.0" x2="430" y2="104.0" class="grid"/>
 <text x="296.7" y="357" class="ax" text-anchor="middle">10</text>
 <rect x="279.7" y="104.0" width="15" height="238.0" fill="#e07b39"/>
-<text x="287.2" y="115.0" class="vlw" text-anchor="middle">100</text>
 <rect x="298.7" y="104.0" width="15" height="238.0" fill="#2b7de9"/>
-<text x="306.2" y="115.0" class="vlw" text-anchor="middle">100</text>
+<text x="296.7" y="100.0" class="vl" text-anchor="middle">100</text>
 <text x="346.0" y="357" class="ax" text-anchor="middle">50</text>
 <rect x="329.0" y="104.0" width="15" height="238.0" fill="#e07b39"/>
-<text x="336.5" y="115.0" class="vlw" text-anchor="middle">100</text>
 <rect x="348.0" y="104.0" width="15" height="238.0" fill="#2b7de9"/>
-<text x="355.5" y="115.0" class="vlw" text-anchor="middle">100</text>
+<text x="346.0" y="100.0" class="vl" text-anchor="middle">100</text>
 <text x="395.3" y="357" class="ax" text-anchor="middle">100</text>
 <rect x="378.3" y="104.0" width="15" height="238.0" fill="#e07b39"/>
-<text x="385.8" y="115.0" class="vlw" text-anchor="middle">100</text>
 <rect x="397.3" y="104.0" width="15" height="238.0" fill="#2b7de9"/>
-<text x="404.8" y="115.0" class="vlw" text-anchor="middle">100</text>
-<text x="548" y="96" class="pt" text-anchor="middle">opus</text>
+<text x="395.3" y="100.0" class="vl" text-anchor="middle">100</text>
+<text x="548" y="86" class="pt" text-anchor="middle">opus</text>
 <line x1="464" y1="342.0" x2="632" y2="342.0" class="grid"/>
 <line x1="464" y1="282.5" x2="632" y2="282.5" class="grid"/>
 <line x1="464" y1="223.0" x2="632" y2="223.0" class="grid"/>
@@ -67,21 +63,18 @@
 <line x1="464" y1="104.0" x2="632" y2="104.0" class="grid"/>
 <text x="498.7" y="357" class="ax" text-anchor="middle">10</text>
 <rect x="481.7" y="104.0" width="15" height="238.0" fill="#e07b39"/>
-<text x="489.2" y="115.0" class="vlw" text-anchor="middle">100</text>
 <rect x="500.7" y="104.0" width="15" height="238.0" fill="#2b7de9"/>
-<text x="508.2" y="115.0" class="vlw" text-anchor="middle">100</text>
+<text x="498.7" y="100.0" class="vl" text-anchor="middle">100</text>
 <text x="548.0" y="357" class="ax" text-anchor="middle">50</text>
 <rect x="531.0" y="104.0" width="15" height="238.0" fill="#e07b39"/>
-<text x="538.5" y="115.0" class="vlw" text-anchor="middle">100</text>
 <rect x="550.0" y="104.0" width="15" height="238.0" fill="#2b7de9"/>
-<text x="557.5" y="115.0" class="vlw" text-anchor="middle">100</text>
+<text x="548.0" y="100.0" class="vl" text-anchor="middle">100</text>
 <text x="597.3" y="357" class="ax" text-anchor="middle">100</text>
 <rect x="580.3" y="104.0" width="15" height="238.0" fill="#e07b39"/>
-<text x="587.8" y="115.0" class="vlw" text-anchor="middle">100</text>
 <rect x="599.3" y="104.0" width="15" height="238.0" fill="#2b7de9"/>
-<text x="606.8" y="115.0" class="vlw" text-anchor="middle">100</text>
+<text x="597.3" y="100.0" class="vl" text-anchor="middle">100</text>
 <text x="700" y="72" class="t">Tokens per call</text>
-<text x="813" y="96" class="pt" text-anchor="middle">all three models (±1%)</text>
+<text x="813" y="86" class="pt" text-anchor="middle">all three models (±1%)</text>
 <line x1="700" y1="342.0" x2="926" y2="342.0" class="grid"/>
 <text x="694" y="345.5" class="ax" text-anchor="end">0</text>
 <line x1="700" y1="294.4" x2="926" y2="294.4" class="grid"/>

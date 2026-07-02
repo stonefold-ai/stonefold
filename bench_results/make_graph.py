@@ -71,7 +71,7 @@ def main() -> int:
     for i, label in enumerate(order[: len(SEL_X0S)]):
         x0 = SEL_X0S[i]
         x1 = x0 + SEL_W
-        el.append(f'<text x="{(x0 + x1) / 2:.0f}" y="{Y1 - 8}" class="pt" text-anchor="middle">{label}</text>')
+        el.append(f'<text x="{(x0 + x1) / 2:.0f}" y="{Y1 - 18}" class="pt" text-anchor="middle">{label}</text>')
         for pct in (0, 25, 50, 75, 100):
             y = pct_y(pct / 100)
             el.append(f'<line x1="{x0}" y1="{y:.1f}" x2="{x1}" y2="{y:.1f}" class="grid"/>')
@@ -82,17 +82,29 @@ def main() -> int:
         for gi, n in enumerate(ns):
             gx = x0 + 10 + group_w * gi + group_w / 2
             el.append(f'<text x="{gx:.1f}" y="{Y0 + 15}" class="ax" text-anchor="middle">{n}</text>')
+            vals = {cond: cells[(cond, n)]["correct"]
+                    for cond in ("mcp", "sif") if (cond, n) in cells}
             for cond, color, dx in (("mcp", MCP_COLOR, -17), ("sif", SIF_COLOR, 2)):
-                if (cond, n) not in cells:
+                if cond not in vals:
                     continue
-                v = cells[(cond, n)]["correct"]
-                y = pct_y(v)
+                y = pct_y(vals[cond])
                 el.append(f'<rect x="{gx + dx:.1f}" y="{y:.1f}" width="15" '
                           f'height="{Y0 - y:.1f}" fill="{color}"/>')
-                ly_val = y + 11 if v > 0.12 else y - 4  # inside the bar when it is tall enough
-                cls = "vlw" if v > 0.12 else "vl"
-                el.append(f'<text x="{gx + dx + 7.5:.1f}" y="{ly_val:.1f}" class="{cls}" '
+            if len(vals) == 2 and vals["mcp"] == vals["sif"]:
+                # equal pair: one centered label above says it for both bars
+                v = vals["mcp"]
+                el.append(f'<text x="{gx:.1f}" y="{pct_y(v) - 4:.1f}" class="vl" '
                           f'text-anchor="middle">{v * 100:.0f}</text>')
+            else:
+                for cond, dx in (("mcp", -17), ("sif", 2)):
+                    if cond not in vals:
+                        continue
+                    v = vals[cond]
+                    y = pct_y(v)
+                    ly_val = y + 11 if v > 0.12 else y - 4
+                    cls = "vlw" if v > 0.12 else "vl"
+                    el.append(f'<text x="{gx + dx + 7.5:.1f}" y="{ly_val:.1f}" class="{cls}" '
+                              f'text-anchor="middle">{v * 100:.0f}</text>')
 
     # --- tokens per call: two mean lines + per-model markers ----------------
     max_tok = max(v["tokens"] for cells in series.values() for v in cells.values())
@@ -105,7 +117,7 @@ def main() -> int:
         return TOK_X0 + 14 + (TOK_W - 28) * ns.index(n) / max(len(ns) - 1, 1)
 
     el.append(f'<text x="{TOK_X0}" y="72" class="t">Tokens per call</text>')
-    el.append(f'<text x="{(TOK_X0 + TOK_X0 + TOK_W) / 2:.0f}" y="{Y1 - 8}" class="pt" '
+    el.append(f'<text x="{(TOK_X0 + TOK_X0 + TOK_W) / 2:.0f}" y="{Y1 - 18}" class="pt" '
               f'text-anchor="middle">all three models (±1%)</text>')
     for v in range(0, ymax + 1, 500):
         y = tok_y(v)
