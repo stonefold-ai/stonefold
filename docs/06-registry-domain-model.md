@@ -109,7 +109,9 @@ Rules:
 ```yaml
 connectors:
   ledger-sql: { type: sql }                 # serves observe/record/transition
-  ledger-pay: { type: method }              # the effect binding for `pay`
+  ledger-pay:
+    type: method                            # the effect binding for `pay`
+    digest: "sha256:9f2b…"                  # OPTIONAL: pins the implementing artifact
 scopePredicates:   [ tenantOf ]             # implemented in the gateway
 preconditionChecks:[ payeeCoolingOffElapsed ]  # named checks (pass/fail)
 handlers:          [ recordLedgerEntry ]       # named post-action handlers
@@ -120,6 +122,8 @@ namedSets:
 ```
 
 These names are exactly what a policy or an action references (`scope: { Payment: tenantOf(actor) }`, `denylist: { set: sanctioned-list }`, `precondition: [payeeCoolingOffElapsed]`, `postActions: [recordLedgerEntry]`). The registry declares them so they can be validated and so implementers have a checklist. Each is a function the integrator implements (see §6).
+
+**Digest pinning (`digest`, optional).** A connector MAY pin the artifact that implements it by content digest (`sha256:…` over the connector's code artifact, as built/deployed). When a digest is declared, the gateway MUST verify the loaded implementation against it **at policy load and at dispatch**; a mismatch is a dependency failure under the policy's `failureMode` rules (ACP §10) — fail closed by default, with an audit record. The point: the registry already declares *what* a connector does; the digest declares *which code* is trusted to do it, so silently replacing a connector's implementation stops being invisible — changing connector code requires a registry change, which is a reviewed, versioned artifact. Production deployments handling irreversible effects SHOULD pin their effect connectors. How the digest is computed and artifacts are signed is deployment tooling, not registry semantics — the registry only carries the declaration. (Trust boundary discussion: docs/13.)
 
 ---
 

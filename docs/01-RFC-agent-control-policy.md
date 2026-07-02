@@ -62,6 +62,8 @@ Five principles constrain the whole format. They are the reason the language sta
 4. **Deterministic gates only.** Every gate resolves to pass / fail / hold by code or a typed hook — never by model judgement. (A hook MAY call out, e.g. a DLP service, but returns a deterministic verdict.)
 5. **Frozen shape.** The vocabulary of *kinds*, *gate types*, and *condition operators* is fixed. Growth happens by adding resources, actions, and named hooks — never new language constructs. (See §13.)
 
+**Trust boundary.** The gateway proves that *intents conform to policy*; it does not prove that the code executing them does what it declares. Connectors, registered hooks, and the gateway itself are the trusted computing base: their integrity is a supply-chain property, mitigated by declaration (connector digest pinning, registry §5 of docs/06; a mismatch is a dependency failure under §10) and by deployment discipline — it is not established by this policy language. The non-normative discussion is in docs/13.
+
 ---
 
 ## 2. Core concepts
@@ -456,7 +458,7 @@ String literals may be single- or double-quoted. The right side of `in` / `not i
 ---
 
 ## 10. Failure mode (`defaults.failureMode`)
-If the gateway, a `contentCheck` hook, or a scope/approval dependency is **unavailable or errors**, behavior is governed by `failureMode`:
+If the gateway, a `contentCheck` hook, or a scope/approval dependency is **unavailable or errors** — or a connector fails its declared-digest check (docs/06 §5) — behavior is governed by `failureMode`:
 
 ```yaml
 defaults:
