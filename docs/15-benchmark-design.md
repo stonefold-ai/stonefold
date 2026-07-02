@@ -127,3 +127,16 @@ gateway vendor can rerun it and be forced to accept the number.
   the existing demo agent, TCK fixtures, and `make demo` battery.
 - Execution, baseline-fairness sign-off, and publication: **the author personally**.
   The credibility of the matrix is non-delegable.
+
+### Implementation status (harness built, no results)
+
+The harness is implemented in `src/acp_bench/` (run `python -m acp_bench --smoke`), on
+the demo agent, the AP demo (docs/05), and `make demo`. It realizes the design; the
+parts §4.4/§7 assign to the author are built as **flagged slots**, never faked:
+Track S rungs S0 and S3 are wired, **S1/S2 are UNCONFIGURED** until the author supplies
+their good-faith baseline policies (`src/acp_bench/policies/README.md`); attack **A2**
+(invite-to-wire) is wired, **A1/A3–A7 are UNWIRED** slots pending scenario sourcing;
+token counts are a build-time estimate to be replaced by SDK usage on a real run; and
+the Track-R surfaces + scorer are built but need a task set and real models to drive.
+No result is produced or committed — the smoke output is labelled as such (§6). *(This
+is a status note, not a design change; the design above is unchanged.)*

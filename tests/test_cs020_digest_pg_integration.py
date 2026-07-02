@@ -78,7 +78,7 @@ def _registry_with_digests(digests: dict[str, str]) -> Any:
 
 
 def _connector_name(reg: Any) -> str:
-    return reg.resolve(RawCall(resource="Email", action="sendEmail")).connector
+    return str(reg.resolve(RawCall(resource="Email", action="sendEmail")).connector)
 
 
 def test_dispatch_digest_mismatch_fails_closed_pg(container: PostgresContainer) -> None:

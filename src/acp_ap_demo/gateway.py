@@ -318,11 +318,15 @@ def _build_common(
     trace: TraceBus,
     clock: Clock,
     directory: PrincipalDirectory,
+    policy_path: Path = PAYMENTS_POLICY,
 ) -> APBundle:
+    # ``policy_path`` defaults to the shipped payments policy; the benchmark harness
+    # (docs/15) passes an ablation-rung policy over the same registry/domain to vary
+    # only the enforcement strength. Every existing caller uses the default.
     registry = load_registry(_load_yaml(_REGISTRY))
     with _SCHEMA.open("r", encoding="utf-8") as fh:
         schema = json.load(fh)
-    policy = load_policy(_load_yaml(PAYMENTS_POLICY), registry, schema=schema)
+    policy = load_policy(_load_yaml(policy_path), registry, schema=schema)
 
     connectors = Connectors({
         "sql": LedgerConnector(ledger, on_effect=trace.publish, clock=clock),
@@ -389,8 +393,13 @@ def build_inmemory_bundle(
     *,
     clock: Clock = _utcnow,
     directory: PrincipalDirectory | None = None,
+    policy_path: Path = PAYMENTS_POLICY,
 ) -> APBundle:
-    """Fully in-process bundle (no Docker, no key) — the fast test/CI path."""
+    """Fully in-process bundle (no Docker, no key) — the fast test/CI path.
+
+    ``policy_path`` defaults to the shipped payments policy; the benchmark harness
+    overrides it to swap in an ablation-rung policy over the same domain.
+    """
     audit = InMemoryAuditSink()
     trace = TraceBus()
     return _build_common(
@@ -403,6 +412,7 @@ def build_inmemory_bundle(
         trace=trace,
         clock=clock,
         directory=directory or default_directory(),
+        policy_path=policy_path,
     )
 
 
