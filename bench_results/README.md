@@ -28,8 +28,10 @@ call **any** tool on the one vaguely-worded probe (`update-address`), while unde
 it committed to the right capability every time. No model ever selected a wrong tool
 or emitted an undeclared name on either surface in the fixed-surface runs.
 
-Graph: `trackR-pilot.svg` (regenerate with the cells.csv files; the generator script
-is committed alongside as `make_graph.py`).
+![Track R pilot — selection accuracy per model (bars) and tokens per call (lines), MCP vs SIF](trackR-pilot.svg)
+
+Graph: `trackR-pilot.svg` above (regenerate with the cells.csv files; the generator
+script is committed alongside as `make_graph.py`).
 
 ## Verify the harness before trusting a number
 

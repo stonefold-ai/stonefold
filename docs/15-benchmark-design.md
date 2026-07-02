@@ -161,6 +161,8 @@ Models: `claude-haiku-4-5-20251001` (small), `claude-sonnet-5` (mid),
 the exact harness functions (surface construction, probe set, scoring rules) so a
 reader can verify correctness rather than trust this summary.
 
+![Track R pilot — selection accuracy per model (bars) and tokens per call (lines), MCP vs SIF](../bench_results/trackR-pilot.svg)
+
 **Correct capability selection** (fixed surface; per cell: 10 probes × 2 reps):
 
 | Model | Surface | N=10 | N=50 | N=100 |
