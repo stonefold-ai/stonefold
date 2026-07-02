@@ -1,0 +1,35 @@
+{
+  "cards": "realistic",
+  "context_tokens": 0,
+  "fillers": "confusable",
+  "finished": "2026-07-02T21:49:25+00:00",
+  "models": [
+    "small"
+  ],
+  "ns": [
+    10,
+    50
+  ],
+  "phrasing": "typical",
+  "probes": [
+    "account-balance",
+    "pay-invoice",
+    "send-email",
+    "ship-order",
+    "close-ticket",
+    "read-user",
+    "create-refund",
+    "read-invoice",
+    "cancel-subscription",
+    "update-address"
+  ],
+  "reps": 2,
+  "smoke": false,
+  "started": "2026-07-02T21:47:44+00:00",
+  "surfaces": [
+    "mcp",
+    "sif"
+  ],
+  "track": "r",
+  "trials": 80
+}

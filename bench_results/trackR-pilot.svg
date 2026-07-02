@@ -1,129 +1,128 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="960" height="470" viewBox="0 0 960 470">
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="500" viewBox="0 0 960 500">
 <style>
- .t { font: 600 14px sans-serif; fill: #222; }
- .pt { font: 600 12px sans-serif; fill: #333; }
+ .t { font: 600 13px sans-serif; fill: #222; }
  .st { font: 11px sans-serif; fill: #777; }
  .ax { font: 11px sans-serif; fill: #555; }
+ .axs { font: 9px sans-serif; fill: #555; }
  .vl { font: 9px sans-serif; fill: #444; }
  .cap { font: 11px sans-serif; fill: #444; }
  .grid { stroke: #e3e3e3; stroke-width: 1; }
 </style>
-<rect width="960" height="470" fill="white"/>
-<text x="60" y="24" class="t">Giving a model N capabilities: as N separate MCP tools, or as one SIF intent tool?</text>
-<text x="60" y="41" class="st">Same tasks, same models (Claude Haiku 4.5, Sonnet 5, Opus 4.8), real API calls. Early pilot: small sample (2 repeats), token counts estimated.</text>
-<text x="60" y="72" class="t">How often the model picked the right capability</text>
-<text x="144" y="86" class="pt" text-anchor="middle">haiku</text>
-<line x1="60" y1="342.0" x2="228" y2="342.0" class="grid"/>
-<text x="54" y="345.5" class="ax" text-anchor="end">0%</text>
-<line x1="60" y1="282.5" x2="228" y2="282.5" class="grid"/>
-<text x="54" y="286.0" class="ax" text-anchor="end">25%</text>
-<line x1="60" y1="223.0" x2="228" y2="223.0" class="grid"/>
-<text x="54" y="226.5" class="ax" text-anchor="end">50%</text>
-<line x1="60" y1="163.5" x2="228" y2="163.5" class="grid"/>
-<text x="54" y="167.0" class="ax" text-anchor="end">75%</text>
-<line x1="60" y1="104.0" x2="228" y2="104.0" class="grid"/>
-<text x="54" y="107.5" class="ax" text-anchor="end">100%</text>
-<text x="94.7" y="357" class="ax" text-anchor="middle">10</text>
-<rect x="77.7" y="127.8" width="15" height="214.2" fill="#e07b39"/>
-<rect x="96.7" y="104.0" width="15" height="238.0" fill="#2b7de9"/>
-<text x="85.2" y="123.8" class="vl" text-anchor="middle">90</text>
-<text x="104.2" y="100.0" class="vl" text-anchor="middle">100</text>
-<text x="144.0" y="357" class="ax" text-anchor="middle">50</text>
-<rect x="127.0" y="115.9" width="15" height="226.1" fill="#e07b39"/>
-<rect x="146.0" y="104.0" width="15" height="238.0" fill="#2b7de9"/>
-<text x="134.5" y="111.9" class="vl" text-anchor="middle">95</text>
-<text x="153.5" y="100.0" class="vl" text-anchor="middle">100</text>
-<text x="193.3" y="357" class="ax" text-anchor="middle">100</text>
-<rect x="176.3" y="104.0" width="15" height="238.0" fill="#e07b39"/>
-<rect x="195.3" y="104.0" width="15" height="238.0" fill="#2b7de9"/>
-<text x="193.3" y="100.0" class="vl" text-anchor="middle">100</text>
-<text x="346" y="86" class="pt" text-anchor="middle">sonnet</text>
-<line x1="262" y1="342.0" x2="430" y2="342.0" class="grid"/>
-<line x1="262" y1="282.5" x2="430" y2="282.5" class="grid"/>
-<line x1="262" y1="223.0" x2="430" y2="223.0" class="grid"/>
-<line x1="262" y1="163.5" x2="430" y2="163.5" class="grid"/>
-<line x1="262" y1="104.0" x2="430" y2="104.0" class="grid"/>
-<text x="296.7" y="357" class="ax" text-anchor="middle">10</text>
-<rect x="279.7" y="104.0" width="15" height="238.0" fill="#e07b39"/>
-<rect x="298.7" y="104.0" width="15" height="238.0" fill="#2b7de9"/>
-<text x="296.7" y="100.0" class="vl" text-anchor="middle">100</text>
-<text x="346.0" y="357" class="ax" text-anchor="middle">50</text>
-<rect x="329.0" y="104.0" width="15" height="238.0" fill="#e07b39"/>
-<rect x="348.0" y="104.0" width="15" height="238.0" fill="#2b7de9"/>
-<text x="346.0" y="100.0" class="vl" text-anchor="middle">100</text>
-<text x="395.3" y="357" class="ax" text-anchor="middle">100</text>
-<rect x="378.3" y="104.0" width="15" height="238.0" fill="#e07b39"/>
-<rect x="397.3" y="104.0" width="15" height="238.0" fill="#2b7de9"/>
-<text x="395.3" y="100.0" class="vl" text-anchor="middle">100</text>
-<text x="548" y="86" class="pt" text-anchor="middle">opus</text>
-<line x1="464" y1="342.0" x2="632" y2="342.0" class="grid"/>
-<line x1="464" y1="282.5" x2="632" y2="282.5" class="grid"/>
-<line x1="464" y1="223.0" x2="632" y2="223.0" class="grid"/>
-<line x1="464" y1="163.5" x2="632" y2="163.5" class="grid"/>
-<line x1="464" y1="104.0" x2="632" y2="104.0" class="grid"/>
-<text x="498.7" y="357" class="ax" text-anchor="middle">10</text>
-<rect x="481.7" y="104.0" width="15" height="238.0" fill="#e07b39"/>
-<rect x="500.7" y="104.0" width="15" height="238.0" fill="#2b7de9"/>
-<text x="498.7" y="100.0" class="vl" text-anchor="middle">100</text>
-<text x="548.0" y="357" class="ax" text-anchor="middle">50</text>
-<rect x="531.0" y="104.0" width="15" height="238.0" fill="#e07b39"/>
-<rect x="550.0" y="104.0" width="15" height="238.0" fill="#2b7de9"/>
-<text x="548.0" y="100.0" class="vl" text-anchor="middle">100</text>
-<text x="597.3" y="357" class="ax" text-anchor="middle">100</text>
-<rect x="580.3" y="104.0" width="15" height="238.0" fill="#e07b39"/>
-<rect x="599.3" y="104.0" width="15" height="238.0" fill="#2b7de9"/>
-<text x="597.3" y="100.0" class="vl" text-anchor="middle">100</text>
-<text x="700" y="72" class="t">Tokens per call</text>
-<text x="813" y="86" class="pt" text-anchor="middle">all three models (±1%)</text>
-<line x1="700" y1="342.0" x2="926" y2="342.0" class="grid"/>
-<text x="694" y="345.5" class="ax" text-anchor="end">0</text>
-<line x1="700" y1="294.4" x2="926" y2="294.4" class="grid"/>
-<text x="694" y="297.9" class="ax" text-anchor="end">500</text>
-<line x1="700" y1="246.8" x2="926" y2="246.8" class="grid"/>
-<text x="694" y="250.3" class="ax" text-anchor="end">1000</text>
-<line x1="700" y1="199.2" x2="926" y2="199.2" class="grid"/>
-<text x="694" y="202.7" class="ax" text-anchor="end">1500</text>
-<line x1="700" y1="151.6" x2="926" y2="151.6" class="grid"/>
-<text x="694" y="155.1" class="ax" text-anchor="end">2000</text>
-<line x1="700" y1="104.0" x2="926" y2="104.0" class="grid"/>
-<text x="694" y="107.5" class="ax" text-anchor="end">2500</text>
-<text x="714.0" y="357" class="ax" text-anchor="middle">10</text>
-<text x="813.0" y="357" class="ax" text-anchor="middle">50</text>
-<text x="912.0" y="357" class="ax" text-anchor="middle">100</text>
-<path d="M714.0,313.6 L813.0,230.5 L912.0,125.9" fill="none" stroke="#e07b39" stroke-width="2.4"/>
-<circle cx="714.0" cy="313.5" r="3.4" fill="#e07b39"/>
-<circle cx="813.0" cy="230.3" r="3.4" fill="#e07b39"/>
-<circle cx="912.0" cy="125.8" r="3.4" fill="#e07b39"/>
-<rect x="710.8" y="311.3" width="6.4" height="6.4" fill="#e07b39"/>
-<rect x="809.8" y="228.2" width="6.4" height="6.4" fill="#e07b39"/>
-<rect x="908.8" y="123.4" width="6.4" height="6.4" fill="#e07b39"/>
-<path d="M714.0,308.6 L718.0,316.0 L710.0,316.0 Z" fill="#e07b39"/>
-<path d="M813.0,225.7 L817.0,233.1 L809.0,233.1 Z" fill="#e07b39"/>
-<path d="M912.0,121.2 L916.0,128.6 L908.0,128.6 Z" fill="#e07b39"/>
-<path d="M714.0,317.2 L813.0,297.9 L912.0,273.2" fill="none" stroke="#2b7de9" stroke-width="2.4"/>
-<circle cx="714.0" cy="317.6" r="3.4" fill="#2b7de9"/>
-<circle cx="813.0" cy="298.2" r="3.4" fill="#2b7de9"/>
-<circle cx="912.0" cy="273.3" r="3.4" fill="#2b7de9"/>
-<rect x="710.8" y="314.4" width="6.4" height="6.4" fill="#2b7de9"/>
-<rect x="809.8" y="295.1" width="6.4" height="6.4" fill="#2b7de9"/>
-<rect x="908.8" y="270.4" width="6.4" height="6.4" fill="#2b7de9"/>
-<path d="M714.0,312.3 L718.0,319.7 L710.0,319.7 Z" fill="#2b7de9"/>
-<path d="M813.0,293.0 L817.0,300.4 L809.0,300.4 Z" fill="#2b7de9"/>
-<path d="M912.0,268.4 L916.0,275.8 L908.0,275.8 Z" fill="#2b7de9"/>
-<text x="904.0" y="143.9" class="pt" text-anchor="end" fill="#e07b39">MCP</text>
-<text x="904.0" y="265.2" class="pt" text-anchor="end" fill="#2b7de9">SIF</text>
-<text x="904.0" y="199.5" class="pt" text-anchor="end">3.1× cheaper</text>
-<text x="480.0" y="375" class="ax" text-anchor="middle">N = how many capabilities the model can choose from</text>
-<text x="60" y="404" class="cap">Left: out of 20 attempts per bar (10 tasks × 2 repeats), how often the model called the capability the task needed. Equal bars = both ways worked equally well.</text>
-<text x="60" y="420" class="cap">Right: an MCP agent resends all N tool definitions with every call; SIF sends one tool whose list of names grows. Lines are the 3-model average; markers are the individual models.</text>
-<rect x="60" y="443" width="14" height="10" fill="#e07b39"/>
-<text x="80" y="452" class="ax">MCP — the same N capabilities as N separate tools</text>
-<rect x="368" y="443" width="14" height="10" fill="#2b7de9"/>
-<text x="388" y="452" class="ax">SIF — one submit_intent tool declaring all N</text>
-<circle cx="700.0" cy="448.0" r="3.4" fill="#555"/>
-<text x="709" y="452" class="ax">haiku</text>
-<rect x="774.8" y="444.8" width="6.4" height="6.4" fill="#555"/>
-<text x="787" y="452" class="ax">sonnet</text>
-<path d="M856.0,443.8 L860.0,451.2 L852.0,451.2 Z" fill="#555"/>
-<text x="865" y="452" class="ax">opus</text>
+<rect width="960" height="500" fill="white"/>
+<text x="60" y="24" class="t" style="font-size:15px">Closer to real life: look-alike tools, vague requests, long context — MCP tool surface vs one SIF intent tool</text>
+<text x="60" y="41" class="st">Claude Haiku 4.5, real API calls. Early pilot: small sample (2 repeats), token counts estimated. Raw logs and per-run reports: bench_results/.</text>
+<text x="60" y="86" class="t">Right capability picked — 10 to choose from</text>
+<line x1="60" y1="356.0" x2="360" y2="356.0" class="grid"/>
+<text x="54" y="359.5" class="ax" text-anchor="end">0%</text>
+<line x1="60" y1="294.5" x2="360" y2="294.5" class="grid"/>
+<text x="54" y="298.0" class="ax" text-anchor="end">25%</text>
+<line x1="60" y1="233.0" x2="360" y2="233.0" class="grid"/>
+<text x="54" y="236.5" class="ax" text-anchor="end">50%</text>
+<line x1="60" y1="171.5" x2="360" y2="171.5" class="grid"/>
+<text x="54" y="175.0" class="ax" text-anchor="end">75%</text>
+<line x1="60" y1="110.0" x2="360" y2="110.0" class="grid"/>
+<text x="54" y="113.5" class="ax" text-anchor="end">100%</text>
+<text x="91.7" y="370" class="axs" text-anchor="middle">confusable</text>
+<rect x="76.7" y="171.5" width="14" height="184.5" fill="#e07b39"/>
+<rect x="92.7" y="122.3" width="14" height="233.7" fill="#2b7de9"/>
+<text x="83.7" y="167.5" class="vl" text-anchor="middle">75</text>
+<text x="99.7" y="118.3" class="vl" text-anchor="middle">95</text>
+<text x="139.0" y="370" class="axs" text-anchor="middle">explicit</text>
+<rect x="124.0" y="146.9" width="14" height="209.1" fill="#e07b39"/>
+<rect x="140.0" y="134.6" width="14" height="221.4" fill="#2b7de9"/>
+<text x="131.0" y="142.9" class="vl" text-anchor="middle">85</text>
+<text x="147.0" y="130.6" class="vl" text-anchor="middle">90</text>
+<text x="186.3" y="370" class="axs" text-anchor="middle">vague</text>
+<rect x="171.3" y="343.7" width="14" height="12.3" fill="#e07b39"/>
+<rect x="187.3" y="294.5" width="14" height="61.5" fill="#2b7de9"/>
+<text x="178.3" y="339.7" class="vl" text-anchor="middle">5</text>
+<text x="194.3" y="290.5" class="vl" text-anchor="middle">25</text>
+<text x="233.7" y="370" class="axs" text-anchor="middle">context2k</text>
+<rect x="218.7" y="171.5" width="14" height="184.5" fill="#e07b39"/>
+<rect x="234.7" y="122.3" width="14" height="233.7" fill="#2b7de9"/>
+<text x="225.7" y="167.5" class="vl" text-anchor="middle">75</text>
+<text x="241.7" y="118.3" class="vl" text-anchor="middle">95</text>
+<text x="281.0" y="370" class="axs" text-anchor="middle">realistic</text>
+<rect x="266.0" y="134.6" width="14" height="221.4" fill="#e07b39"/>
+<rect x="282.0" y="159.2" width="14" height="196.8" fill="#2b7de9"/>
+<text x="273.0" y="130.6" class="vl" text-anchor="middle">90</text>
+<text x="289.0" y="155.2" class="vl" text-anchor="middle">80</text>
+<text x="328.3" y="370" class="axs" text-anchor="middle">no-tool</text>
+<rect x="313.3" y="110.0" width="14" height="246.0" fill="#e07b39"/>
+<rect x="329.3" y="110.0" width="14" height="246.0" fill="#2b7de9"/>
+<text x="328.3" y="106.0" class="vl" text-anchor="middle">100</text>
+<text x="388" y="86" class="t">Right capability picked — 50 to choose from</text>
+<line x1="388" y1="356.0" x2="688" y2="356.0" class="grid"/>
+<line x1="388" y1="294.5" x2="688" y2="294.5" class="grid"/>
+<line x1="388" y1="233.0" x2="688" y2="233.0" class="grid"/>
+<line x1="388" y1="171.5" x2="688" y2="171.5" class="grid"/>
+<line x1="388" y1="110.0" x2="688" y2="110.0" class="grid"/>
+<text x="419.7" y="370" class="axs" text-anchor="middle">confusable</text>
+<rect x="404.7" y="220.7" width="14" height="135.3" fill="#e07b39"/>
+<rect x="420.7" y="159.2" width="14" height="196.8" fill="#2b7de9"/>
+<text x="411.7" y="216.7" class="vl" text-anchor="middle">55</text>
+<text x="427.7" y="155.2" class="vl" text-anchor="middle">80</text>
+<text x="467.0" y="370" class="axs" text-anchor="middle">explicit</text>
+<rect x="452.0" y="257.6" width="14" height="98.4" fill="#e07b39"/>
+<rect x="468.0" y="208.4" width="14" height="147.6" fill="#2b7de9"/>
+<text x="459.0" y="253.6" class="vl" text-anchor="middle">40</text>
+<text x="475.0" y="204.4" class="vl" text-anchor="middle">60</text>
+<text x="514.3" y="370" class="axs" text-anchor="middle">vague</text>
+<rect x="499.3" y="356.0" width="14" height="0.0" fill="#e07b39"/>
+<rect x="515.3" y="319.1" width="14" height="36.9" fill="#2b7de9"/>
+<text x="506.3" y="352.0" class="vl" text-anchor="middle">0</text>
+<text x="522.3" y="315.1" class="vl" text-anchor="middle">15</text>
+<text x="561.7" y="370" class="axs" text-anchor="middle">context2k</text>
+<rect x="546.7" y="208.4" width="14" height="147.6" fill="#e07b39"/>
+<rect x="562.7" y="134.6" width="14" height="221.4" fill="#2b7de9"/>
+<text x="553.7" y="204.4" class="vl" text-anchor="middle">60</text>
+<text x="569.7" y="130.6" class="vl" text-anchor="middle">90</text>
+<text x="609.0" y="370" class="axs" text-anchor="middle">realistic</text>
+<rect x="594.0" y="134.6" width="14" height="221.4" fill="#e07b39"/>
+<rect x="610.0" y="183.8" width="14" height="172.2" fill="#2b7de9"/>
+<text x="601.0" y="130.6" class="vl" text-anchor="middle">90</text>
+<text x="617.0" y="179.8" class="vl" text-anchor="middle">70</text>
+<text x="656.3" y="370" class="axs" text-anchor="middle">no-tool</text>
+<rect x="641.3" y="110.0" width="14" height="246.0" fill="#e07b39"/>
+<rect x="657.3" y="110.0" width="14" height="246.0" fill="#2b7de9"/>
+<text x="656.3" y="106.0" class="vl" text-anchor="middle">100</text>
+<text x="736" y="86" class="t">Tokens per call</text>
+<text x="736" y="100" class="st">N=50; terse vs realistic tool cards</text>
+<line x1="736" y1="356.0" x2="926" y2="356.0" class="grid"/>
+<text x="730" y="359.5" class="ax" text-anchor="end">0</text>
+<line x1="736" y1="327.1" x2="926" y2="327.1" class="grid"/>
+<text x="730" y="330.6" class="ax" text-anchor="end">1000</text>
+<line x1="736" y1="298.1" x2="926" y2="298.1" class="grid"/>
+<text x="730" y="301.6" class="ax" text-anchor="end">2000</text>
+<line x1="736" y1="269.2" x2="926" y2="269.2" class="grid"/>
+<text x="730" y="272.7" class="ax" text-anchor="end">3000</text>
+<line x1="736" y1="240.2" x2="926" y2="240.2" class="grid"/>
+<text x="730" y="243.7" class="ax" text-anchor="end">4000</text>
+<line x1="736" y1="211.3" x2="926" y2="211.3" class="grid"/>
+<text x="730" y="214.8" class="ax" text-anchor="end">5000</text>
+<line x1="736" y1="182.4" x2="926" y2="182.4" class="grid"/>
+<text x="730" y="185.9" class="ax" text-anchor="end">6000</text>
+<line x1="736" y1="153.4" x2="926" y2="153.4" class="grid"/>
+<text x="730" y="156.9" class="ax" text-anchor="end">7000</text>
+<line x1="736" y1="124.5" x2="926" y2="124.5" class="grid"/>
+<text x="730" y="128.0" class="ax" text-anchor="end">8000</text>
+<rect x="750.0" y="310.2" width="34.5" height="45.8" fill="#e07b39"/>
+<text x="767.2" y="306.2" class="vl" text-anchor="middle">1582</text>
+<text x="767.2" y="370" class="axs" text-anchor="middle">mcp-terse</text>
+<rect x="792.5" y="325.0" width="34.5" height="31.0" fill="#2b7de9"/>
+<text x="809.8" y="321.0" class="vl" text-anchor="middle">1073</text>
+<text x="809.8" y="370" class="axs" text-anchor="middle">sif-terse</text>
+<rect x="835.0" y="117.2" width="34.5" height="238.8" fill="#e07b39"/>
+<text x="852.2" y="113.2" class="vl" text-anchor="middle">8251</text>
+<text x="852.2" y="370" class="axs" text-anchor="middle">mcp-real</text>
+<rect x="877.5" y="312.0" width="34.5" height="44.0" fill="#2b7de9"/>
+<text x="894.8" y="308.0" class="vl" text-anchor="middle">1519</text>
+<text x="894.8" y="370" class="axs" text-anchor="middle">sif-real</text>
+<text x="60" y="396" class="cap">Bars: out of 20 attempts each (10 tasks × 2 repeats, Claude Haiku 4.5), how often the model called the capability the task needed —</text>
+<text x="60" y="412" class="cap">with look-alike capabilities in the selection space (confusable), different prompt wordings (explicit / vague), ~2,000 tokens of prior conversation</text>
+<text x="60" y="428" class="cap">(context2k), and production-length tool descriptions (realistic). "no-tool" prompts need NO call — that bar is how often the model correctly stayed quiet.</text>
+<rect x="60" y="475" width="14" height="10" fill="#e07b39"/>
+<text x="80" y="484" class="ax">MCP — the same N capabilities as N separate tools</text>
+<rect x="380" y="475" width="14" height="10" fill="#2b7de9"/>
+<text x="400" y="484" class="ax">SIF — one submit_intent tool declaring all N</text>
 </svg>

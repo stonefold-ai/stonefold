@@ -1,0 +1,71 @@
+{
+  "cells": [
+    {
+      "clarify": 0.0,
+      "condition": "mcp",
+      "correct": 0.85,
+      "count": 20,
+      "hallucinated": 0.0,
+      "malformed": 0.0,
+      "n": 10,
+      "no_call": 0.05,
+      "overcall": 0.0,
+      "retrieval_miss": 0.0,
+      "tokens_mean": 410.0,
+      "wrong_args": 0.1,
+      "wrong_tool": 0.0
+    },
+    {
+      "clarify": 0.0,
+      "condition": "mcp",
+      "correct": 0.4,
+      "count": 20,
+      "hallucinated": 0.0,
+      "malformed": 0.0,
+      "n": 50,
+      "no_call": 0.0,
+      "overcall": 0.0,
+      "retrieval_miss": 0.0,
+      "tokens_mean": 1589.05,
+      "wrong_args": 0.05,
+      "wrong_tool": 0.55
+    },
+    {
+      "clarify": 0.05,
+      "condition": "sif",
+      "correct": 0.9,
+      "count": 20,
+      "hallucinated": 0.0,
+      "malformed": 0.0,
+      "n": 10,
+      "no_call": 0.0,
+      "overcall": 0.0,
+      "retrieval_miss": 0.0,
+      "tokens_mean": 416.65,
+      "wrong_args": 0.0,
+      "wrong_tool": 0.05
+    },
+    {
+      "clarify": 0.0,
+      "condition": "sif",
+      "correct": 0.6,
+      "count": 20,
+      "hallucinated": 0.0,
+      "malformed": 0.0,
+      "n": 50,
+      "no_call": 0.0,
+      "overcall": 0.0,
+      "retrieval_miss": 0.0,
+      "tokens_mean": 1078.55,
+      "wrong_args": 0.0,
+      "wrong_tool": 0.4
+    }
+  ],
+  "models": [
+    "small"
+  ],
+  "reps": 2,
+  "rounds_done": 2,
+  "smoke": false,
+  "track": "r"
+}

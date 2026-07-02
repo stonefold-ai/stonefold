@@ -314,3 +314,100 @@ def test_cli_rejects_unknown_filters(tmp_path: Path) -> None:
         main(["--track", "r", "--smoke", "--surfaces", "nope", "--out", str(tmp_path)])
     with pytest.raises(SystemExit):
         main(["--track", "s", "--smoke", "--rungs", "S9", "--out", str(tmp_path)])
+
+
+# --- realism extensions (docs/15 pilot record follow-up) --------------------
+def test_confusable_fillers_are_unique_and_near_duplicates() -> None:
+    from acp_bench.realism import confusable_fillers
+    from acp_bench.reliability import _ANCHORS
+
+    fillers = confusable_fillers(_ANCHORS, 40)
+    assert len(fillers) == 40
+    names = [c.name for c in fillers] + [a.name for a in _ANCHORS]
+    pairs = [(c.resource, c.action) for c in fillers] + [(a.resource, a.action) for a in _ANCHORS]
+    assert len(set(names)) == len(names)          # unique tool names
+    assert len(set(pairs)) == len(pairs)          # unique SIF (resource, action) pairs
+    # near-duplicates target the anchors: a synonym-verb sibling of send_email exists
+    assert any(c.resource == "Email" and c.action != "send" for c in fillers)
+    assert all(c.description for c in fillers)    # overlapping descriptions present
+
+
+def test_sif_surface_carries_the_same_descriptions_as_mcp() -> None:
+    from acp_bench.reliability import MCP, PROBES, SIF, surface_for
+
+    probe = PROBES[1]
+    mcp = surface_for(MCP, 50, probe, fillers="confusable")
+    sif = surface_for(SIF, 50, probe, fillers="confusable")
+    # parity: every MCP card description also appears in the SIF capability list
+    sif_desc = sif.tools[0].description
+    for tool in mcp.tools:
+        assert tool.description in sif_desc
+
+
+def test_scoring_clarify_overcall_and_wrong_args() -> None:
+    from acp_ap_demo.llm import ToolCall
+    from acp_bench.reliability import (
+        CLARIFY, CORRECT, DISTRACTOR_PROBES, MCP, NO_CALL, OVERCALL, PROBES, SIF,
+        WRONG_ARGS, _score, surface_for,
+    )
+
+    probe = PROBES[1]  # pay-invoice, gold value "800"
+    mcp = surface_for(MCP, 10, probe)
+    # no call: question => clarify, silence => no_call
+    assert _score(MCP, mcp, probe, None, "Which account should I use?")[0] == CLARIFY
+    assert _score(MCP, mcp, probe, None, "I cannot do that.")[0] == NO_CALL
+    # right capability, gold value missing => wrong_args; present => correct
+    good = ToolCall("1", "pay_invoice", {"amount": 800})
+    bad = ToolCall("1", "pay_invoice", {"amount": 999})
+    assert _score(MCP, mcp, probe, good, "", gold=("800",))[0] == CORRECT
+    assert _score(MCP, mcp, probe, bad, "", gold=("800",))[0] == WRONG_ARGS
+    # distractor: no call is correct, any call is an over-call
+    d = DISTRACTOR_PROBES[0]
+    dsurf = surface_for(MCP, 10, d)
+    assert _score(MCP, dsurf, d, None, "Net 30 means payment is due in 30 days.")[0] == CORRECT
+    assert _score(MCP, dsurf, d, ToolCall("1", "read_invoice", {}), "")[0] == OVERCALL
+    # SIF gold check reads the data block too
+    sif = surface_for(SIF, 10, probe)
+    sif_good = ToolCall("1", "submit_intent",
+                        {"resource": "Payment", "action": "pay", "data": {"amount": "800"}})
+    sif_bad = ToolCall("1", "submit_intent",
+                       {"resource": "Payment", "action": "pay", "data": {"amount": "1"}})
+    assert _score(SIF, sif, probe, sif_good, "", gold=("800",))[0] == CORRECT
+    assert _score(SIF, sif, probe, sif_bad, "", gold=("800",))[0] == WRONG_ARGS
+
+
+def test_realistic_cards_have_params_on_both_surfaces() -> None:
+    from acp_bench.reliability import MCP, PROBES, SIF, surface_for
+
+    probe = PROBES[1]
+    mcp = surface_for(MCP, 10, probe, cards="realistic")
+    pay = next(t for t in mcp.tools if t.name == "pay_invoice")
+    assert "amount" in pay.input_schema["properties"]
+    assert len(pay.description) > 100
+    sif = surface_for(SIF, 10, probe, cards="realistic")
+    assert "amount" in sif.tools[0].description  # param names listed for parity
+
+
+def test_context_builder_is_bounded_and_alternating() -> None:
+    from acp_bench.realism import build_context
+
+    assert build_context(0) == []
+    msgs = build_context(2000)
+    chars = sum(len(m["content"]) for m in msgs)
+    assert 0 < chars <= 2000 * 4 + 600            # ~2k tokens at 4 chars/token
+    roles = [m["role"] for m in msgs]
+    assert roles[0] == "user" and roles[-1] == "assistant"
+    assert all(roles[i] != roles[i + 1] for i in range(len(roles) - 1))
+
+
+def test_cli_realism_flags_smoke(tmp_path: Path) -> None:
+    from acp_bench.__main__ import main
+
+    assert main(["--track", "r", "--smoke", "--reps", "1", "--ns", "10",
+                 "--surfaces", "sif", "--fillers", "confusable", "--cards", "realistic",
+                 "--phrasing", "vague", "--context-tokens", "500",
+                 "--out", str(tmp_path)]) == 0
+    rows = read_jsonl(tmp_path / "track-r" / "trials.jsonl")
+    assert rows and all(r["phrasing"] == "vague" and r["context_tokens"] == 500 for r in rows)
+    assert main(["--track", "r", "--smoke", "--reps", "1", "--ns", "10",
+                 "--probe-set", "distractor", "--out", str(tmp_path)]) == 0

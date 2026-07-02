@@ -31,6 +31,7 @@ class Capability:
     resource: str  # SIF resource enum value, e.g. "Res7"
     action: str    # "read" | "act"
     kind: str      # "observe" | "effect"
+    description: str = ""  # optional one-liner; BOTH surfaces carry it (parity)
 
 
 def capability_set(n: int) -> tuple[Capability, ...]:
@@ -55,7 +56,8 @@ def _obj_schema() -> dict[str, object]:
 def mcp_surface(caps: tuple[Capability, ...]) -> list[ToolDef]:
     """The MCP condition: N tools, one per capability."""
     return [
-        ToolDef(name=c.name, description=f"{c.action} {c.resource}", input_schema=_obj_schema())
+        ToolDef(name=c.name, description=c.description or f"{c.action} {c.resource}",
+                input_schema=_obj_schema())
         for c in caps
     ]
 
@@ -75,13 +77,21 @@ def sif_surface(caps: tuple[Capability, ...]) -> list[ToolDef]:
     than N tool names."""
     resources = sorted({c.resource for c in caps})
     actions = sorted({c.action for c in caps})
-    pairs = ", ".join(f"{c.resource}.{c.action}" for c in caps)
+    # Description parity: whatever one-liner the MCP tool card carries, the SIF
+    # capability list carries too — neither surface gets more signal.
+    if any(c.description for c in caps):
+        pairs = "\n".join(
+            f"{c.resource}.{c.action}" + (f" — {c.description}" if c.description else "")
+            for c in caps)
+        intro = ("Submit one intended action for enforcement. Set `resource` and "
+                 "`action` to exactly one of the declared capabilities:\n")
+    else:
+        pairs = ", ".join(f"{c.resource}.{c.action}" for c in caps)
+        intro = ("Submit one intended action for enforcement. Set `resource` and "
+                 "`action` to exactly one of the declared capabilities: ")
     return [ToolDef(
         name="submit_intent",
-        description=(
-            "Submit one intended action for enforcement. Set `resource` and `action` to "
-            f"exactly one of the declared capabilities: {pairs}."
-        ),
+        description=intro + pairs + ".",
         input_schema={
             "type": "object",
             "properties": {

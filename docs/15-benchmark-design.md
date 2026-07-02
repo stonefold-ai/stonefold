@@ -236,3 +236,73 @@ not a design change — the design always specified the SIF condition as "one
 `submit_intent` … declaring the same N capabilities", which the free-string form
 under-implemented. Haiku N=10/50/100 were re-run on the fixed surface so the
 headline cells share one surface version.
+
+### Realism battery — 2026-07-02, same day (Track R; supersedes the count pilot as headline)
+
+The count pilot above answered its narrow question (count alone does not break
+selection) and pointed at what would: the axes real deployments actually stress.
+**Amendment A2** added five of them to the harness — all deterministic, all
+parity-preserving (whatever description or parameter list one surface carries, the
+other carries too): **confusable fillers** (near-duplicate capabilities: synonym
+verbs/resources with overlapping descriptions — `realism.confusable_fillers`),
+**prompt phrasings** (explicit / typical / vague) plus **no-tool distractor prompts**
+(over-calling is now observable: the system prompts became neutral — "if no tool is
+needed, just answer"), **gold argument values** (key-agnostic `wrong_args` outcome),
+**realistic tool cards** (production-length descriptions + typed parameters on both
+surfaces), and a **deterministic ~2k-token context prefix**. New outcomes:
+`wrong_args`, `clarify` (asked instead of acting — deliberately not counted as
+failure), `overcall`.
+
+**Executed:** Claude Haiku 4.5, N ∈ {10, 50}, `mcp` vs `sif`, 2 reps × 10 probes per
+cell (PILOT, below the §5 bar), all configurations over the confusable catalog. Raw
+logs: `bench_results/2026-07-02-trackR-haiku-realism/`; graph: `trackR-pilot.svg`.
+
+**Correct capability selection, % (N=10 / N=50):**
+
+| Configuration | MCP | SIF |
+|---|---|---|
+| confusable, typical prompts | 75 / 55 | **95 / 80** |
+| confusable + explicit prompts | 85 / 40 | **90 / 60** |
+| confusable + vague prompts¹ | 5 / 0 | **25 / 15** |
+| confusable + ~2k context | 75 / 60 | **95 / 90** |
+| realistic tool cards | **90 / 90** | 80 / 70 |
+| no-tool distractors (correct = no call) | 100 / 100 | 100 / 100 |
+
+¹ vague prompts mostly produce `clarify` on both surfaces (45–65%) — the model asks
+instead of acting, which for an underspecified request is arguably right; it is its
+own outcome, not a failure. Rates among *commitments* still favour SIF.
+
+**Findings:**
+
+1. **Confusability is the failure driver the folklore describes — and the surfaces
+   now separate.** With look-alike capabilities, MCP wrong-tool selection reaches
+   25% at N=50; SIF degrades too (the pre-registered risk was real: 10%) but holds a
+   20–25-point correctness lead. The count pilot's "no issue at any N" and this
+   battery's "large issue at N=50" differ in exactly one variable: whether the
+   space contains near-duplicates.
+2. **Explicit wording can be lexical bait.** Detailed prompts ("*transfer* USD
+   800…") collide with look-alike names (`transfer_…`) and *hurt* both surfaces at
+   N=50 — user word choice steering tool choice is a realistic failure mode, found
+   accidentally and reported as found.
+3. **Context load separates the surfaces again.** ~2k tokens of prior conversation
+   barely moves SIF (95/90) while MCP degrades (75/60) — the single typed intent
+   tool appears more robust to attention dilution than fifty tool cards.
+4. **An honest SIF loss: realistic tool cards fix MCP's selection.** Rich
+   per-tool descriptions disambiguate the look-alikes (MCP back to 90/90) — better
+   than SIF's 80/70, whose single long capability list also produced 15% `clarify`.
+   Presentation of the SIF catalogue at scale is unoptimized (cf. Amendment A1's
+   lesson) and this is the row to beat. The cost of that MCP fix, however, is the
+   token story: **8,251 vs 1,519 tokens per call at N=50 — 5.4×** (up from 3.1× with
+   terse cards; the realistic-card gap is what production deployments pay).
+5. **No over-calling, anywhere.** On prompts needing no tool, both surfaces were
+   perfect (zero calls) — a tie, reported as one (§6).
+
+**Scope unchanged:** one model, 2 reps, estimated tokens, no retrieval baseline,
+single-turn. The §5-bar experiment still requires ≥5 reps, more models, the
+retrieval condition, SDK token usage, and the fairness sign-off.
+
+**Amendment A2 (2026-07-02).** Harness additions as listed above
+(`acp_bench.realism`; CLI flags `--fillers/--cards/--phrasing/--context-tokens/`
+`--probe-set`); anchor capabilities now carry one-line descriptions on **both**
+surfaces; system prompts neutralized. Recorded per §7. The count-pilot runs remain
+published under `bench_results/superseded-count-pilot/`.

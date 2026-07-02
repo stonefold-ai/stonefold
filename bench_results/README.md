@@ -1,59 +1,72 @@
-# bench_results — raw logs of executed benchmark runs
+# bench_results — test data + harness for verifying the method
 
-Raw, verbatim output of `python -m acp_bench` runs that were actually executed
-(docs/15 §5: the logs are published so anyone can recompute the matrix). The findings
-and their interpretation live in **docs/15 → "Pilot run record"** — this directory is
-the evidence, not the narrative.
+**Everything needed to check these results — the raw data of every model call, the
+harness that produced them, and the scripts that aggregate and plot them — is in this
+repository.** Nothing here asks to be trusted: recompute the matrix from the logs,
+read the scoring code, or re-run the whole battery with your own key (docs/15 §5:
+"someone at a gateway vendor can rerun it and be forced to accept the number").
 
-Every run folder carries the full output contract: `trials.jsonl` (one line per model
-call), `cells.json` / `cells.csv` (aggregated rates — the graphing input), `report.md`
-(rendered matrix), `meta.json` (parameters + timestamps).
+The findings and their interpretation live in **docs/15 → "Pilot run record"** — this
+directory is the evidence, not the narrative.
 
-| Folder | Model | Surface version | Status |
-|---|---|---|---|
-| `2026-07-02-trackR-haiku/` | claude-haiku-4-5-20251001 | fixed (action enum-injected) | **headline data** |
-| `2026-07-02-trackR-sonnet/` | claude-sonnet-5 | fixed | headline data |
-| `2026-07-02-trackR-opus/` | claude-opus-4-8 | fixed | headline data |
-| `2026-07-02-trackR-haiku-freestring-action/` | claude-haiku-4-5-20251001 | pre-fix (free-string `action`) | kept as evidence of the formatting finding (docs/15 pilot record, point 3) — do **not** mix with fixed-surface cells |
+![Track R realism battery — selection accuracy per configuration (bars) and tokens per call (right)](trackR-pilot.svg)
 
-**These are PILOT runs**: 2 repetitions per cell (the docs/15 §5 bar is ≥5), one probe
-set of 10 benign tasks, the retrieval-assisted baseline was not run, and token counts
-are the ~4-chars/token estimate (not SDK usage). They are honest pilots, labelled as
-such — not the publishable experiment. Findings + full context: docs/15 → "Pilot run
-record".
+## Headline data — the realism battery (2026-07-02, Claude Haiku 4.5)
 
-**Reading the sub-100% cells:** haiku's misses on the MCP surface are *not* wrong-tool
-picks — in every one (grep `no_call` in the trials.jsonl files) the model declined to
-call **any** tool on the one vaguely-worded probe (`update-address`), while under SIF
-it committed to the right capability every time. No model ever selected a wrong tool
-or emitted an undeclared name on either surface in the fixed-surface runs.
+`2026-07-02-trackR-haiku-realism/` — six configurations at N ∈ {10, 50}, `mcp` vs
+`sif`, 2 repetitions × 10 probes per cell, all with **confusable** (near-duplicate)
+capabilities in the selection space unless noted:
 
-![Track R pilot — selection accuracy per model (bars) and tokens per call (lines), MCP vs SIF](trackR-pilot.svg)
+| Folder | What it varies | One-line result |
+|---|---|---|
+| `confusable/` | look-alike capabilities, typical prompts | MCP 75/55 %, SIF 95/80 % correct (N=10/50) |
+| `explicit/` | detailed prompt wording | hurts both at N=50 (wording collides with look-alike names); SIF still ahead |
+| `vague/` | underspecified prompts | both mostly ask a clarifying question (~45–65 %) — scored as its own outcome, not failure |
+| `distractor/` | prompts needing NO tool | **perfect on both surfaces** — zero over-calls; reported as the tie it is |
+| `realistic/` | production-length tool cards | **MCP recovers to 90/90 % — an honest SIF loss on selection (80/70 %)** — but at 5.4× the tokens (8 251 vs 1 519 at N=50) |
+| `context2k/` | ~2 000 tokens of prior conversation | MCP degrades (75/60 %), SIF barely moves (95/90 %) |
 
-Graph: `trackR-pilot.svg` above (regenerate with the cells.csv files; the generator
-script is committed alongside as `make_graph.py`).
+Every run folder carries the full output contract: `trials.jsonl` (one line per real
+model call, including exactly what the model chose), `cells.json` / `cells.csv` (the
+aggregated rates — the graphing input), `report.md` (rendered matrix), `meta.json`
+(parameters + timestamps).
+
+**These are PILOT runs**: one model, 2 repetitions per cell (the docs/15 §5 bar is
+≥5), token counts are the ~4-chars/token estimate, and the retrieval-assisted
+baseline was not run. Honest pilots, labelled as such — not the publishable
+experiment.
+
+## Superseded: the count-only pilot
+
+`superseded-count-pilot/` — the first pilot (same day, earlier): tool COUNT alone at
+N ∈ {10, 50, 100} with semantically distant fillers, three models (Haiku/Sonnet 5/
+Opus 4.8). Its result — count alone does not break selection on current models;
+tokens grow linearly for MCP (~3.1× gap at N=100) — motivated the realism battery
+above, which is why it is superseded as the headline but kept in full (published
+logs stay published; the `…-freestring-action/` subfolder is the evidence for the
+formatting finding, docs/15 Amendment A1).
 
 ## Verify the harness before trusting a number
 
-Every mechanism behind these logs is small, committed code — check it, don't take our
-word (docs/15 §5: "someone at a gateway vendor can rerun it and be forced to accept
-the number"):
-
 | What to check | Where |
 |---|---|
-| The two surfaces really expose the same N capabilities (parity, §4.1) | `src/acp_bench/tracks.py` — `mcp_surface` / `sif_surface` / `capability_set`; parity asserted in `tests/test_bench_harness.py` |
-| The task set (10 benign probes, one per capability) | `src/acp_bench/reliability.py` — `PROBES` |
-| The scoring rules (what counts as correct / wrong-tool / hallucinated / malformed / no-call) | `src/acp_bench/reliability.py` — `_score`, unit-tested in `tests/test_bench_harness.py` |
-| The single-turn protocol (system prompts, one call per trial) | `src/acp_bench/reliability.py` — `run_trial`, `_SYS_MCP` / `_SYS_SIF` |
-| The token numbers are an ESTIMATE (~4 chars/token) | `src/acp_bench/model.py` — `MeteredProvider` docstring |
-| The surface-version difference between run folders | `sif_surface`'s docstring records the 2026-07-02 action-enum fix |
+| The two surfaces expose the same N capabilities, with the SAME descriptions (parity) | `src/acp_bench/tracks.py` (`mcp_surface`/`sif_surface`), `src/acp_bench/realism.py` (`realistic_mcp`/`realistic_sif`); asserted in `tests/test_bench_harness.py` |
+| The confusable catalog (synonym verbs/resources, overlapping descriptions) | `src/acp_bench/realism.py` — `confusable_fillers` |
+| The task set, phrasings, gold argument values, no-tool distractors | `reliability.PROBES`, `realism._PROMPTS` / `GOLD_VALUES` / `DISTRACTOR_PROMPTS` |
+| The scoring rules (correct / wrong_tool / wrong_args / hallucinated / malformed / no_call / clarify / overcall) | `src/acp_bench/reliability.py` — `_score`, unit-tested |
+| SIF is scored on picking the right `resource.action` PAIR — calling the single tool earns nothing | `_score`'s SIF branch; the `chose` column in every trials.jsonl |
+| The deterministic 2k-token context prefix | `realism.build_context` + `_CONTEXT_TURNS` |
+| Token numbers are an ESTIMATE (~4 chars/token) | `src/acp_bench/model.py` — `MeteredProvider` docstring |
 
-Reproduce a run (any Anthropic key; ~40–120 calls):
+Reproduce any cell (your own Anthropic key):
 
 ```
-python -m acp_bench --track r --run --models small --reps 2 --ns 10,50,100 --surfaces mcp,sif --out mydir
+python -m acp_bench --track r --run --models small --reps 2 --ns 10,50 \
+    --surfaces mcp,sif --fillers confusable [--phrasing vague] [--cards realistic] \
+    [--context-tokens 2000] [--probe-set distractor] --out mydir
 ```
 
-Recompute the matrix from a raw log without re-running: read `trials.jsonl` and count
-outcomes per (condition, n) — the aggregation is `reliability.reliability_matrix`,
-~20 lines.
+Recompute a matrix from a raw log without re-running: count outcomes per
+(condition, n) over `trials.jsonl` — the aggregation is
+`reliability.reliability_matrix`, ~25 lines. The graph regenerates from the CSVs via
+`make_graph.py` (committed alongside).

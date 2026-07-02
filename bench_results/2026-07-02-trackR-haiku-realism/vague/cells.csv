@@ -1,0 +1,5 @@
+condition,n,count,correct,wrong_tool,wrong_args,hallucinated,malformed,no_call,clarify,overcall,retrieval_miss,tokens_mean
+mcp,10,20,0.05,0.0,0.3,0.0,0.0,0.1,0.55,0.0,0.0,447.35
+mcp,50,20,0.0,0.15,0.15,0.0,0.0,0.1,0.6,0.0,0.0,1633.75
+sif,10,20,0.25,0.0,0.1,0.0,0.0,0.2,0.45,0.0,0.0,447.35
+sif,50,20,0.15,0.05,0.1,0.0,0.0,0.05,0.65,0.0,0.0,1129.55

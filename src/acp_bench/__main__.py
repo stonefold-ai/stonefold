@@ -40,7 +40,10 @@ from acp_bench.matrix import aggregate
 from acp_bench.model import PINNED_MODELS, ModelSpec, model_by_key
 from acp_bench.raw_log import JsonlWriter, write_csv, write_json
 from acp_bench.reliability import (
+    CARDS,
     CONDITIONS as R_SURFACES,
+    DISTRACTOR_PROBES,
+    FILLERS,
     PROBES,
     Probe,
     RTrial,
@@ -82,11 +85,14 @@ def _meta(out: Path, base: dict[str, Any], **updates: Any) -> dict[str, Any]:
 # --- Track R — tool-selection effectiveness --------------------------------
 def _run_track_r(models: tuple[ModelSpec, ...], surfaces: tuple[str, ...],
                  ns: tuple[int, ...], probes: tuple[Probe, ...], reps: int,
-                 out: Path, *, smoke: bool) -> int:
+                 out: Path, *, smoke: bool, fillers: str = "synthetic",
+                 cards: str = "terse", phrasing: str = "typical",
+                 context_tokens: int = 0) -> int:
     meta = _meta(out, {
         "track": "r", "smoke": smoke, "models": [m.key for m in models],
         "surfaces": list(surfaces), "ns": list(ns), "probes": [p.id for p in probes],
-        "reps": reps, "started": _now(), "finished": None,
+        "reps": reps, "fillers": fillers, "cards": cards, "phrasing": phrasing,
+        "context_tokens": context_tokens, "started": _now(), "finished": None,
     })
 
     def write_cells(trials: list[RTrial], rounds_done: int) -> None:
@@ -105,6 +111,8 @@ def _run_track_r(models: tuple[ModelSpec, ...], surfaces: tuple[str, ...],
     with JsonlWriter(out / "trials.jsonl") as log:
         trials = run_reliability(
             models, ns, conditions=surfaces, probes=probes, reps=reps,
+            fillers=fillers, cards=cards, phrasing=phrasing,
+            context_tokens=context_tokens,
             on_trial=lambda t: log.write(t.as_dict()), on_round=on_round,
         )
 
@@ -191,6 +199,20 @@ def main(argv: list[str] | None = None) -> int:
                              f"(default: {','.join(R_SURFACES)})")
     parser.add_argument("--probes", default="",
                         help="[track r] probe ids to run (default: all; see README)")
+    parser.add_argument("--probe-set", choices=("main", "distractor"), default="main",
+                        help="[track r] main = the capability probes; distractor = "
+                             "no-tool prompts (a correct model answers WITHOUT calling)")
+    parser.add_argument("--fillers", choices=FILLERS, default="synthetic",
+                        help="[track r] filler capabilities: synthetic (distant) or "
+                             "confusable (near-duplicates of the anchors)")
+    parser.add_argument("--cards", choices=CARDS, default="terse",
+                        help="[track r] tool cards: terse one-liners or realistic "
+                             "(long descriptions + typed params, both surfaces)")
+    parser.add_argument("--phrasing", choices=("typical", "explicit", "vague"),
+                        default="typical", help="[track r] prompt wording variant")
+    parser.add_argument("--context-tokens", type=int, default=0,
+                        help="[track r] ~tokens of deterministic conversation history "
+                             "prepended before the probe (0 = fresh context)")
     parser.add_argument("--rungs", default="",
                         help="[track s] rungs to run, e.g. S0,S3 (default: all)")
     parser.add_argument("--out", default=DEFAULT_OUT,
@@ -222,16 +244,21 @@ def main(argv: list[str] | None = None) -> int:
         for s in surfaces:
             if s not in R_SURFACES:
                 parser.error(f"unknown surface {s!r}; known: {', '.join(R_SURFACES)}")
+        pool = DISTRACTOR_PROBES if args.probe_set == "distractor" else PROBES
         if args.probes:
             wanted = {p.strip() for p in args.probes.split(",") if p.strip()}
-            unknown = wanted - {p.id for p in PROBES}
+            unknown = wanted - {p.id for p in pool}
             if unknown:
                 parser.error(f"unknown probes {sorted(unknown)}; "
-                             f"known: {', '.join(p.id for p in PROBES)}")
-            probes = tuple(p for p in PROBES if p.id in wanted)
+                             f"known: {', '.join(p.id for p in pool)}")
+            probes = tuple(p for p in pool if p.id in wanted)
         else:
-            probes = PROBES
-        return _run_track_r(models, surfaces, ns, probes, reps, out, smoke=args.smoke)
+            probes = pool
+        if args.context_tokens < 0:
+            parser.error("--context-tokens must be >= 0")
+        return _run_track_r(models, surfaces, ns, probes, reps, out, smoke=args.smoke,
+                            fillers=args.fillers, cards=args.cards,
+                            phrasing=args.phrasing, context_tokens=args.context_tokens)
 
     if args.rungs:
         wanted_rungs = {r.strip().upper() for r in args.rungs.split(",") if r.strip()}
