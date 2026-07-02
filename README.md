@@ -155,6 +155,7 @@ The full version of this argument — the PDP/PEP category error, the four-verdi
 - **[Conformance TCK](docs/12-conformance-tck.md)** — certify a gateway in any language against the RFC: one small driver adapter (Python protocol or 15 JSON endpoints), one report, named profiles.
 - **[Who is this for](docs/13-who-is-this-for.md)** — the industries ranked by fit, each one's blocking risk mapped to the mechanisms that answer it, who buys, and where ACP is the wrong tool.
 - **[EU AI Act mapping](docs/14-eu-ai-act-mapping.md)** — the high-risk logging and human-oversight obligations, mechanism by mechanism (draft; citations pending verification).
+- **[Incremental adoption](docs/16-incremental-adoption.md)** — the ramp from an existing MCP tool estate to structural containment: draft → intercept → migrate entity-by-entity → SIF-native, with the honest coverage guarantee at each stage.
 - **Changelogs:** [v0.1 → v0.2](docs/RFC-changeset-v0.1-to-v0.2.md) · [v0.2 → v0.3](docs/RFC-changeset-v0.2-to-v0.3.md) · [v0.3 → v0.4](docs/RFC-changeset-v0.3-to-v0.4.md) (decision freshness + scope no-race, both implemented).
 
 ## License
