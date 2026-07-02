@@ -137,6 +137,100 @@ Track S rungs S0 and S3 are wired, **S1/S2 are UNCONFIGURED** until the author s
 their good-faith baseline policies (`src/acp_bench/policies/README.md`); attack **A2**
 (invite-to-wire) is wired, **A1/A3–A7 are UNWIRED** slots pending scenario sourcing;
 token counts are a build-time estimate to be replaced by SDK usage on a real run; and
-the Track-R surfaces + scorer are built but need a task set and real models to drive.
-No result is produced or committed — the smoke output is labelled as such (§6). *(This
-is a status note, not a design change; the design above is unchanged.)*
+the Track-R surfaces, task set, and scorer are built and have driven real models (the
+pilot record below).
+The console runner executes each track in isolation (`--track r|s`, with
+`--surfaces/--ns/--probes/--rungs/--models` slice filters) and streams structured
+output for graphing: every finished trial is appended to `trials.jsonl` immediately,
+and the aggregated cells are rewritten as `cells.json`/`cells.csv` after every
+completed round — a run cut short keeps everything finished so far (repetition is the
+outermost loop, so a partial run is a complete matrix at fewer reps). Field schemas:
+`src/acp_bench/README.md`. No result is produced or committed — the smoke output is
+labelled as such (§6). *(This is a status note, not a design change; the design above
+is unchanged.)*
+
+### Pilot run record — 2026-07-02 (Track R only; PILOT, below the §5 bar)
+
+Executed by the author. **Configuration:** Track R, surfaces `mcp` vs `sif`
+(the retrieval-assisted baseline was *not* part of these runs), N ∈ {10, 50, 100},
+the 10-probe benign task set, 2 repetitions per cell (§5 requires ≥ 5 — this is a
+pilot), single-turn selection, token counts are the ~4-chars/token estimate.
+Models: `claude-haiku-4-5-20251001` (small), `claude-sonnet-5` (mid),
+`claude-opus-4-8` (large). Raw logs, per-cell CSVs, and the graph
+(`trackR-pilot.svg`): [`bench_results/`](../bench_results/) — its README points at
+the exact harness functions (surface construction, probe set, scoring rules) so a
+reader can verify correctness rather than trust this summary.
+
+**Correct capability selection** (fixed surface; per cell: 10 probes × 2 reps):
+
+| Model | Surface | N=10 | N=50 | N=100 |
+|---|---|---|---|---|
+| haiku | mcp | 90% | 95% | 100% |
+| haiku | **sif** | **100%** | **100%** | **100%** |
+| sonnet | both | 100% | 100% | 100% |
+| opus | both | 100% | 100% | 100% |
+
+**Mean tokens per call** (estimate):
+
+| Model | Surface | N=10 | N=50 | N=100 |
+|---|---|---|---|---|
+| haiku | mcp / sif | 300 / 257 | 1173 / 460 | 2271 / 722 |
+| sonnet | mcp / sif | 289 / 257 | 1162 / 459 | 2263 / 718 |
+| opus | mcp / sif | 306 / 268 | 1177 / 470 | 2276 / 729 |
+
+**Findings, in plain language:**
+
+1. **The token curve is the robust, model-independent result.** MCP's per-call cost
+   grows linearly with N (every tool definition rides in the context: ×7.5 from
+   N=10→100), SIF's sub-linearly (one tool, a growing enum: ×2.8). At N=100 SIF is
+   ~3.1× cheaper per call, and the three models agree to within ~1% — because this is
+   a *mechanical* property of the schema payload, not model behaviour. It transfers to
+   production directly; real MCP tool descriptions are longer than the bench's terse
+   ones, so real-world gaps are likely larger.
+2. **Selection differences appear only below the model's ceiling.** Haiku missed
+   3/120 MCP trials (every miss the same shape: the vaguest probe, `update-address`,
+   answered with *no tool call at all* — hesitation, not confusion) and 0/120 on SIF.
+   Sonnet and Opus were 100% on **both** surfaces at every N — so **N=50 and N=100
+   produce identical results**: at this task difficulty, selection saturates, and
+   adding 50 more (deliberately non-confusable) capabilities changes nothing for any
+   model. Per §6 this tie is reported as a tie: on selection accuracy, `mcp ≈ sif`
+   for capable models here; the surface-shape advantage showed up only on the small
+   model — consistent with §4.5's hypothesis that the constrained surface does work
+   the model doesn't have to.
+3. **The formatting finding (the pilot's most instructive result).** The first runs
+   used a bench SIF surface that enum-injected `resource` but left `action` a free
+   string — a deviation from the real `submit_intent_schema`. Haiku then wrote the
+   qualified pair into the action field (`action: "Order.ship"` instead of `"ship"`)
+   on 2 of 10 probes — the *capability choice was right in every single trial*; only
+   the output spelling varied with prompt presentation (and flipped between N=10 and
+   N=50, i.e. with an incidental change in how the capability list read). Restoring
+   parity (action enum-injected — **amendment A1** to the harness, not to this
+   design) eliminated the failure completely: SIF went to 100% at every N. The
+   lesson is exactly SIF's argument: model output *formatting* is sensitive to schema
+   presentation, and enum injection removes that sensitivity structurally instead of
+   hoping the prompt reads right. Pre-fix logs are preserved in
+   `bench_results/2026-07-02-trackR-haiku-freestring-action/` — never mixed with the
+   fixed-surface cells.
+4. **Hallucinated names: 0% in both conditions, all models, all N.** This pilot
+   provides *no empirical support* for a "models hallucinate tool names at scale"
+   reliability argument — at these Ns, on these models, with benign prompts, neither
+   surface produced a single undeclared name. Enum injection's value here is the
+   structural worst-case guarantee (an undeclared name is unrepresentable, cf. A6)
+   and the formatting finding above — not a measured rate reduction. Reported per §6.
+
+**Scope limitation (what this pilot is not).** Single-turn selection with clean,
+1:1-mapped prompts; synthetic filler capabilities that are numerous but *not
+confusable* (real catalogs contain near-duplicates — `send_email`/`send_message` —
+where wrong-tool errors actually live); no conversation history; no retrieval
+baseline; 2 reps; estimated tokens. The relative comparisons above are controlled
+and meaningful; the absolute accuracy figures are optimistic and forecast nothing
+about production. The full §5-bar experiment needs: ≥ 5 reps, the retrieval
+condition, confusable fillers, SDK-reported token usage, and the fairness sign-off.
+
+**Amendment A1 (2026-07-02).** `tracks.sif_surface` now enum-injects `action`
+alongside `resource` (parity with the real `submit_intent_schema`). Recorded here
+because first results existed when it landed (§7); it is a harness-correctness fix,
+not a design change — the design always specified the SIF condition as "one
+`submit_intent` … declaring the same N capabilities", which the free-string form
+under-implemented. Haiku N=10/50/100 were re-run on the fixed surface so the
+headline cells share one surface version.

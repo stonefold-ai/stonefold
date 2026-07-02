@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="470" viewBox="0 0 960 470">
+<style>
+ .t { font: 600 15px sans-serif; fill: #222; }
+ .st { font: 12px sans-serif; fill: #555; }
+ .ax { font: 11px sans-serif; fill: #555; }
+ .grid { stroke: #ddd; stroke-width: 1; }
+</style>
+<rect width="960" height="470" fill="white"/>
+<text x="60" y="20" class="t">Track R pilot — MCP tool surface vs SIF submit_intent (real models, 2 reps × 10 probes/cell)</text>
+<text x="60" y="36" class="st">PILOT — below the docs/15 §5 bar (2 reps, estimated tokens). Raw logs: bench_results/. Fixed-surface runs only.</text>
+<text x="60" y="66" class="t">Correct capability selection</text>
+<line x1="60" y1="406.0" x2="435" y2="406.0" class="grid"/>
+<text x="54" y="410.0" class="ax" text-anchor="end">0%</text>
+<line x1="60" y1="324.5" x2="435" y2="324.5" class="grid"/>
+<text x="54" y="328.5" class="ax" text-anchor="end">25%</text>
+<line x1="60" y1="243.0" x2="435" y2="243.0" class="grid"/>
+<text x="54" y="247.0" class="ax" text-anchor="end">50%</text>
+<line x1="60" y1="161.5" x2="435" y2="161.5" class="grid"/>
+<text x="54" y="165.5" class="ax" text-anchor="end">75%</text>
+<line x1="60" y1="80.0" x2="435" y2="80.0" class="grid"/>
+<text x="54" y="84.0" class="ax" text-anchor="end">100%</text>
+<text x="60.0" y="422" class="ax" text-anchor="middle">10</text>
+<text x="247.5" y="422" class="ax" text-anchor="middle">50</text>
+<text x="435.0" y="422" class="ax" text-anchor="middle">100</text>
+<text x="247.5" y="438" class="ax" text-anchor="middle">N (capabilities in the selection space)</text>
+<path d="M60.0,112.6 L247.5,96.3 L435.0,80.0" fill="none" stroke="#e07b39" stroke-width="2.5"/>
+<circle cx="60.0" cy="112.6" r="3.5" fill="#e07b39"/>
+<circle cx="247.5" cy="96.3" r="3.5" fill="#e07b39"/>
+<circle cx="435.0" cy="80.0" r="3.5" fill="#e07b39"/>
+<path d="M60.0,80.0 L247.5,80.0 L435.0,80.0" fill="none" stroke="#2b7de9" stroke-width="2.5"/>
+<circle cx="60.0" cy="80.0" r="3.5" fill="#2b7de9"/>
+<circle cx="247.5" cy="80.0" r="3.5" fill="#2b7de9"/>
+<circle cx="435.0" cy="80.0" r="3.5" fill="#2b7de9"/>
+<path d="M60.0,80.0 L247.5,80.0 L435.0,80.0" fill="none" stroke="#a4501f" stroke-width="2.5" stroke-dasharray="6,3"/>
+<circle cx="60.0" cy="80.0" r="3.5" fill="#a4501f"/>
+<circle cx="247.5" cy="80.0" r="3.5" fill="#a4501f"/>
+<circle cx="435.0" cy="80.0" r="3.5" fill="#a4501f"/>
+<path d="M60.0,80.0 L247.5,80.0 L435.0,80.0" fill="none" stroke="#1a4e94" stroke-width="2.5" stroke-dasharray="6,3"/>
+<circle cx="60.0" cy="80.0" r="3.5" fill="#1a4e94"/>
+<circle cx="247.5" cy="80.0" r="3.5" fill="#1a4e94"/>
+<circle cx="435.0" cy="80.0" r="3.5" fill="#1a4e94"/>
+<path d="M60.0,80.0 L247.5,80.0 L435.0,80.0" fill="none" stroke="#c22f2f" stroke-width="2.5" stroke-dasharray="2,2"/>
+<circle cx="60.0" cy="80.0" r="3.5" fill="#c22f2f"/>
+<circle cx="247.5" cy="80.0" r="3.5" fill="#c22f2f"/>
+<circle cx="435.0" cy="80.0" r="3.5" fill="#c22f2f"/>
+<path d="M60.0,80.0 L247.5,80.0 L435.0,80.0" fill="none" stroke="#0e7c4a" stroke-width="2.5" stroke-dasharray="2,2"/>
+<circle cx="60.0" cy="80.0" r="3.5" fill="#0e7c4a"/>
+<circle cx="247.5" cy="80.0" r="3.5" fill="#0e7c4a"/>
+<circle cx="435.0" cy="80.0" r="3.5" fill="#0e7c4a"/>
+<text x="505" y="66" class="t">Mean tokens / call</text>
+<line x1="505" y1="406.0" x2="880" y2="406.0" class="grid"/>
+<text x="499" y="410.0" class="ax" text-anchor="end">0</text>
+<line x1="505" y1="324.5" x2="880" y2="324.5" class="grid"/>
+<text x="499" y="328.5" class="ax" text-anchor="end">625</text>
+<line x1="505" y1="243.0" x2="880" y2="243.0" class="grid"/>
+<text x="499" y="247.0" class="ax" text-anchor="end">1250</text>
+<line x1="505" y1="161.5" x2="880" y2="161.5" class="grid"/>
+<text x="499" y="165.5" class="ax" text-anchor="end">1875</text>
+<line x1="505" y1="80.0" x2="880" y2="80.0" class="grid"/>
+<text x="499" y="84.0" class="ax" text-anchor="end">2500</text>
+<text x="505.0" y="422" class="ax" text-anchor="middle">10</text>
+<text x="692.5" y="422" class="ax" text-anchor="middle">50</text>
+<text x="880.0" y="422" class="ax" text-anchor="middle">100</text>
+<text x="692.5" y="438" class="ax" text-anchor="middle">N (capabilities in the selection space)</text>
+<path d="M505.0,366.9 L692.5,253.0 L880.0,109.9" fill="none" stroke="#e07b39" stroke-width="2.5"/>
+<circle cx="505.0" cy="366.9" r="3.5" fill="#e07b39"/>
+<circle cx="692.5" cy="253.0" r="3.5" fill="#e07b39"/>
+<circle cx="880.0" cy="109.9" r="3.5" fill="#e07b39"/>
+<path d="M505.0,372.5 L692.5,346.0 L880.0,311.9" fill="none" stroke="#2b7de9" stroke-width="2.5"/>
+<circle cx="505.0" cy="372.5" r="3.5" fill="#2b7de9"/>
+<circle cx="692.5" cy="346.0" r="3.5" fill="#2b7de9"/>
+<circle cx="880.0" cy="311.9" r="3.5" fill="#2b7de9"/>
+<path d="M505.0,368.3 L692.5,254.5 L880.0,110.9" fill="none" stroke="#a4501f" stroke-width="2.5" stroke-dasharray="6,3"/>
+<circle cx="505.0" cy="368.3" r="3.5" fill="#a4501f"/>
+<circle cx="692.5" cy="254.5" r="3.5" fill="#a4501f"/>
+<circle cx="880.0" cy="110.9" r="3.5" fill="#a4501f"/>
+<path d="M505.0,372.5 L692.5,346.1 L880.0,312.3" fill="none" stroke="#1a4e94" stroke-width="2.5" stroke-dasharray="6,3"/>
+<circle cx="505.0" cy="372.5" r="3.5" fill="#1a4e94"/>
+<circle cx="692.5" cy="346.1" r="3.5" fill="#1a4e94"/>
+<circle cx="880.0" cy="312.3" r="3.5" fill="#1a4e94"/>
+<path d="M505.0,366.0 L692.5,252.5 L880.0,109.2" fill="none" stroke="#c22f2f" stroke-width="2.5" stroke-dasharray="2,2"/>
+<circle cx="505.0" cy="366.0" r="3.5" fill="#c22f2f"/>
+<circle cx="692.5" cy="252.5" r="3.5" fill="#c22f2f"/>
+<circle cx="880.0" cy="109.2" r="3.5" fill="#c22f2f"/>
+<path d="M505.0,371.1 L692.5,344.7 L880.0,310.9" fill="none" stroke="#0e7c4a" stroke-width="2.5" stroke-dasharray="2,2"/>
+<circle cx="505.0" cy="371.1" r="3.5" fill="#0e7c4a"/>
+<circle cx="692.5" cy="344.7" r="3.5" fill="#0e7c4a"/>
+<circle cx="880.0" cy="310.9" r="3.5" fill="#0e7c4a"/>
+<rect x="60" y="452" width="14" height="4" fill="#e07b39"/>
+<text x="78" y="458" class="ax">haiku · mcp</text>
+<rect x="190" y="452" width="14" height="4" fill="#2b7de9"/>
+<text x="208" y="458" class="ax">haiku · sif</text>
+<rect x="320" y="452" width="14" height="4" fill="#a4501f"/>
+<text x="338" y="458" class="ax">sonnet · mcp</text>
+<rect x="450" y="452" width="14" height="4" fill="#1a4e94"/>
+<text x="468" y="458" class="ax">sonnet · sif</text>
+<rect x="580" y="452" width="14" height="4" fill="#c22f2f"/>
+<text x="598" y="458" class="ax">opus · mcp</text>
+<rect x="710" y="452" width="14" height="4" fill="#0e7c4a"/>
+<text x="728" y="458" class="ax">opus · sif</text>
+</svg>

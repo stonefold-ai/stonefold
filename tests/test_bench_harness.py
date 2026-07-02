@@ -147,6 +147,9 @@ def test_track_r_surfaces_have_capability_parity() -> None:
     sif = sif_surface(caps)
     assert len(sif) == 1                            # one submit_intent…
     assert len(sif[0].input_schema["properties"]["resource"]["enum"]) == 30  # …N enum'd
+    # action is enum-injected too (parity with the real submit_intent_schema; the
+    # 2026-07-02 pilot showed a free-string action invites "Resource.action" spellings)
+    assert set(sif[0].input_schema["properties"]["action"]["enum"]) == {"read", "act"}
     assert len(retrieval_surface(caps, "read res_7", k=10)) == 10  # mandatory baseline
 
 
@@ -164,9 +167,9 @@ def test_reliability_scorer() -> None:
 
 
 # --- the CLI smoke path exits clean ---------------------------------------
-def test_cli_smoke_runs() -> None:
+def test_cli_smoke_runs(tmp_path: Path) -> None:
     from acp_bench.__main__ import main
-    assert main(["--smoke"]) == 0
+    assert main(["--smoke", "--out", str(tmp_path)]) == 0
 
 
 def test_model_spec_label() -> None:
@@ -215,3 +218,99 @@ def test_reliability_matrix_and_runner_mechanics() -> None:
     cells = reliability_matrix(trials)
     assert {c.condition for c in cells} == {MCP, SIF}
     assert all(0.0 <= c.correct <= 1.0 for c in cells)
+
+
+# --- streaming output: per-trial flush, per-round cells --------------------
+def test_jsonl_writer_flushes_each_line(tmp_path: Path) -> None:
+    from acp_bench.raw_log import JsonlWriter
+
+    path = tmp_path / "t.jsonl"
+    with JsonlWriter(path) as writer:
+        writer.write({"a": 1})
+        # durable on disk immediately, not at close
+        assert path.read_text(encoding="utf-8").strip() == '{"a": 1}'
+        writer.write({"b": 2})
+    assert writer.count == 2 and len(read_jsonl(path)) == 2
+
+
+def test_write_json_and_csv(tmp_path: Path) -> None:
+    import json as _json
+    from acp_bench.raw_log import write_csv, write_json
+
+    j = write_json(tmp_path / "x.json", {"b": 2, "a": 1})
+    assert _json.loads(j.read_text(encoding="utf-8")) == {"a": 1, "b": 2}
+    c = write_csv(tmp_path / "x.csv", [{"n": 1, "rate": 0.5}, {"n": 10, "rate": 1.0}])
+    lines = c.read_text(encoding="utf-8").strip().splitlines()
+    assert lines[0] == "n,rate" and lines[1] == "1,0.5" and len(lines) == 3
+    # empty rows -> empty file, no crash
+    assert write_csv(tmp_path / "e.csv", []).read_text(encoding="utf-8") == ""
+
+
+def test_run_security_is_rep_outermost_and_streams() -> None:
+    seen: list[tuple[int, str]] = []
+    rounds: list[int] = []
+    run_security(
+        (FAKE,), (S0, S3), (INVITE_WIRE,), reps=2,
+        on_trial=lambda t: seen.append((t.rep, t.rung)),
+        on_round=lambda rep, trials: rounds.append(len(trials)),
+    )
+    # rep 0 covers BOTH rungs before any rep-1 trial (partial runs stay complete)
+    first_rep1 = next(i for i, (rep, _) in enumerate(seen) if rep == 1)
+    assert {rung for _, rung in seen[:first_rep1]} == {"S0", "S3"}
+    # on_round fired once per rep with the cumulative trial count
+    assert rounds == [len(seen) // 2, len(seen)]
+
+
+def test_reliability_on_round_fires_per_rep() -> None:
+    from acp_bench.reliability import MCP, run_reliability
+
+    rounds: list[tuple[int, int]] = []
+    trials = run_reliability(
+        (FAKE,), (1,), conditions=(MCP,), reps=2,
+        on_round=lambda rep, ts: rounds.append((rep, len(ts))),
+    )
+    assert rounds == [(0, len(trials) // 2), (1, len(trials))]
+
+
+# --- the CLI writes the full structured-output contract --------------------
+def test_cli_track_r_writes_structured_outputs(tmp_path: Path) -> None:
+    from acp_bench.__main__ import main
+    from acp_bench.raw_log import write_json  # noqa: F401  (import sanity)
+
+    assert main(["--track", "r", "--smoke", "--reps", "1", "--ns", "1,10",
+                 "--surfaces", "mcp,sif", "--probes", "pay-invoice",
+                 "--out", str(tmp_path)]) == 0
+    out = tmp_path / "track-r"
+    for name in ("trials.jsonl", "cells.json", "cells.csv", "report.md", "meta.json"):
+        assert (out / name).exists(), name
+    rows = read_jsonl(out / "trials.jsonl")
+    # isolation respected: only the requested surfaces, ns, and probe ran
+    assert {r["condition"] for r in rows} == {"mcp", "sif"}
+    assert {r["n"] for r in rows} == {1, 10}
+    assert {r["probe"] for r in rows} == {"pay-invoice"}
+    import json as _json
+    meta = _json.loads((out / "meta.json").read_text(encoding="utf-8"))
+    assert meta["finished"] is not None and meta["trials"] == len(rows)
+    cells = _json.loads((out / "cells.json").read_text(encoding="utf-8"))
+    assert cells["track"] == "r" and cells["rounds_done"] == 1 and cells["cells"]
+
+
+def test_cli_track_s_isolated_rung(tmp_path: Path) -> None:
+    from acp_bench.__main__ import main
+
+    assert main(["--track", "s", "--smoke", "--reps", "1", "--rungs", "S0",
+                 "--out", str(tmp_path)]) == 0
+    out = tmp_path / "track-s"
+    rows = read_jsonl(out / "trials.jsonl")
+    assert rows and all(r["rung"] == "S0" for r in rows)
+    assert (out / "bts.csv").exists() and (out / "cells.csv").exists()
+
+
+def test_cli_rejects_unknown_filters(tmp_path: Path) -> None:
+    import pytest
+    from acp_bench.__main__ import main
+
+    with pytest.raises(SystemExit):
+        main(["--track", "r", "--smoke", "--surfaces", "nope", "--out", str(tmp_path)])
+    with pytest.raises(SystemExit):
+        main(["--track", "s", "--smoke", "--rungs", "S9", "--out", str(tmp_path)])

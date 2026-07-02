@@ -21,6 +21,7 @@ LLM cannot), so the fake path exercises the machinery, not a measurement.
 from __future__ import annotations
 
 from collections import Counter, defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -188,18 +189,29 @@ def run_reliability(
     conditions: tuple[str, ...] = CONDITIONS,
     probes: tuple[Probe, ...] = PROBES,
     reps: int = 5,
+    on_trial: Callable[[RTrial], None] | None = None,
+    on_round: Callable[[int, list[RTrial]], None] | None = None,
 ) -> list[RTrial]:
-    """Drive every (model x condition x N x probe x rep) trial. One provider is built
-    per model; a fresh MeteredProvider wraps it per trial for per-trial token counts."""
+    """Drive every (rep x model x condition x N x probe) trial. **Rep is outermost**, so
+    an interrupted run still leaves a *complete* matrix at fewer repetitions (every
+    condition/N covered) rather than only the first condition. ``on_trial`` is called
+    as each trial completes — the CLI uses it to append the raw log incrementally, so
+    nothing is lost if a run is cut short; ``on_round(rep, trials_so_far)`` fires after
+    each full repetition sweep — the CLI rewrites the aggregated cells files there."""
+    providers = {spec.key: build_provider(spec) for spec in models}
     trials: list[RTrial] = []
-    for spec in models:
-        provider = build_provider(spec)
-        for condition in conditions:
-            for n in ns:
-                for probe in probes:
-                    for rep in range(reps):
-                        trials.append(run_trial(provider, condition, n, probe, rep,
-                                                model_key=spec.key))
+    for rep in range(reps):
+        for spec in models:
+            provider = providers[spec.key]
+            for condition in conditions:
+                for n in ns:
+                    for probe in probes:
+                        trial = run_trial(provider, condition, n, probe, rep, model_key=spec.key)
+                        trials.append(trial)
+                        if on_trial is not None:
+                            on_trial(trial)
+        if on_round is not None:
+            on_round(rep, list(trials))
     return trials
 
 
@@ -243,12 +255,24 @@ def reliability_matrix(trials: list[RTrial]) -> list[RCell]:
     return cells
 
 
+def cells_as_dicts(cells: list[RCell]) -> list[dict[str, Any]]:
+    """Flat, graph-ready rows (one per condition × N cell) for JSON/CSV output.
+    Sorted by (condition, n) so re-written files diff stably between rounds."""
+    return [
+        {"condition": c.condition, "n": c.n, "count": c.count, "correct": c.correct,
+         "wrong_tool": c.wrong_tool, "hallucinated": c.hallucinated,
+         "malformed": c.malformed, "no_call": c.no_call,
+         "retrieval_miss": c.retrieval_miss, "tokens_mean": c.tokens_mean}
+        for c in sorted(cells, key=lambda c: (c.condition, c.n))
+    ]
+
+
 def _pct(x: float) -> str:
     return f"{100.0 * x:4.0f}%"
 
 
 def render_reliability(cells: list[RCell], *, models: tuple[str, ...], reps: int,
-                       smoke: bool) -> str:
+                       smoke: bool, probe_count: int = len(PROBES)) -> str:
     ns = sorted({c.n for c in cells})
     conditions = [c for c in CONDITIONS if any(cell.condition == c for cell in cells)]
     lines: list[str] = ["# Track R — reliability vs. tool count\n"]
@@ -258,7 +282,7 @@ def render_reliability(cells: list[RCell], *, models: tuple[str, ...], reps: int
         lines.append("> Pilot output. Publish only with the harness, task set, and raw "
                      "logs (docs/15 §5-6); report the honest picture (§6).\n")
     lines.append(f"Models: {', '.join(models) or '-'} - reps/cell: {reps} - "
-                 f"probes: {len(PROBES)}\n")
+                 f"probes: {probe_count}\n")
 
     def table(title: str, value: Any) -> None:
         lines.append(f"### {title}")

@@ -1,0 +1,83 @@
+{
+  "cells": [
+    {
+      "condition": "mcp",
+      "correct": 1.0,
+      "count": 20,
+      "hallucinated": 0.0,
+      "malformed": 0.0,
+      "n": 10,
+      "no_call": 0.0,
+      "retrieval_miss": 0.0,
+      "tokens_mean": 289.25,
+      "wrong_tool": 0.0
+    },
+    {
+      "condition": "mcp",
+      "correct": 1.0,
+      "count": 20,
+      "hallucinated": 0.0,
+      "malformed": 0.0,
+      "n": 50,
+      "no_call": 0.0,
+      "retrieval_miss": 0.0,
+      "tokens_mean": 1162.15,
+      "wrong_tool": 0.0
+    },
+    {
+      "condition": "mcp",
+      "correct": 1.0,
+      "count": 20,
+      "hallucinated": 0.0,
+      "malformed": 0.0,
+      "n": 100,
+      "no_call": 0.0,
+      "retrieval_miss": 0.0,
+      "tokens_mean": 2262.9,
+      "wrong_tool": 0.0
+    },
+    {
+      "condition": "sif",
+      "correct": 1.0,
+      "count": 20,
+      "hallucinated": 0.0,
+      "malformed": 0.0,
+      "n": 10,
+      "no_call": 0.0,
+      "retrieval_miss": 0.0,
+      "tokens_mean": 256.6,
+      "wrong_tool": 0.0
+    },
+    {
+      "condition": "sif",
+      "correct": 1.0,
+      "count": 20,
+      "hallucinated": 0.0,
+      "malformed": 0.0,
+      "n": 50,
+      "no_call": 0.0,
+      "retrieval_miss": 0.0,
+      "tokens_mean": 459.3,
+      "wrong_tool": 0.0
+    },
+    {
+      "condition": "sif",
+      "correct": 1.0,
+      "count": 20,
+      "hallucinated": 0.0,
+      "malformed": 0.0,
+      "n": 100,
+      "no_call": 0.0,
+      "retrieval_miss": 0.0,
+      "tokens_mean": 718.5,
+      "wrong_tool": 0.0
+    }
+  ],
+  "models": [
+    "mid"
+  ],
+  "reps": 2,
+  "rounds_done": 2,
+  "smoke": false,
+  "track": "r"
+}

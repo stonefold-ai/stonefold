@@ -67,3 +67,6 @@ desktop.ini
 # Logs / scratch
 # ---------------------------------------------------------------------------
 *.log
+
+# benchmark harness output (docs/15; results are never committed)
+bench_out/

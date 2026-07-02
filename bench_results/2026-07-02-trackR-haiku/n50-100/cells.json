@@ -1,0 +1,59 @@
+{
+  "cells": [
+    {
+      "condition": "mcp",
+      "correct": 0.95,
+      "count": 20,
+      "hallucinated": 0.0,
+      "malformed": 0.0,
+      "n": 50,
+      "no_call": 0.05,
+      "retrieval_miss": 0.0,
+      "tokens_mean": 1173.2,
+      "wrong_tool": 0.0
+    },
+    {
+      "condition": "mcp",
+      "correct": 1.0,
+      "count": 20,
+      "hallucinated": 0.0,
+      "malformed": 0.0,
+      "n": 100,
+      "no_call": 0.0,
+      "retrieval_miss": 0.0,
+      "tokens_mean": 2270.55,
+      "wrong_tool": 0.0
+    },
+    {
+      "condition": "sif",
+      "correct": 1.0,
+      "count": 20,
+      "hallucinated": 0.0,
+      "malformed": 0.0,
+      "n": 50,
+      "no_call": 0.0,
+      "retrieval_miss": 0.0,
+      "tokens_mean": 460.4,
+      "wrong_tool": 0.0
+    },
+    {
+      "condition": "sif",
+      "correct": 1.0,
+      "count": 20,
+      "hallucinated": 0.0,
+      "malformed": 0.0,
+      "n": 100,
+      "no_call": 0.0,
+      "retrieval_miss": 0.0,
+      "tokens_mean": 721.7,
+      "wrong_tool": 0.0
+    }
+  ],
+  "models": [
+    "small"
+  ],
+  "reps": 2,
+  "rounds_done": 2,
+  "smoke": false,
+  "track": "r"
+}

@@ -62,13 +62,19 @@ def mcp_surface(caps: tuple[Capability, ...]) -> list[ToolDef]:
 
 def sif_surface(caps: tuple[Capability, ...]) -> list[ToolDef]:
     """The SIF condition: one ``submit_intent`` whose registry declares the same N
-    capabilities — the ``resource`` enum is injected and the valid ``resource.action``
-    pairs are named in the description (parity with the real ``submit_intent_schema``,
-    which carries the ``x-acp-actions`` catalogue). Undeclared resources cannot be
-    emitted — the structural-coverage property that also kills A6. Capability parity
-    with the MCP surface: the model sees the same N capabilities, just as one typed
-    tool rather than N tool names."""
+    capabilities — **both** the ``resource`` and ``action`` enums are injected, and the
+    valid ``resource.action`` pairs are named in the description (parity with the real
+    ``submit_intent_schema``, which enum-injects every name and carries the
+    ``x-acp-actions`` catalogue). Undeclared names cannot be emitted — the
+    structural-coverage property that also kills A6. The action enum matters
+    empirically, not just principially: the 2026-07-02 pilot showed that with a
+    free-string ``action`` the model sometimes writes the qualified pair
+    (``action: "Order.ship"``) instead of the bare action — a formatting failure real
+    SIF makes unrepresentable (docs/15, pilot record). Capability parity with the MCP
+    surface: the model sees the same N capabilities, just as one typed tool rather
+    than N tool names."""
     resources = sorted({c.resource for c in caps})
+    actions = sorted({c.action for c in caps})
     pairs = ", ".join(f"{c.resource}.{c.action}" for c in caps)
     return [ToolDef(
         name="submit_intent",
@@ -80,7 +86,7 @@ def sif_surface(caps: tuple[Capability, ...]) -> list[ToolDef]:
             "type": "object",
             "properties": {
                 "resource": {"type": "string", "enum": resources},
-                "action": {"type": "string"},
+                "action": {"type": "string", "enum": actions},
                 "data": {"type": "object"},
             },
             "required": ["resource", "action"],

@@ -43,6 +43,7 @@ PINNED_MODELS: tuple[ModelSpec, ...] = (
     ModelSpec(key="fake", provider="fake"),
     ModelSpec(key="small", provider="anthropic", model="claude-haiku-4-5-20251001"),
     ModelSpec(key="mid", provider="anthropic", model="claude-sonnet-5"),
+    ModelSpec(key="large", provider="anthropic", model="claude-opus-4-8"),
     ModelSpec(key="oss-small", provider="openai", model="gpt-4o-mini"),
 )
 

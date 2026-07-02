@@ -1,0 +1,32 @@
+{
+  "finished": "2026-07-02T20:52:45+00:00",
+  "models": [
+    "mid"
+  ],
+  "ns": [
+    10,
+    50,
+    100
+  ],
+  "probes": [
+    "account-balance",
+    "pay-invoice",
+    "send-email",
+    "ship-order",
+    "close-ticket",
+    "read-user",
+    "create-refund",
+    "read-invoice",
+    "cancel-subscription",
+    "update-address"
+  ],
+  "reps": 2,
+  "smoke": false,
+  "started": "2026-07-02T20:48:45+00:00",
+  "surfaces": [
+    "mcp",
+    "sif"
+  ],
+  "track": "r",
+  "trials": 120
+}
