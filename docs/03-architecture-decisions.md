@@ -130,6 +130,26 @@ Every place an external system can plug in, and what runs there when nothing doe
 - **Acceptance test exists:** the benchmark's `--cards realistic` row
   (docs/15 realism battery) — the redesign wins when SIF matches structured-card
   selection while keeping its ~5× token advantage.
+- **Assessment (2026-07-03): the current design can plausibly beat MCP here —
+  no RFC change needed.** What lost was an implementation choice the RFC does not
+  prescribe: the RFC fixes the *shape* (one registry-generated tool, enum-injected
+  names) and leaves the catalogue's *presentation* free. JSON Schema already allows
+  card-equivalent structure inside one tool: a `oneOf` of
+  `{const: <action>, description: …}` entries gives every capability its own
+  card-like description, and per-resource branches can carry per-action `data`
+  schemas with typed, documented parameters — N structured cards inside one tool,
+  with undeclared names still unrepresentable. Qualifications, recorded honestly:
+  (a) buying signal costs tokens — the 5.4× advantage shrinks toward maybe 1.5–2×
+  at full card richness, but presentation depth is *generated*, so it becomes a
+  per-deployment knob (terse for capable models, rich where a small model needs
+  help) that per-tool surfaces don't have; (b) models are trained on the tool-cards
+  format, so a residual out-of-distribution gap on small models may survive good
+  packaging — measurable via the acceptance row, not arguable; (c) the single-turn
+  bench cannot see SIF's structured-error self-correction loop (SIF §6) — a wrong
+  pair gets a recoverable "no such pair" while a wrong MCP tool call executes the
+  wrong tool; the multi-step extension (#6, designed, unbuilt) is what would
+  measure it. Next concrete step: implement the `oneOf` catalogue presentation in
+  the bench's SIF surface and re-run `--cards realistic` — one run decides.
 
 ## Out of scope for this concept
 Full domain-modeling/ontology authoring UX; `assess` explainability tooling beyond the `requireExplanation` gate; multi-agent orchestration / durable workflows; full RBAC/ABAC engine; SaaS multi-tenancy, billing, SSO; auto-generation of policy from a schema; production HA/throughput hardening.
