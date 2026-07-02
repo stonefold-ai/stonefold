@@ -90,12 +90,28 @@ Orthogonal to every industry above sits a second class of customer: **agent-plat
 
 In every regulated vertical the economic buyer is usually **not the AI team**. The AI team wants to ship the agent; the **CISO / compliance office / controls owner** is the one blocked on "can you control it and prove what it did". Lead with the audit record and the kill-switch (the evidence and the emergency brake), not with the policy grammar. The Gartner/MIT numbers in the README are the macro version of the same fact: agentic projects stall on *inadequate controls*, not on model capability.
 
+## What the gateway does not judge — and where other systems plug in
+
+Everything above is what the gateway *does*. Just as important for an evaluator is what it deliberately does **not** do. The enforcement core is deterministic by invariant — no model, no heuristics, no judgment calls inside `enforce()`. That is what makes its decisions predictable and auditable, and it draws a hard line: **the gateway never judges meaning itself.** It cannot read an email body and know it contains PII, look at an invoice and sense fraud, or decide whether a clinical judgment is sound.
+
+The design answer is not to pretend otherwise but to give each of those judgments a **declared hook** — a registered function the gateway calls at its chokepoint, whose verdict enters the pipeline as an ordinary deterministic gate result, and whose *failure* triggers the fail-closed discipline like any other dependency (RFC §10):
+
+| The gateway cannot itself… | The hook where a specialist system plugs in | Who plugs in |
+|---|---|---|
+| judge **content** — PII in an outbound email, fraudulent wording, toxic or off-policy text | the `contentCheck` gate is a registered content hook (RFC §7.7); `disclosure` adds pre/post result-flow checks (§7.12) | your DLP, moderation service, or classifier |
+| verify **world truth** — is the drug discontinued? has the payee's cooling-off elapsed? | `precondition` / `emissionControl` named checks (§7.6, §7.13) — re-validated at dispatch since v0.4 | the system of record |
+| hold the **organization's authorization model** — roles, entitlement graphs, org hierarchies | registered scope predicates (§6.3) and the authorization seam (docs/10 — OPA/Cedar/IAM compose behind it) | your IAM / policy engine |
+| make the agent's choice **good** — a permitted-but-wrong action stays possible | `requireApproval` / `dualAuthorization` / `requireExplanation`; the audit record as reviewable evidence | humans; downstream review and SIEM |
+
+Two things keep this from being a hand-wave. First, the hooks are held to a contract: registered functions are **policy-grade code** — reviewed and versioned like the policy itself, and the reference ships a conformance harness (determinism, totality, fail-closed; docs/06 §6) to hold them to it. Second, the placement matters: the external check runs *at the gateway's chokepoint, under the gateway's failure mode, onto the gateway's audit record* — so "the gateway can't check content" resolves to "your content checker runs where it can't be bypassed and its verdict is on the record".
+
+What remains genuinely open even with every hook plugged: an action whose content passes every check can still be a bad idea (that is what the approval gates and the audit trail are for), and the gateway governs the agent's *direct* effects, never the downstream cascade a committed effect triggers (RFC §11 scope boundary).
+
 ## Where ACP is the wrong tool (honesty section)
 
 - **Read-only, low-stakes agents** (internal search, summarization, analytics over non-sensitive data): default-deny scoping is cheap insurance but the full gateway is overkill; a thin allowlist proxy may do.
 - **Creative/content workflows** with a human already reviewing every output: the human *is* the gateway.
 - **Agent orchestration, planning, memory, multi-step workflow engines:** explicitly out of scope (RFC non-goals) — ACP governs the actions, not the agent's reasoning loop.
-- **Making the agent's choices *good*:** ACP bounds what the agent can do and proves what it did. A permitted-but-wrong action remains possible; that is what the approval gates and the audit trail are for.
 
 ## Recommended beachhead
 

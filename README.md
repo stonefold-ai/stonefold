@@ -86,9 +86,9 @@ The short rule: ACP earns its keep wherever an agent's action can **move money, 
 
 There's a second customer orthogonal to all of these: **platform and vertical-SaaS vendors who embed a gateway** in their own product — for them the spec, the registry generator, and the conformance TCK (certify your own implementation, any language) are the deliverables.
 
-And where it's the *wrong* tool, honestly: read-only low-stakes agents, creative workflows a human already reviews, and anything that's really an orchestration problem — ACP governs actions, not the agent's reasoning loop.
+And where it's the *wrong* tool, honestly: read-only low-stakes agents, creative workflows a human already reviews, and anything that's really an orchestration problem — ACP governs actions, not the agent's reasoning loop. One boundary worth knowing up front: the gateway never judges *content* itself (it's deterministic on purpose) — instead it hosts the hooks where your DLP, moderation, or fraud checks plug in, at a point the agent can't bypass, with their verdicts on the audit record.
 
-The full analysis — each industry's blocking risk, the exact ACP mechanisms and worked policy examples that answer it, who the buyer is, and the recommended beachhead — is [`docs/13-who-is-this-for.md`](docs/13-who-is-this-for.md).
+The full analysis — each industry's blocking risk, the exact ACP mechanisms and worked policy examples that answer it, who the buyer is, what the gateway does *not* judge and where other systems plug in, and the recommended beachhead — is [`docs/13-who-is-this-for.md`](docs/13-who-is-this-for.md).
 
 ## See it run
 
