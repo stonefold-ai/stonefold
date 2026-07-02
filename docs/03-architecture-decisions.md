@@ -44,6 +44,22 @@ acp/
 8. **Audit** append-only; the app's DB role has no UPDATE/DELETE on the audit table; settle writes outcome + audit in one transaction (design §11).
 9. **OPA/IAM and SIEM are seams, not builds.** Define the protocols; ship the simple built-in policy and a Postgres/file audit sink. Real engines plug in later.
 10. **Kill is two independent axes** — the operator emergency hard-kill is **unconditional and independent of `killable`**; the `killable` tag is a separate *manner-of-stopping* declaration, never an operator veto. See the dedicated section below.
+11. **Identity is a seam too (same rule as decision 9).** An `IdentityProvider` protocol sits *ahead* of the pipeline and is the sole source of the authenticated `actor:`/`agent:` identities the session carries. Built-in and default: the existing session/transport authentication — the gateway is fully standalone. The seam exists so a credential-based verifier (an agent-passport scheme, W3C Verifiable Credentials, SPIFFE, mTLS identity) can stand in the same slot; protocol + fakes only, **no DID/VC stack is built or planned as a dependency**. Invariant unchanged and non-negotiable: identity comes from the authenticated layer below the model — never from the agent payload, whichever provider established it.
+
+### Integration seams — standalone by default, connectable by design
+
+Every place an external system can plug in, and what runs there when nothing does. The gateway MUST be fully functional with only the built-ins (no seam is a required dependency); each plug-in runs at the gateway's chokepoint, under its `failureMode`, onto its audit record.
+
+| Seam | Built-in default (standalone) | What can plug in |
+|---|---|---|
+| Identity in (`actor:`/`agent:`) | session/transport auth | passport/VC verifier, SPIFFE, mTLS (decision 11) |
+| Authorization step (RFC §12 step 2) | built-in matcher | OPA / Cedar / org IAM (decision 9) |
+| Scope predicates (RFC §6.3) | registered functions | org entitlement / tenancy service |
+| Content hooks (`contentCheck`, §7.7) | none required by default | DLP, moderation, fraud scoring |
+| Precondition checks (§7.6) | registered functions | the system of record |
+| Outer ring | gateway's own scoped credentials | cloud IAM (docs/10 §3) |
+| Audit out (§11) | Postgres/file sink | SIEM, evidence-pack export |
+| Transport | SIF-native MCP server / interception | any MCP-speaking agent stack |
 
 ## Kill is two axes — operator hard-kill vs `killable`
 

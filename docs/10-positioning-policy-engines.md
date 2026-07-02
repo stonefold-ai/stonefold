@@ -103,7 +103,7 @@ A newer neighbour deserves its own comparison: **agent passport schemes** (Open 
 
 And the honesty column, which matters more here than with OPA: **passport schemes have what this project lacks entirely** — cryptographically verifiable, portable identity (DIDs, W3C Verifiable Credentials, assurance levels) and cross-organizational attestation. This gateway takes `agent:` and `actor:` as authenticated-session facts and verifies nothing cryptographic about them; in any scenario where you must verify *someone else's* agent, the passport addresses a problem this design doesn't touch.
 
-Which is why the two compose rather than compete: **a passport proves who the agent is and issues a verdict; this gateway makes reality obey verdicts.** Concretely: the passport slots in as the identity input at the gateway's `actor:`/`agent:` seam, and the passport's escalation path is this gateway's shipped `hold` + staged execution. Passport control, versus the vault door and the ledger.
+Which is why the two layers are complementary in principle: **a passport proves who the agent is and issues a verdict; this gateway makes reality obey verdicts.** Architecturally, a verified credential is the natural *identity input* at the gateway's `actor:`/`agent:` seam — the gateway consumes an authenticated identity and doesn't care how it was established, so a passport verifier can stand in front of it the same way a session/transport authenticator does today. No integration with any specific scheme exists or is claimed; the point is that the seam is there. Passport control, versus the vault door and the ledger.
 
 ---
 

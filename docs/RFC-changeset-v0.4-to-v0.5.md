@@ -46,3 +46,21 @@ a registry change — a reviewed, versioned artifact.
 (reference implementation: pending). TCK: a freshness-style profile check is future
 work for when the reference implements it — a certification claim MUST NOT imply digest
 verification until then.
+
+## CS-016 — Identity-provider seam (ADDED, architecture decision 11)
+
+**What:** the authenticated `actor:`/`agent:` identities the session carries come from
+an `IdentityProvider` protocol ahead of the pipeline. Default and built-in: the existing
+session/transport authentication (no behavioural change; the gateway remains fully
+standalone). The seam permits credential-based verifiers (agent passports, W3C VCs,
+SPIFFE) to stand in the same slot. No specific scheme is integrated or endorsed; no
+DID/VC machinery becomes a dependency.
+
+**Why:** identity provenance is deliberately outside this spec's scope (the trust
+boundary, CS-014) — but *where* identity enters must be a declared seam, like the
+authorization step (decision 9), or every deployment invents its own splice point.
+Names the seam; changes nothing about how identity is used downstream. Invariant 3
+(identity never from the agent payload) is restated as binding on every provider.
+
+**Implementation impact:** protocol definition + the trivial built-in + fakes in tests
+(reference implementation: pending).
