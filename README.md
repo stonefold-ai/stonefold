@@ -10,6 +10,8 @@ The slogan: **the AI proposes; a machine you control disposes.**
 
 Three names, once, so the rest of this page and the docs line up: the protocol is what this repo specifies — the contract between an agent and the systems it acts on. The checkpoint component that enforces it is the **gateway**; the rulebook language is **ACP** (Agent Control Policy); the request-slip format the agent emits is **SIF** (Structured Intent Format). That's the whole vocabulary.
 
+If you're coming from the MCP world: **SIF runs on MCP** — the SIF-native binding *is* an MCP server, exposing exactly one registry-typed tool (`submit_intent`, SIF RFC §7). It replaces the tool sprawl, not the transport: instead of an agent facing dozens of tools it can be tricked into misusing, the agent faces one provable surface whose vocabulary is generated from your domain model. An existing MCP tool estate doesn't have to migrate first — interception mode governs it as-is (unmapped calls are denied), and the [registry generator](docs/06-registry-domain-model.md) drafts a governance model straight from your `tools/list`.
+
 ## The analogy
 
 Think of the AI as a brilliant but gullible new employee who works incredibly fast. You don't want to give a new hire — especially one who can be tricked — the keys to the vault, the company checkbook, and the customer database on day one. So you put a **supervisor with a rulebook** between that employee and anything consequential. The employee fills out a request slip; the supervisor checks it against the rules, stamps it or rejects it, and files a copy. This product is that supervisor — except it's automatic, follows the rules exactly the same way every time, and never gets tired or talked out of it.
@@ -68,6 +70,8 @@ And the judgment call: when the AI proposes identifying a track as hostile, that
 ## Why it matters
 
 Companies are stuck: AI agents are capable enough to do real work, but most firms **can't safely deploy them on anything that matters** because they can't control or prove what the AI does. Industry data backs this up — Gartner expects [over 40% of agentic-AI projects to be cancelled by 2027](https://www.gartner.com/en/newsroom/press-releases/2025-06-25-gartner-predicts-over-40-percent-of-agentic-ai-projects-will-be-canceled-by-end-of-2027), mainly over cost, unclear value, and **inadequate controls**, and MIT found [95% of corporate AI pilots deliver no return](https://fortune.com/2025/08/18/mit-report-95-percent-generative-ai-pilots-at-companies-failing-cfo/). The blocker isn't smarter AI — it's trust and control. This is the layer that provides them. It works **on top of** any AI model (ACP doesn't build or train the model), so it rides the whole industry's progress instead of competing with it, and it's aimed at the regulated, high-stakes settings where being unable to control the agent is a dealbreaker — finance, healthcare, critical operations.
+
+For EU deployers there is a harder-edged version of "why it matters": the AI Act's high-risk obligations — automatic logging of what the system did, and human oversight including the ability to interrupt it — are *mechanical* requirements, and they describe this gateway's feature list almost line by line (transactional audit, approval holds, the stop button with its no-race guarantee). The mapping, obligation by obligation, is [`docs/14-eu-ai-act-mapping.md`](docs/14-eu-ai-act-mapping.md).
 
 One honest caveat worth stating plainly: this **bounds what the AI is able to do, and proves it — it does not make the AI's choices correct.** A permitted-but-wrong action is still possible. It's containment, not omniscience. That's exactly why the human-approval steps and the audit trail matter.
 
@@ -150,6 +154,7 @@ The full version of this argument — the PDP/PEP category error, the four-verdi
 - **[Positioning vs OPA / Cedar / IAM / AgentCore](docs/10-positioning-policy-engines.md)** — why a decision engine alone can't govern an agent, and how they compose.
 - **[Conformance TCK](docs/12-conformance-tck.md)** — certify a gateway in any language against the RFC: one small driver adapter (Python protocol or 15 JSON endpoints), one report, named profiles.
 - **[Who is this for](docs/13-who-is-this-for.md)** — the industries ranked by fit, each one's blocking risk mapped to the mechanisms that answer it, who buys, and where ACP is the wrong tool.
+- **[EU AI Act mapping](docs/14-eu-ai-act-mapping.md)** — the high-risk logging and human-oversight obligations, mechanism by mechanism (draft; citations pending verification).
 - **Changelogs:** [v0.1 → v0.2](docs/RFC-changeset-v0.1-to-v0.2.md) · [v0.2 → v0.3](docs/RFC-changeset-v0.2-to-v0.3.md) · [v0.3 → v0.4](docs/RFC-changeset-v0.3-to-v0.4.md) (decision freshness + scope no-race, both implemented).
 
 ## License
