@@ -26,13 +26,13 @@
 <text x="94.7" y="357" class="ax" text-anchor="middle">10</text>
 <rect x="77.7" y="127.8" width="15" height="214.2" fill="#e07b39"/>
 <rect x="96.7" y="104.0" width="15" height="238.0" fill="#2b7de9"/>
-<text x="85.2" y="138.8" class="vlw" text-anchor="middle">90</text>
-<text x="104.2" y="115.0" class="vlw" text-anchor="middle">100</text>
+<text x="85.2" y="123.8" class="vl" text-anchor="middle">90</text>
+<text x="104.2" y="100.0" class="vl" text-anchor="middle">100</text>
 <text x="144.0" y="357" class="ax" text-anchor="middle">50</text>
 <rect x="127.0" y="115.9" width="15" height="226.1" fill="#e07b39"/>
 <rect x="146.0" y="104.0" width="15" height="238.0" fill="#2b7de9"/>
-<text x="134.5" y="126.9" class="vlw" text-anchor="middle">95</text>
-<text x="153.5" y="115.0" class="vlw" text-anchor="middle">100</text>
+<text x="134.5" y="111.9" class="vl" text-anchor="middle">95</text>
+<text x="153.5" y="100.0" class="vl" text-anchor="middle">100</text>
 <text x="193.3" y="357" class="ax" text-anchor="middle">100</text>
 <rect x="176.3" y="104.0" width="15" height="238.0" fill="#e07b39"/>
 <rect x="195.3" y="104.0" width="15" height="238.0" fill="#2b7de9"/>

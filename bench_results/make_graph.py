@@ -96,14 +96,12 @@ def main() -> int:
                 el.append(f'<text x="{gx:.1f}" y="{pct_y(v) - 4:.1f}" class="vl" '
                           f'text-anchor="middle">{v * 100:.0f}</text>')
             else:
+                # unequal bars differ in height, so above-bar labels cannot collide
                 for cond, dx in (("mcp", -17), ("sif", 2)):
                     if cond not in vals:
                         continue
                     v = vals[cond]
-                    y = pct_y(v)
-                    ly_val = y + 11 if v > 0.12 else y - 4
-                    cls = "vlw" if v > 0.12 else "vl"
-                    el.append(f'<text x="{gx + dx + 7.5:.1f}" y="{ly_val:.1f}" class="{cls}" '
+                    el.append(f'<text x="{gx + dx + 7.5:.1f}" y="{pct_y(v) - 4:.1f}" class="vl" '
                               f'text-anchor="middle">{v * 100:.0f}</text>')
 
     # --- tokens per call: two mean lines + per-model markers ----------------
