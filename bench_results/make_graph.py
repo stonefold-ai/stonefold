@@ -2,7 +2,17 @@
 
 Usage: python make_graph.py OUT.svg LABEL=path/to/cells.csv [LABEL=path ...]
 Each cells.csv row: condition,n,count,correct,...,tokens_mean (acp_bench schema).
-Two panels: correct-selection rate vs N, and mean tokens/call vs N.
+
+Design notes (the data largely coincides, so the chart types are chosen to make the
+ties readable instead of overlapping):
+
+* Selection accuracy — grouped BARS, one small panel per model: bars cannot paint
+  over each other, equal bars read as the tie they are, and every bar carries its
+  value label.
+* Tokens per call — LINES (the story is growth: linear for MCP, sub-linear for SIF),
+  one line per surface averaged over the three models (they agree within ~1%; the
+  per-model markers show it).
+* All in-image text is plain language; spec references stay in the README/docs.
 """
 from __future__ import annotations
 
@@ -10,18 +20,18 @@ import csv
 import sys
 from pathlib import Path
 
-COLORS = {
-    ("haiku", "mcp"): "#e07b39", ("haiku", "sif"): "#2b7de9",
-    ("sonnet", "mcp"): "#a4501f", ("sonnet", "sif"): "#1a4e94",
-    ("opus", "mcp"): "#c22f2f", ("opus", "sif"): "#0e7c4a",
-}
-DASH = {"haiku": "", "sonnet": "6,3", "opus": "2,2"}
+MCP_COLOR = "#e07b39"
+SIF_COLOR = "#2b7de9"
+MARKERS = ("circle", "square", "triangle")  # per model, in first-seen order
 
-W, H, PAD_L, PAD_R, PAD_T, PAD_B, GAP = 960, 470, 60, 20, 80, 64, 70
-PANEL_W = (W - PAD_L - PAD_R - GAP) // 2 - PAD_L // 2
+W, H = 960, 470
+SEL_X0S = (60, 262, 464)          # three mini bar panels, one per model
+SEL_W = 168
+TOK_X0, TOK_W = 700, 226
+Y0, Y1 = 342, 104                 # plot area (bottom, top)
 
 
-def load(label: str, path: Path) -> dict[tuple[str, int], dict[str, float]]:
+def load(path: Path) -> dict[tuple[str, int], dict[str, float]]:
     out: dict[tuple[str, int], dict[str, float]] = {}
     with path.open(encoding="utf-8") as fh:
         for row in csv.DictReader(fh):
@@ -30,76 +40,137 @@ def load(label: str, path: Path) -> dict[tuple[str, int], dict[str, float]]:
     return out
 
 
+def marker(kind: str, x: float, y: float, color: str) -> str:
+    if kind == "circle":
+        return f'<circle cx="{x:.1f}" cy="{y:.1f}" r="3.4" fill="{color}"/>'
+    if kind == "square":
+        return f'<rect x="{x - 3.2:.1f}" y="{y - 3.2:.1f}" width="6.4" height="6.4" fill="{color}"/>'
+    return (f'<path d="M{x:.1f},{y - 4.2:.1f} L{x + 4:.1f},{y + 3.2:.1f} '
+            f'L{x - 4:.1f},{y + 3.2:.1f} Z" fill="{color}"/>')
+
+
 def main() -> int:
     out_path = Path(sys.argv[1])
     series: dict[str, dict[tuple[str, int], dict[str, float]]] = {}
+    order: list[str] = []
     for arg in sys.argv[2:]:
         label, _, p = arg.partition("=")
-        cells = load(label, Path(p))
-        series.setdefault(label, {}).update(cells)
+        if label not in series:
+            series[label] = {}
+            order.append(label)
+        series[label].update(load(Path(p)))
 
     ns = sorted({n for cells in series.values() for (_, n) in cells})
-    max_tok = max(v["tokens"] for cells in series.values() for v in cells.values())
-    max_tok = (int(max_tok / 500) + 1) * 500
+    el: list[str] = []
 
-    def panel(x0: float, title: str, ymax: float, yfmt, value_key: str) -> list[str]:
-        x1, y0, y1 = x0 + PANEL_W, H - PAD_B, PAD_T
-        el = [f'<text x="{x0}" y="{PAD_T - 14}" class="t">{title}</text>']
-        # axes + gridlines
-        for i in range(5):
-            y = y0 - (y0 - y1) * i / 4
-            el.append(f'<line x1="{x0}" y1="{y}" x2="{x1}" y2="{y}" class="grid"/>')
-            el.append(f'<text x="{x0 - 6}" y="{y + 4}" class="ax" text-anchor="end">{yfmt(ymax * i / 4)}</text>')
-        for n in ns:
-            x = x0 + (x1 - x0) * ns.index(n) / max(len(ns) - 1, 1)
-            el.append(f'<text x="{x}" y="{y0 + 16}" class="ax" text-anchor="middle">{n}</text>')
-        el.append(f'<text x="{(x0 + x1) / 2}" y="{y0 + 32}" class="ax" text-anchor="middle">N (capabilities in the selection space)</text>')
-        # series lines
-        for label, cells in series.items():
-            for cond in ("mcp", "sif"):
-                pts = []
-                for n in ns:
-                    if (cond, n) not in cells:
-                        continue
-                    x = x0 + (x1 - x0) * ns.index(n) / max(len(ns) - 1, 1)
-                    y = y0 - (y0 - y1) * min(cells[(cond, n)][value_key], ymax) / ymax
-                    pts.append((x, y))
-                if not pts:
+    # --- selection accuracy: grouped bars, one mini panel per model ---------
+    def pct_y(v: float) -> float:
+        return Y0 - (Y0 - Y1) * v
+
+    el.append(f'<text x="{SEL_X0S[0]}" y="72" class="t">How often the model picked the right capability</text>')
+    for i, label in enumerate(order[: len(SEL_X0S)]):
+        x0 = SEL_X0S[i]
+        x1 = x0 + SEL_W
+        el.append(f'<text x="{(x0 + x1) / 2:.0f}" y="{Y1 - 8}" class="pt" text-anchor="middle">{label}</text>')
+        for pct in (0, 25, 50, 75, 100):
+            y = pct_y(pct / 100)
+            el.append(f'<line x1="{x0}" y1="{y:.1f}" x2="{x1}" y2="{y:.1f}" class="grid"/>')
+            if i == 0:
+                el.append(f'<text x="{x0 - 6}" y="{y + 3.5:.1f}" class="ax" text-anchor="end">{pct}%</text>')
+        cells = series[label]
+        group_w = (SEL_W - 20) / len(ns)
+        for gi, n in enumerate(ns):
+            gx = x0 + 10 + group_w * gi + group_w / 2
+            el.append(f'<text x="{gx:.1f}" y="{Y0 + 15}" class="ax" text-anchor="middle">{n}</text>')
+            for cond, color, dx in (("mcp", MCP_COLOR, -17), ("sif", SIF_COLOR, 2)):
+                if (cond, n) not in cells:
                     continue
-                color = COLORS.get((label, cond), "#666")
-                dash = f' stroke-dasharray="{DASH.get(label, "")}"' if DASH.get(label) else ""
-                d = " ".join(f"{'M' if i == 0 else 'L'}{x:.1f},{y:.1f}" for i, (x, y) in enumerate(pts))
-                el.append(f'<path d="{d}" fill="none" stroke="{color}" stroke-width="2.5"{dash}/>')
-                for x, y in pts:
-                    el.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="3.5" fill="{color}"/>')
-        return el
+                v = cells[(cond, n)]["correct"]
+                y = pct_y(v)
+                el.append(f'<rect x="{gx + dx:.1f}" y="{y:.1f}" width="15" '
+                          f'height="{Y0 - y:.1f}" fill="{color}"/>')
+                ly_val = y + 11 if v > 0.12 else y - 4  # inside the bar when it is tall enough
+                cls = "vlw" if v > 0.12 else "vl"
+                el.append(f'<text x="{gx + dx + 7.5:.1f}" y="{ly_val:.1f}" class="{cls}" '
+                          f'text-anchor="middle">{v * 100:.0f}</text>')
 
-    legend = []
-    lx = PAD_L
-    for label, cells in series.items():
-        for cond in ("mcp", "sif"):
-            if not any(c == cond for (c, _) in cells):
+    # --- tokens per call: two mean lines + per-model markers ----------------
+    max_tok = max(v["tokens"] for cells in series.values() for v in cells.values())
+    ymax = (int(max_tok / 500) + 1) * 500
+
+    def tok_y(v: float) -> float:
+        return Y0 - (Y0 - Y1) * v / ymax
+
+    def tok_x(n: int) -> float:
+        return TOK_X0 + 14 + (TOK_W - 28) * ns.index(n) / max(len(ns) - 1, 1)
+
+    el.append(f'<text x="{TOK_X0}" y="72" class="t">Tokens per call</text>')
+    el.append(f'<text x="{(TOK_X0 + TOK_X0 + TOK_W) / 2:.0f}" y="{Y1 - 8}" class="pt" '
+              f'text-anchor="middle">all three models (±1%)</text>')
+    for v in range(0, ymax + 1, 500):
+        y = tok_y(v)
+        el.append(f'<line x1="{TOK_X0}" y1="{y:.1f}" x2="{TOK_X0 + TOK_W}" y2="{y:.1f}" class="grid"/>')
+        el.append(f'<text x="{TOK_X0 - 6}" y="{y + 3.5:.1f}" class="ax" text-anchor="end">{v}</text>')
+    for n in ns:
+        el.append(f'<text x="{tok_x(n):.1f}" y="{Y0 + 15}" class="ax" text-anchor="middle">{n}</text>')
+    mean_at: dict[tuple[str, int], float] = {}
+    for cond, color in (("mcp", MCP_COLOR), ("sif", SIF_COLOR)):
+        pts = []
+        for n in ns:
+            vals = [series[m][(cond, n)]["tokens"] for m in order if (cond, n) in series[m]]
+            if not vals:
                 continue
-            color = COLORS.get((label, cond), "#666")
-            legend.append(f'<rect x="{lx}" y="{H - 18}" width="14" height="4" fill="{color}"/>')
-            legend.append(f'<text x="{lx + 18}" y="{H - 12}" class="ax">{label} · {cond}</text>')
-            lx += 130
+            mean_at[(cond, n)] = sum(vals) / len(vals)
+            pts.append((tok_x(n), tok_y(mean_at[(cond, n)])))
+        d = " ".join(f"{'M' if j == 0 else 'L'}{x:.1f},{y:.1f}" for j, (x, y) in enumerate(pts))
+        el.append(f'<path d="{d}" fill="none" stroke="{color}" stroke-width="2.4"/>')
+        for mi, m in enumerate(order):
+            for n in ns:
+                if (cond, n) in series[m]:
+                    el.append(marker(MARKERS[mi % 3], tok_x(n), tok_y(series[m][(cond, n)]["tokens"]), color))
+    n_last = ns[-1]
+    if ("mcp", n_last) in mean_at and ("sif", n_last) in mean_at and mean_at[("sif", n_last)]:
+        ratio = mean_at[("mcp", n_last)] / mean_at[("sif", n_last)]
+        el.append(f'<text x="{tok_x(n_last) - 8:.1f}" y="{tok_y(mean_at[("mcp", n_last)]) + 18:.1f}" '
+                  f'class="pt" text-anchor="end" fill="{MCP_COLOR}">MCP</text>')
+        el.append(f'<text x="{tok_x(n_last) - 8:.1f}" y="{tok_y(mean_at[("sif", n_last)]) - 8:.1f}" '
+                  f'class="pt" text-anchor="end" fill="{SIF_COLOR}">SIF</text>')
+        ymid = (tok_y(mean_at[("mcp", n_last)]) + tok_y(mean_at[("sif", n_last)])) / 2
+        el.append(f'<text x="{tok_x(n_last) - 8:.1f}" y="{ymid:.1f}" class="pt" '
+                  f'text-anchor="end">{ratio:.1f}× cheaper</text>')
 
-    body = "\n".join(
-        panel(PAD_L, "Correct capability selection", 1.0, lambda v: f"{v * 100:.0f}%", "correct")
-        + panel(PAD_L + PANEL_W + GAP, "Mean tokens / call", max_tok, lambda v: f"{v:.0f}", "tokens")
-        + legend
-    )
+    # --- shared x-label, plain-language captions, legend ---------------------
+    el.append(f'<text x="{W / 2}" y="{Y0 + 33}" class="ax" text-anchor="middle">'
+              'N = how many capabilities the model can choose from</text>')
+    el.append(f'<text x="60" y="404" class="cap">Left: out of 20 attempts per bar (10 tasks × 2 repeats), '
+              'how often the model called the capability the task needed. Equal bars = both ways worked equally well.</text>')
+    el.append(f'<text x="60" y="420" class="cap">Right: an MCP agent resends all N tool definitions with every call; '
+              'SIF sends one tool whose list of names grows. Lines are the 3-model average; markers are the individual models.</text>')
+    ly = H - 22
+    el.append(f'<rect x="60" y="{ly - 5}" width="14" height="10" fill="{MCP_COLOR}"/>')
+    el.append(f'<text x="80" y="{ly + 4}" class="ax">MCP — the same N capabilities as N separate tools</text>')
+    el.append(f'<rect x="368" y="{ly - 5}" width="14" height="10" fill="{SIF_COLOR}"/>')
+    el.append(f'<text x="388" y="{ly + 4}" class="ax">SIF — one submit_intent tool declaring all N</text>')
+    lx = 700
+    for mi, m in enumerate(order):
+        el.append(marker(MARKERS[mi % 3], lx, ly, "#555"))
+        el.append(f'<text x="{lx + 9}" y="{ly + 4}" class="ax">{m}</text>')
+        lx += 78
+
+    body = "\n".join(el)
     svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}">
 <style>
- .t {{ font: 600 15px sans-serif; fill: #222; }}
- .st {{ font: 12px sans-serif; fill: #555; }}
+ .t {{ font: 600 14px sans-serif; fill: #222; }}
+ .pt {{ font: 600 12px sans-serif; fill: #333; }}
+ .st {{ font: 11px sans-serif; fill: #777; }}
  .ax {{ font: 11px sans-serif; fill: #555; }}
- .grid {{ stroke: #ddd; stroke-width: 1; }}
+ .vl {{ font: 9px sans-serif; fill: #444; }}
+ .cap {{ font: 11px sans-serif; fill: #444; }}
+ .grid {{ stroke: #e3e3e3; stroke-width: 1; }}
 </style>
 <rect width="{W}" height="{H}" fill="white"/>
-<text x="{PAD_L}" y="20" class="t">Track R pilot — MCP tool surface vs SIF submit_intent (real models, 2 reps × 10 probes/cell)</text>
-<text x="{PAD_L}" y="36" class="st">PILOT — below the docs/15 §5 bar (2 reps, estimated tokens). Raw logs: bench_results/. Fixed-surface runs only.</text>
+<text x="60" y="24" class="t">Giving a model N capabilities: as N separate MCP tools, or as one SIF intent tool?</text>
+<text x="60" y="41" class="st">Same tasks, same models (Claude Haiku 4.5, Sonnet 5, Opus 4.8), real API calls. Early pilot: small sample (2 repeats), token counts estimated.</text>
 {body}
 </svg>'''
     out_path.write_text(svg, encoding="utf-8", newline="\n")
