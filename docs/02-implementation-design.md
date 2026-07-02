@@ -326,6 +326,36 @@ worker = DispatchWorker(
 
 The agent sees a cancelled ticket resolve to a recoverable refusal (`stale-decision` / `stale-guard:<gate>`); nothing is ever partially dispatched. Spec text and acceptance scenarios: `docs/RFC-changeset-v0.3-to-v0.4.md` (CS-017), scenarios D5/D6, tests in `tests/test_v04_freshness.py`.
 
+### 9.2 Scope no-race (v0.4 CS-018) — what, why, how
+
+**What.** Scope-on-effect (§5) is a *decision-time* pre-check, and staging widens the gap to the effect's commit: the target can be reassigned to another tenant in between, and the effect lands on state the actor was never authorized for — a classic TOCTOU race. CS-018 closes it where it can be closed and prices it where it can't, keyed on a capability **each connector declares once** (`ScopeCapability`, connector metadata in gateway code — like the scope-predicate bindings, never policy syntax):
+
+- **`transactional`** (SQL-class): the dispatch worker calls `dispatch_scoped(…)`, and the connector ANDs the predicate's constraint into the effect's own write (`UPDATE … WHERE id = %(target)s AND tenant_id = %(scope_tenant_id)s`). Zero rows affected ⇒ the transaction rolls back and the row settles `FAILED`/`scope-lost` — the write commits against authorized state **or not at all**, the same shape as the kill no-race (§8.4). No compensation is staged: nothing landed, so there is nothing to undo.
+- **`window`** (HTTP, email, device): the predicate cannot ride into the upstream's transaction. The worker re-resolves the target under scope (`fetch_target`) immediately before the call — shrinking the race to connector latency; a vanished target settles `FAILED`/`scope-lost` with nothing sent — and the connector's *declared* residual window is written into the audit's `scopeApplied` (`reassertion:window:<declared>`), so the residual risk is priced, not hidden. An undeclared connector is treated as `window:undeclared` — fail-safe, and honestly labelled in the audit.
+
+**Why.** Together with CS-017 this closes the second half of the decide→act gap a payments/healthcare buyer asks about: freshness covers *facts that move* (sanctions lists, time, world state); scope no-race covers *authorization that moves* (the target itself changing hands). v0.3 documented the window and offered only the kill switch; v0.4 makes the guarantee structural for transactional connectors and auditable for the rest.
+
+**How.** Opt-in like freshness: give the dispatch worker the same scope resolver the pipeline uses, and nothing else changes.
+
+```python
+from acp_core.scope import make_scope_resolver
+from acp_connectors import SqlConnector
+
+# transactional connectors register the statement each effect dispatches to;
+# {scope} is where the predicate's constraint is ANDed in.
+sql = SqlConnector(conn, effect_sql={
+    "Payment.pay": "UPDATE accounts SET balance = balance - %(amount)s "
+                   "WHERE id = %(accountId)s AND {scope}",
+})
+
+worker = DispatchWorker(
+    outbox, connectors, registry=registry,
+    scopes=make_scope_resolver(policy),   # CS-018: re-assert scope at dispatch
+)
+```
+
+Shipped declarations: `SqlConnector` and `InMemoryConnector` are `transactional`; `HttpConnector` (`http round-trip`) and `EmailConnector` (`smtp accept`) declare their windows. A custom transactional connector implements the `TransactionalDispatch` protocol and raises `ScopeLostError` when the re-asserted predicate selects nothing; one that declares `transactional` without implementing it fails closed (`scope-unavailable`). Spec text and acceptance scenarios: `docs/RFC-changeset-v0.3-to-v0.4.md` (CS-018), scenarios B4/B5, tests in `tests/test_v04_scope_norace.py` + the Postgres B4 test in `tests/test_m4_pg_integration.py`.
+
 ---
 
 ## 10. The condition engine (`when:`)

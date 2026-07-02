@@ -50,11 +50,17 @@ from acp_core.condition import (
 )
 from acp_core.gating import ApprovalSpec, GateEngine, GateOutcome, RequestEnv
 from acp_core.connector import (
+    SCOPE_LOST,
     Connector,
     ConnectorCancelled,
     ConnectorRegistry,
     ConnectorResult,
     Connectors,
+    ScopeCapability,
+    ScopeLostError,
+    ScopeReassertion,
+    TransactionalDispatch,
+    scope_capability_of,
 )
 from acp_core.kill import (
     KillOrder,
@@ -202,6 +208,13 @@ __all__ = [
     "ConnectorRegistry",
     "ConnectorResult",
     "Connectors",
+    # scope no-race (v0.4 CS-018)
+    "SCOPE_LOST",
+    "ScopeCapability",
+    "ScopeLostError",
+    "ScopeReassertion",
+    "TransactionalDispatch",
+    "scope_capability_of",
     # kill-switch seam
     "KillScope",
     "KillScopeKind",

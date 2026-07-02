@@ -22,13 +22,23 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 
 from acp_core.audit import build_record
-from acp_core.connector import ConnectorCancelled, ConnectorRegistry, ConnectorResult
+from acp_core.connector import (
+    SCOPE_LOST,
+    ConnectorCancelled,
+    ConnectorRegistry,
+    ConnectorResult,
+    ScopeLostError,
+    ScopeReassertion,
+    TransactionalDispatch,
+    scope_capability_of,
+)
 from acp_core.enums import Decision, Reversibility
 from acp_core.freshness import STALE_DECISION, DispatchRevalidator, stale_guard_reason
 from acp_core.kill import KillStore, KillTarget
 from acp_core.models import AuditRecord, EvalResult, RawCall, ResolvedAction, Session
 from acp_core.outbox import KillCheck, OutboxStore, PendingAction, PendingState
 from acp_core.registry import Registry
+from acp_core.scope import ScopePredicate, ScopeResolver
 from acp_store.inflight import InFlightCall, InFlightRegistry
 
 
@@ -63,6 +73,7 @@ class DispatchWorker:
         inflight: InFlightRegistry | None = None,
         clock: Callable[[], datetime] | None = None,
         revalidate: DispatchRevalidator | None = None,
+        scopes: ScopeResolver | None = None,
     ) -> None:
         self._store = store
         self._connectors = connectors
@@ -71,6 +82,11 @@ class DispatchWorker:
         self._inflight = inflight
         self._clock = clock
         self._revalidate = revalidate
+        # CS-018 scope no-race, opt-in like freshness: with a resolver the worker
+        # re-asserts the scope predicate at dispatch — inside the effect's own
+        # transaction for a transactional connector, via a pre-dispatch target
+        # re-resolve for a window connector. ``None`` = v0.3 behaviour.
+        self._scopes = scopes
 
     def _default_kill_check(self, row: PendingAction) -> bool:
         # The authoritative, in-transaction kill re-check (design §8.4). Reads the
@@ -115,6 +131,36 @@ class DispatchWorker:
             self._maybe_compensate(claimed)
             return True
 
+        # CS-018 scope no-race (B4/B5): with a resolver wired, re-assert the scope
+        # predicate at dispatch. The connector's declared capability picks the
+        # form; either way the audit records which one ran.
+        scope: ScopePredicate | None = None
+        if self._scopes is not None:
+            scope = self._scopes.scope_for(claimed.resolved.resource)
+        scope_trace: tuple[str, ...] = ()
+        txn: TransactionalDispatch | None = None
+        if scope is not None:
+            cap = scope_capability_of(connector)
+            scope_trace = (f"{claimed.resolved.resource}:{scope.name}", cap.audit_note())
+            if cap.reassertion is ScopeReassertion.TRANSACTIONAL:
+                if not isinstance(connector, TransactionalDispatch):
+                    # declared transactional but cannot carry the predicate into
+                    # the effect's transaction ⇒ fail closed, nothing dispatched.
+                    self._settle_scope_failure(claimed, "scope-unavailable", scope_trace)
+                    return True
+                txn = connector
+            else:
+                # window connector (B5): re-resolve the target under scope right
+                # before the call, shrinking the race to connector latency.
+                try:
+                    target = connector.fetch_target(claimed.resolved, scope, claimed.actor)
+                except Exception:  # cannot verify scope ⇒ fail closed (invariant 7)
+                    self._settle_scope_failure(claimed, "scope-unavailable", scope_trace)
+                    return True
+                if target is None:
+                    self._settle_scope_failure(claimed, SCOPE_LOST, scope_trace)
+                    return True
+
         call: InFlightCall | None = None
         if self._inflight is not None:
             call = InFlightCall(
@@ -126,9 +172,17 @@ class DispatchWorker:
             self._inflight.register(call)
 
         try:
-            result = connector.dispatch(
-                claimed.resolved, claimed.actor, claimed.idempotency_key
-            )
+            if txn is not None and scope is not None:
+                result = txn.dispatch_scoped(
+                    claimed.resolved, claimed.actor, claimed.idempotency_key, scope
+                )
+            else:
+                result = connector.dispatch(
+                    claimed.resolved, claimed.actor, claimed.idempotency_key
+                )
+        except ScopeLostError:  # B4: the re-asserted predicate selected zero rows
+            self._settle_scope_failure(claimed, SCOPE_LOST, scope_trace)
+            return True
         except ConnectorCancelled as exc:  # in-flight kill abort (design §8.5)
             self._store.settle(
                 claimed.id,
@@ -156,9 +210,28 @@ class DispatchWorker:
             result=result.receipt,
             audit=self._audit_record(
                 claimed, Decision.ALLOW, "success", result_refs=_result_refs_of(result),
+                scope_applied=scope_trace,
             ),
         )
         return True
+
+    def _settle_scope_failure(
+        self, row: PendingAction, reason: str, scope_trace: tuple[str, ...]
+    ) -> None:
+        """Settle a row whose scope could not be re-asserted at dispatch (CS-018).
+
+        Never stages a compensation: a scope failure means the effect did NOT
+        land ("authorized state or not at all"), so there is nothing to undo.
+        """
+        self._store.settle(
+            row.id,
+            state=PendingState.FAILED,
+            result={"error": reason},
+            reason=reason,
+            audit=self._audit_record(
+                row, Decision.DENY, "failure", rule=reason, scope_applied=scope_trace,
+            ),
+        )
 
     def drain(self, *, max_iterations: int = 1000, kill_check: KillCheck | None = None) -> int:
         """Process pending rows until none remain (or the safety cap is hit)."""
@@ -206,9 +279,13 @@ class DispatchWorker:
 
     def _audit_record(
         self, row: PendingAction, decision: Decision, outcome: str,
-        *, result_refs: list[str] | None = None,
+        *, result_refs: list[str] | None = None, rule: str = "dispatch",
+        scope_applied: tuple[str, ...] = (),
     ) -> AuditRecord:
-        result = EvalResult(decision=decision, rule="dispatch", gates=row.gates, ticket=row.id)
+        result = EvalResult(
+            decision=decision, rule=rule, gates=row.gates, ticket=row.id,
+            scope_applied=scope_applied,
+        )
         return build_record(
             agent=row.agent,
             actor=row.actor,

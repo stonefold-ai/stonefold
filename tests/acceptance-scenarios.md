@@ -65,12 +65,12 @@ Translate each scenario into an automated test **before** implementing the featu
 - When enforced
 - Then those payload fields are ignored; identity comes only from the authenticated session.
 
-**B4 — scope no-race on a transactional connector (v0.4 — PROPOSED, CS-018)**
+**B4 — scope no-race on a transactional connector (v0.4 CS-018 — implemented, `test_v04_scope_norace.py` + `test_m4_pg_integration.py`)**
 - Given a staged `pay` decided while the target account belonged to the actor's tenant, and a `transactional` connector
 - When the account is reassigned to another tenant before dispatch
 - Then the effect's write re-asserts the scope predicate inside its own transaction, affects zero rows, and settles `FAILED` with reason `scope-lost` — the effect never lands on un-authorized state.
 
-**B5 — residual window is declared, not hidden (v0.4 — PROPOSED, CS-018)**
+**B5 — residual window is declared, not hidden (v0.4 CS-018 — implemented, `test_v04_scope_norace.py`)**
 - Given the same reassignment race over a `window` connector (HTTP/email)
 - When the dispatch worker re-resolves the target under scope immediately before the call
 - Then the stale target is caught pre-dispatch; and the connector's declared residual window appears in the audit record.

@@ -13,9 +13,10 @@ pre-resolution check. Policy logic never lives in a connector (CLAUDE.md).
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, Protocol
+from enum import Enum
+from typing import Any, Protocol, runtime_checkable
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from acp_core.models import Actor, ResolvedAction
 from acp_core.scope import ScopePredicate
@@ -25,6 +26,76 @@ class ConnectorCancelled(Exception):
     """Raised by a connector when an in-flight cancellable call is aborted by the
     kill-switch (design §8.5). The dispatch worker maps it to a terminal
     ``CANCELLED`` settle — distinct from an ordinary dispatch ``FAILED``."""
+
+
+# The settle reason for an effect refused because the scope predicate no longer
+# selects its target at dispatch/commit time (v0.4 CS-018, acceptance B4/B5).
+SCOPE_LOST = "scope-lost"
+
+
+class ScopeLostError(Exception):
+    """Raised by a *transactional* connector when the scope predicate,
+    re-asserted inside the effect's own transaction, no longer selects the
+    target (CS-018): the write affected zero rows and was **not** committed.
+    The dispatch worker settles the row ``FAILED`` with reason ``scope-lost`` —
+    the effect lands on authorized state or not at all, never partially."""
+
+
+class ScopeReassertion(str, Enum):
+    """How a connector closes (or prices) the decide→commit scope race (CS-018)."""
+
+    TRANSACTIONAL = "transactional"  # predicate carried into the effect's own tx
+    WINDOW = "window"  # residual race window remains; declared, re-checked pre-dispatch
+
+
+class ScopeCapability(BaseModel):
+    """A connector's declared scope-reassertion capability (CS-018) — connector
+    metadata, declared once per connector implementation (like the gateway's
+    scope-predicate bindings, this lives in gateway code, not in policy syntax).
+
+    ``transactional``: the connector can AND the scope predicate into the
+    effect's own transaction (SQL-class) — the gateway then guarantees B4.
+    ``window``: it cannot (HTTP, email, device); ``window`` names the residual
+    race window so the audit prices it rather than hiding it (B5).
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    reassertion: ScopeReassertion
+    window: str | None = None  # the declared residual window (WINDOW only)
+
+    @model_validator(mode="after")
+    def _pairing(self) -> "ScopeCapability":
+        if self.reassertion is ScopeReassertion.WINDOW and not self.window:
+            raise ValueError("a window connector must declare its residual window")
+        if self.reassertion is ScopeReassertion.TRANSACTIONAL and self.window is not None:
+            raise ValueError("a transactional connector has no residual window")
+        return self
+
+    @classmethod
+    def transactional(cls) -> "ScopeCapability":
+        return cls(reassertion=ScopeReassertion.TRANSACTIONAL)
+
+    @classmethod
+    def window_declared(cls, declared: str) -> "ScopeCapability":
+        return cls(reassertion=ScopeReassertion.WINDOW, window=declared)
+
+    def audit_note(self) -> str:
+        """The ``scopeApplied`` entry recording which reassertion form ran."""
+        if self.reassertion is ScopeReassertion.TRANSACTIONAL:
+            return "reassertion:transactional"
+        return f"reassertion:window:{self.window}"
+
+
+def scope_capability_of(connector: object) -> ScopeCapability:
+    """The connector's declared ``scope_capability``, additive and fail-safe: a
+    connector that declares nothing is treated as having an *undeclared* residual
+    window — the worker still re-resolves the target pre-dispatch and the audit
+    prices the window as ``undeclared`` rather than pretending it is closed."""
+    declared = getattr(connector, "scope_capability", None)
+    if isinstance(declared, ScopeCapability):
+        return declared
+    return ScopeCapability(reassertion=ScopeReassertion.WINDOW, window="undeclared")
 
 
 class ConnectorResult(BaseModel):
@@ -47,7 +118,11 @@ class ConnectorResult(BaseModel):
 
 
 class Connector(Protocol):
-    """Structural interface every adapter satisfies (design §2)."""
+    """Structural interface every adapter satisfies (design §2).
+
+    CS-018 adds two *additive* pieces alongside this protocol: a declared
+    ``scope_capability`` attribute (read via ``scope_capability_of``) and, for
+    transactional connectors, the ``TransactionalDispatch`` surface below."""
 
     def execute(
         self, action: ResolvedAction, scope: ScopePredicate | None, actor: Actor
@@ -73,6 +148,23 @@ class Connector(Protocol):
     def cancel(self, handle: str) -> None:
         """Abort an in-flight cancellable call (used by the kill-switch, M5)."""
         ...
+
+
+@runtime_checkable
+class TransactionalDispatch(Protocol):
+    """The extra dispatch surface of a connector that declared
+    ``ScopeReassertion.TRANSACTIONAL`` (CS-018): dispatch with the scope
+    predicate carried *into* the effect's own transaction. Zero rows selected
+    by the re-asserted predicate ⇒ raise ``ScopeLostError`` (nothing committed).
+    Additive: connectors that cannot do this simply don't implement it."""
+
+    def dispatch_scoped(
+        self,
+        action: ResolvedAction,
+        actor: Actor,
+        idempotency_key: str,
+        scope: ScopePredicate,
+    ) -> ConnectorResult: ...
 
 
 class ConnectorRegistry(Protocol):

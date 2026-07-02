@@ -138,10 +138,11 @@ class InMemoryOutboxStore:
         state: PendingState,
         result: dict[str, Any] | None = None,
         audit: AuditRecord | None = None,
+        reason: str | None = None,
     ) -> PendingAction:
         row = self._require(action_id)
         settled = row.model_copy(
-            update={"state": state, "result": result, "updated_at": _now()}
+            update={"state": state, "result": result, "reason": reason, "updated_at": _now()}
         )
         self._rows[action_id] = settled
         # audit shares this (logical) transaction with the settle (invariant 6).

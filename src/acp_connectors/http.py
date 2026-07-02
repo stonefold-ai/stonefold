@@ -11,7 +11,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from typing import Any
 
-from acp_core.connector import ConnectorResult
+from acp_core.connector import ConnectorResult, ScopeCapability
 from acp_core.enums import Kind
 from acp_core.models import Actor, ResolvedAction
 from acp_core.scope import ScopePredicate
@@ -20,6 +20,11 @@ Sender = Callable[[dict[str, Any]], list[dict[str, Any]]]
 
 
 class HttpConnector:
+    # CS-018: an HTTP call cannot carry the scope predicate into the upstream's
+    # transaction — the residual race window (one round-trip) is declared, so
+    # the worker re-resolves the target pre-dispatch and the audit prices it.
+    scope_capability = ScopeCapability.window_declared("http round-trip")
+
     def __init__(self, base_url: str = "https://api.internal", sender: Sender | None = None) -> None:
         self.base_url = base_url
         self._sender = sender

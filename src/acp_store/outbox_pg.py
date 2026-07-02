@@ -181,10 +181,11 @@ class PostgresOutboxStore:
         state: PendingState,
         result: dict[str, Any] | None = None,
         audit: AuditRecord | None = None,
+        reason: str | None = None,
     ) -> PendingAction:
         with self._conn.transaction(), self._conn.cursor() as cur:
             row = self._lock(cur, action_id)
-            settled = row.model_copy(update={"state": state, "result": result})
+            settled = row.model_copy(update={"state": state, "result": result, "reason": reason})
             self._write(cur, settled)
             if audit is not None:
                 self._write_audit(cur, audit)  # same transaction as the settle

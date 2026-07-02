@@ -168,9 +168,11 @@ class OutboxStore(Protocol):
         state: PendingState,
         result: dict[str, Any] | None = None,
         audit: AuditRecord | None = None,
+        reason: str | None = None,
     ) -> PendingAction:
         """Move a ``DISPATCHING`` row to ``DONE``/``FAILED``, writing ``audit`` in
-        the **same transaction** as the state change (invariant 6)."""
+        the **same transaction** as the state change (invariant 6). ``reason``
+        records *why* a row failed/cancelled (e.g. ``scope-lost``, CS-018)."""
         ...
 
     def approve(self, action_id: str, approver_id: str) -> PendingAction:

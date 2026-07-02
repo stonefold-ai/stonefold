@@ -172,6 +172,68 @@ def test_stale_decision_cancelled_inside_claim(container: PostgresContainer) -> 
     conn.close()
 
 
+def test_b4_scope_lost_inside_the_effects_transaction(container: PostgresContainer) -> None:
+    # v0.4 CS-018 (B4 over real Postgres): the SQL connector ANDs the scope
+    # predicate into the effect's own UPDATE. A target reassigned to another
+    # tenant between decision and dispatch ⇒ zero rows affected ⇒ FAILED
+    # scope-lost, and the write commits against authorized state or not at all.
+    from acp_connectors import SqlConnector
+    from acp_core.scope import ScopeResolver, default_scope_registry
+
+    conn = _connect(container)
+    _truncate(conn)
+    with conn.cursor() as cur:
+        cur.execute(
+            """DROP TABLE IF EXISTS accounts;
+               CREATE TABLE accounts (
+                   id text PRIMARY KEY, tenant_id text NOT NULL, balance numeric NOT NULL
+               );
+               INSERT INTO accounts VALUES ('A-1', 'T1', 1000), ('A-2', 'T1', 500)"""
+        )
+
+    store = PostgresOutboxStore(conn)
+    sql_conn = SqlConnector(conn, effect_sql={
+        "Payment.pay": (
+            "UPDATE accounts SET balance = balance - %(amount)s "
+            "WHERE id = %(accountId)s AND {scope}"
+        ),
+    })
+    worker = DispatchWorker(
+        store,
+        Connectors({"sql": sql_conn}),
+        registry=full_registry(),
+        scopes=ScopeResolver({"Payment": "tenantOf"}, default_scope_registry()),
+    )
+    actor = Actor(id="alice", claims={"tenant": "T1"})
+
+    lost = store.stage(
+        resolved=_resolve("Payment", "pay", {"accountId": "A-1", "amount": 100}),
+        actor=actor, session_id="s1", agent="pay", state=PendingState.PENDING,
+    )
+    ok = store.stage(
+        resolved=_resolve("Payment", "pay", {"accountId": "A-2", "amount": 100}),
+        actor=actor, session_id="s1", agent="pay", state=PendingState.PENDING,
+    )
+    # the race: A-1 moves to another tenant before dispatch
+    with conn.cursor() as cur:
+        cur.execute("UPDATE accounts SET tenant_id = 'T2' WHERE id = 'A-1'")
+
+    assert worker.drain() == 2
+    lost_row = store.get(lost.id)
+    assert lost_row is not None and lost_row.state is PendingState.FAILED
+    assert lost_row.reason == "scope-lost"
+    assert _state(store, ok.id) is PendingState.DONE
+
+    with conn.cursor() as cur:
+        cur.execute("SELECT id, balance FROM accounts ORDER BY id")
+        balances = dict(cur.fetchall())
+        assert balances["A-1"] == 1000  # untouched — the effect never landed
+        assert balances["A-2"] == 400   # the in-scope effect committed
+        cur.execute("SELECT count(*) FROM audit_log")
+        assert cur.fetchone()[0] == 2  # both settles audited
+    conn.close()
+
+
 def test_approval_release_over_postgres(container: PostgresContainer) -> None:
     conn = _connect(container)
     _truncate(conn)

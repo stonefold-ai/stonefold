@@ -8,12 +8,16 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from acp_core.connector import ConnectorResult
+from acp_core.connector import ConnectorResult, ScopeCapability
 from acp_core.models import Actor, ResolvedAction
 from acp_core.scope import ScopePredicate
 
 
 class EmailConnector:
+    # CS-018: SMTP accepts once and cannot re-assert scope at commit — the
+    # residual window is declared rather than hidden (B5).
+    scope_capability = ScopeCapability.window_declared("smtp accept")
+
     def __init__(self) -> None:
         self.outbox: list[dict[str, Any]] = []
         self._dispatched: dict[str, ConnectorResult] = {}
