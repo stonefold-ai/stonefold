@@ -7,7 +7,15 @@
 **Status:** Draft v0.4 (reference specification; supersedes v0.3). **Authors:** the agent-platform team.
 **Audience:** engineers implementing or writing policies, and reviewers (security, compliance) who must read and certify them.
 
-> **Compatibility:** v0.4 promotes the two deferred timing guarantees (decision freshness, scope no-race) from *documented boundary* to *specified behaviour* — **no policy-file syntax changed**; `schema/acp.schema.json` is unchanged and existing `apiVersion: acp/v0.1` policy files remain valid as-is. CS-017 adds gateway behaviour + deployment configuration; CS-018 adds a declared connector capability (connector metadata, additive). Deltas: v0.1 → v0.2 is `docs/RFC-changeset-v0.1-to-v0.2.md`; v0.2 → v0.3 is `docs/RFC-changeset-v0.2-to-v0.3.md`; v0.3 → v0.4 is `docs/RFC-changeset-v0.3-to-v0.4.md`.
+> **Compatibility:** v0.4 promotes the two deferred timing guarantees (decision freshness, scope no-race) from *documented boundary* to *specified behaviour* — **no policy-file syntax changed**; `schema/acp.schema.json` is unchanged and existing `apiVersion: acp/v0.1` policy files remain valid as-is. CS-017 adds gateway behaviour + deployment configuration; CS-018 adds a declared connector capability (connector metadata, additive). Deltas: v0.1 → v0.2 is `docs/RFC-changeset-v0.1-to-v0.2.md`; v0.2 → v0.3 is `docs/RFC-changeset-v0.2-to-v0.3.md`; v0.3 → v0.4 is `docs/RFC-changeset-v0.3-to-v0.4.md`. A **draft** set for the next revision is accumulating in `docs/RFC-changeset-v0.4-to-v0.5.md`.
+
+## Changelog — v0.4 → v0.5 (draft, accumulating)
+
+| ID | Type | §  | Summary |
+|----|------|----|---------|
+| CS-019 | ADDED | §1 | **Trust boundary stated.** The gateway proves *intents conform to policy*; it does not prove the executing code does what it declares. Connectors, hooks, and the gateway are the trusted computing base; their integrity is a supply-chain property. Text only; non-normative discussion in docs/13. |
+| CS-020 | ADDED | registry §5; §10 | **Connector digest pinning.** A connector declaration MAY pin its implementing artifact by `sha256` digest; when declared, the gateway MUST verify at policy load and at dispatch — mismatch is a dependency failure under §10 (fail closed, audited). Additive; existing registries unaffected. Reference implementation pending. |
+| CS-021 | ADDED | arch. decision 11 | **Identity-provider seam.** The session's authenticated `actor:`/`agent:` identities come from an `IdentityProvider` protocol ahead of the pipeline; built-in default is the existing session/transport auth (no behavioural change). No credential scheme integrated or endorsed. Invariant 3 binds every provider. Reference implementation pending. |
 
 ## Changelog — v0.3 → v0.4
 

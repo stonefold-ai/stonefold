@@ -10,7 +10,7 @@ strings and all existing `examples/*` remain valid.
 
 ---
 
-## CS-014 — Trust boundary stated in the spec (ADDED, §1)
+## CS-019 — Trust boundary stated in the spec (ADDED, §1)
 
 **What:** RFC §1 now states the guarantee boundary explicitly: the gateway proves that
 *intents conform to policy*; it does not prove that the code executing them does what
@@ -25,7 +25,7 @@ uncharitably. No behavioural change; documentation of an existing boundary.
 
 **Implementation impact:** none (text only).
 
-## CS-015 — Connector digest pinning (ADDED, registry §5; §10 hook)
+## CS-020 — Connector digest pinning (ADDED, registry §5; §10 hook)
 
 **What:** a connector declaration MAY carry `digest: "sha256:<64 hex>"` pinning the
 implementing artifact by content digest. When declared, the gateway MUST verify the
@@ -38,7 +38,7 @@ additive, existing registries unaffected.
 
 **Why:** the registry declared *what* a connector does but not *which code* is trusted
 to do it. Silent replacement of a connector's implementation (the supply-chain attack in
-CS-014's boundary statement) was invisible to the gateway; with a pinned digest it
+CS-019's boundary statement) was invisible to the gateway; with a pinned digest it
 becomes a fail-closed refusal with an audit record, and changing connector code requires
 a registry change — a reviewed, versioned artifact.
 
@@ -47,7 +47,7 @@ a registry change — a reviewed, versioned artifact.
 work for when the reference implements it — a certification claim MUST NOT imply digest
 verification until then.
 
-## CS-016 — Identity-provider seam (ADDED, architecture decision 11)
+## CS-021 — Identity-provider seam (ADDED, architecture decision 11)
 
 **What:** the authenticated `actor:`/`agent:` identities the session carries come from
 an `IdentityProvider` protocol ahead of the pipeline. Default and built-in: the existing
@@ -57,7 +57,7 @@ SPIFFE) to stand in the same slot. No specific scheme is integrated or endorsed;
 DID/VC machinery becomes a dependency.
 
 **Why:** identity provenance is deliberately outside this spec's scope (the trust
-boundary, CS-014) — but *where* identity enters must be a declared seam, like the
+boundary, CS-019) — but *where* identity enters must be a declared seam, like the
 authorization step (decision 9), or every deployment invents its own splice point.
 Names the seam; changes nothing about how identity is used downstream. Invariant 3
 (identity never from the agent payload) is restated as binding on every provider.
