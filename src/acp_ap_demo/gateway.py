@@ -31,6 +31,7 @@ from acp_core import (
     Connectors,
     Decision,
     EvalResult,
+    FreshnessConfig,
     KillOrder,
     KillScope,
     PendingAction,
@@ -47,7 +48,7 @@ from acp_core.outbox import OutboxStore
 from acp_core.scope import make_scope_resolver
 from acp_connectors import InMemoryConnector
 from acp_gates.content import default_hooks
-from acp_gates.engine import DefaultGateEngine
+from acp_gates.engine import DefaultGateEngine, make_dispatch_revalidator
 from acp_gateway.kill_service import KillService
 from acp_gateway.transport import Gateway
 from acp_store import (
@@ -348,18 +349,31 @@ def _build_common(
         return RequestEnv(now=clock(), resource={"payeeId": str(payee)})
 
     inflight = InFlightRegistry()
+    scopes = make_scope_resolver(policy)
     gateway = Gateway(
         registry=registry,
         audit=audit,
         policy=policy,
         gates=gates,
-        scopes=make_scope_resolver(policy),
+        scopes=scopes,
         connectors=connectors,
         outbox=outbox,
         kill=kill,
         env_factory=_env_factory,
+        # v0.4 CS-017: bound how stale a staged payment decision may get — a
+        # payee sanctioned or an approval granted long ago is caught at claim.
+        freshness=FreshnessConfig(),
     )
-    worker = DispatchWorker(outbox, connectors, registry=registry, kill=kill, inflight=inflight)
+    # v0.4 wiring: the worker's clock is the same injected demo clock the
+    # decisions use; it re-runs volatile gates inside the claim (CS-017) and
+    # re-asserts scope at dispatch (CS-018 — the ledger connector declares a
+    # residual window, so the target account is re-resolved pre-dispatch).
+    worker = DispatchWorker(
+        outbox, connectors, registry=registry, kill=kill, inflight=inflight,
+        clock=clock,
+        revalidate=make_dispatch_revalidator(gates, policy),
+        scopes=scopes,
+    )
     kill_service = KillService(kill, audit=audit, inflight=inflight)
 
     return APBundle(

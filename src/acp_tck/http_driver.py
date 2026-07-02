@@ -25,10 +25,14 @@ Wire protocol (all JSON; camelCase keys):
 | GET    | /tck/effects                    | → {effects: [{resource, action, data}]} |
 | POST   | /tck/kill                       | {scope, agent?, sessionId?, resource?, action?, issuedBy} → {killId} |
 | POST   | /tck/lift                       | {killId} → {} |
-| GET    | /tck/audit                      | → {records: [{decision, resource, action, outcome}]} |
+| GET    | /tck/audit                      | → {records: [{decision, resource, action, outcome, reason?}]} |
 | POST   | /tck/inject-dispatch-failure    | {action} → {} |
+| POST   | /tck/update-set                 | {name, values: [str]} → {} |
 
 Omit an endpoint (404/501) only if its capability is not advertised.
+(``reason`` carries the deciding rule/settle reason; required for the
+``freshness``/``scope-reassert`` capabilities. ``/tck/update-set`` backs
+``freshness``.)
 """
 
 from __future__ import annotations
@@ -193,9 +197,13 @@ class HttpDriver:
                 resource=r.get("resource"),
                 action=r.get("action"),
                 outcome=str(r.get("outcome", "")),
+                reason=str(r.get("reason") or ""),
             )
             for r in body.get("records", [])
         ]
 
     def inject_dispatch_failure(self, action: str) -> None:
         self._call("POST", "/tck/inject-dispatch-failure", {"action": action})
+
+    def update_named_set(self, name: str, values: Sequence[str]) -> None:
+        self._call("POST", "/tck/update-set", {"name": name, "values": list(values)})

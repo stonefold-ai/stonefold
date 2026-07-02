@@ -165,6 +165,10 @@ class AuditRecord(BaseModel):
     scopeApplied: list[str] = Field(default_factory=list)
     gates: list[GateResult] = Field(default_factory=list)
     decision: Decision = Decision.DENY
+    # The deciding rule/gate or settle reason (RFC §11: the decision is recorded
+    # "with the deciding rule/gate") — e.g. "gate:denylist", "stale-decision",
+    # "scope-lost", "dispatch".
+    rule: str | None = None
     approval: dict[str, Any] | None = None
     # Connector result: "success" | "failure" | "not_executed".
     outcome: str = "not_executed"

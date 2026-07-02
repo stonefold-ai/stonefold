@@ -94,10 +94,14 @@ class InMemoryConnector:
         # NOT append a second effect (design §9, acceptance D1).
         if idempotency_key in self._dispatched:
             return self._dispatched[idempotency_key]
-        if scope is not None and self._find(action, scope, actor) is None:
-            raise ScopeLostError(
-                f"{action.resource} target is no longer in the actor's scoped set"
-            )
+        # Re-assert only when the effect names a target: a targetless effect
+        # (a pure send, an auto-staged compensation) has no row the predicate
+        # could select, so there is nothing to re-assert.
+        if scope is not None and _target_id(action) is not None:
+            if self._find(action, scope, actor) is None:
+                raise ScopeLostError(
+                    f"{action.resource} target is no longer in the actor's scoped set"
+                )
         self.effects.append(
             {"resource": action.resource, "action": action.action, "data": dict(action.data), "key": idempotency_key}
         )

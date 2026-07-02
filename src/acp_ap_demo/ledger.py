@@ -21,7 +21,7 @@ from collections.abc import Callable, Mapping
 from datetime import datetime, timezone
 from typing import Any, Protocol
 
-from acp_core.connector import ConnectorResult
+from acp_core.connector import ConnectorResult, ScopeCapability
 from acp_core.enums import Kind
 from acp_core.models import Actor, ResolvedAction
 from acp_core.scope import ScopePredicate
@@ -254,6 +254,11 @@ class PostgresLedger:
 class LedgerConnector:
     """The single adapter to the fake bank. Satisfies ``acp_core.Connector``."""
 
+    # CS-018: a payment rail cannot carry the scope predicate into its own
+    # transaction — the residual window is declared, and the worker re-resolves
+    # the source account under scope immediately before dispatch.
+    scope_capability = ScopeCapability.window_declared("payment-rail call")
+
     def __init__(
         self,
         backend: LedgerBackend,
@@ -346,6 +351,8 @@ class EmailStub:
     """A clearly-fake email connector. payments-ops allows no Email action, so any
     attempt is default-denied before this is ever reached — it exists only so the
     connector map covers the registry's ``email`` binding."""
+
+    scope_capability = ScopeCapability.window_declared("smtp stub")
 
     def __init__(self) -> None:
         self.sent: list[dict[str, Any]] = []

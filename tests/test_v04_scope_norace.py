@@ -245,6 +245,22 @@ def test_transactional_declaration_without_dispatch_scoped_fails_closed() -> Non
     assert row.reason == "scope-unavailable"  # cannot re-assert ⇒ never dispatched
 
 
+def test_targetless_effect_has_nothing_to_reassert() -> None:
+    # An effect that names no target row — the shape of an auto-staged
+    # compensation, which bypasses the decision-time scope pre-check — has
+    # nothing the predicate could select, so the transactional re-assert is
+    # skipped and the effect dispatches normally.
+    h = harness(_pay_doc(), _pay_tables())
+    resolved = h.reg.resolve(RawCall(resource="Payment", action="refund", data={"amount": 10}))
+    row = h.outbox.stage(
+        resolved=resolved, actor=ACTOR, session_id="s1", agent="pay",
+        state=PendingState.PENDING,
+    )
+    assert h.worker().drain() == 1
+    assert h.get(row.id).state is PendingState.DONE
+    assert len(h.conn.effects) == 1
+
+
 # --- capability declaration unit checks --------------------------------------
 def test_scope_capability_pairing_is_validated() -> None:
     with pytest.raises(ValueError):

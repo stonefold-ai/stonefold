@@ -108,6 +108,7 @@ def create_tck_harness(driver: ConformanceDriver, *, implementation: str) -> Fas
                     "resource": r.resource,
                     "action": r.action,
                     "outcome": r.outcome,
+                    "reason": r.reason,
                 }
                 for r in driver.audit()
             ]
@@ -116,6 +117,11 @@ def create_tck_harness(driver: ConformanceDriver, *, implementation: str) -> Fas
     @app.post("/tck/inject-dispatch-failure")
     def inject(body: dict[str, Any]) -> dict[str, Any]:
         driver.inject_dispatch_failure(str(body["action"]))
+        return {}
+
+    @app.post("/tck/update-set")
+    def update_set(body: dict[str, Any]) -> dict[str, Any]:
+        driver.update_named_set(str(body["name"]), [str(v) for v in body["values"]])
         return {}
 
     return app

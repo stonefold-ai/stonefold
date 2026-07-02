@@ -17,9 +17,16 @@ from typing import Any
 
 import yaml
 
-from acp_core import CompiledPolicy, InMemoryAuditSink, RequestEnv, load_policy, load_registry
+from acp_core import (
+    CompiledPolicy,
+    FreshnessConfig,
+    InMemoryAuditSink,
+    RequestEnv,
+    load_policy,
+    load_registry,
+)
 from acp_core.scope import make_scope_resolver
-from acp_gates.engine import DefaultGateEngine
+from acp_gates.engine import DefaultGateEngine, make_dispatch_revalidator
 from acp_gateway.transport import Gateway
 from acp_store import DispatchWorker, InMemoryOutboxStore
 from acp_store.kill_memory import InMemoryKillStore
@@ -69,17 +76,29 @@ def build_gateway(world: World, *, policy_path: Path = SUPPORT_POLICY) -> Gatewa
     outbox = InMemoryOutboxStore(audit=audit)
     kill = InMemoryKillStore()
     connectors = world.connectors()
+    engine = DefaultGateEngine(registry)
+    scopes = make_scope_resolver(policy)
     gateway = Gateway(
         registry=registry,
         audit=audit,
         policy=policy,
-        gates=DefaultGateEngine(registry),
-        scopes=make_scope_resolver(policy),
+        gates=engine,
+        scopes=scopes,
         connectors=connectors,
         outbox=outbox,
         kill=kill,
         env=RequestEnv(now=DEMO_NOW),
+        freshness=FreshnessConfig(),  # v0.4 CS-017: staged effects carry a TTL
     )
-    worker = DispatchWorker(outbox, connectors, registry=registry, kill=kill)
+    # v0.4 wiring: the worker's clock must be the same fixed instant the demo
+    # decides at — a wall clock would see every DEMO_NOW-stamped TTL as long
+    # expired. It also re-runs volatile gates (CS-017) and re-asserts scope at
+    # dispatch (CS-018).
+    worker = DispatchWorker(
+        outbox, connectors, registry=registry, kill=kill,
+        clock=lambda: DEMO_NOW,
+        revalidate=make_dispatch_revalidator(engine, policy),
+        scopes=scopes,
+    )
     return GatewayBundle(gateway=gateway, policy=policy, audit=audit,
                          outbox=outbox, kill=kill, worker=worker)

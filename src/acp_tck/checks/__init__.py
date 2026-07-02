@@ -21,6 +21,7 @@ PROFILE_SCOPE = "scope"  # scope injection below the model
 PROFILE_STAGING = "staging"  # outbox, approvals, dual-auth
 PROFILE_KILL = "kill"  # kill-switch semantics (serialized form)
 PROFILE_AUDIT = "audit"  # decision log completeness & consistency
+PROFILE_FRESHNESS = "freshness"  # v0.4 CS-017/018: decision TTL, volatile re-validation, scope no-race
 
 ALL_PROFILES = (
     PROFILE_CORE,
@@ -29,6 +30,7 @@ ALL_PROFILES = (
     PROFILE_STAGING,
     PROFILE_KILL,
     PROFILE_AUDIT,
+    PROFILE_FRESHNESS,
 )
 
 
@@ -67,6 +69,6 @@ def check(
 
 def all_checks() -> tuple[Check, ...]:
     # import for side effects: each module registers its checks
-    from acp_tck.checks import audit, core, kill, lint, scope, staging  # noqa: F401
+    from acp_tck.checks import audit, core, freshness, kill, lint, scope, staging  # noqa: F401
 
     return tuple(_CHECKS)

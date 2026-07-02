@@ -41,6 +41,7 @@ from acp_core import (
     build_record,
     enforce,
 )
+from acp_core.freshness import FreshnessConfig
 from acp_core.scope import ScopeResolver
 
 
@@ -63,6 +64,7 @@ class Gateway:
         kill: KillStore | None = None,
         env: RequestEnv | None = None,
         env_factory: Callable[[RawCall], RequestEnv] | None = None,
+        freshness: FreshnessConfig | None = None,
         agent: str = "unknown",
     ) -> None:
         self._registry = registry
@@ -82,6 +84,9 @@ class Gateway:
         # context only from the gateway's own stores — never the agent's identity
         # (invariant 3 stays intact: identity is the per-call ``actor`` argument).
         self._env_factory = env_factory
+        # Decision freshness (v0.4 CS-017), opt-in: with a config every staged
+        # effect gets a TTL stamped from the request env's clock.
+        self._freshness = freshness
         self._agent = policy.agent if policy is not None else agent
 
     @property
@@ -117,6 +122,7 @@ class Gateway:
             connectors=self._connectors,
             outbox=self._outbox,
             kill=self._kill,
+            freshness=self._freshness,
             agent=self._agent,
         )
 

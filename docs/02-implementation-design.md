@@ -356,6 +356,8 @@ worker = DispatchWorker(
 
 Shipped declarations: `SqlConnector` and `InMemoryConnector` are `transactional`; `HttpConnector` (`http round-trip`) and `EmailConnector` (`smtp accept`) declare their windows. A custom transactional connector implements the `TransactionalDispatch` protocol and raises `ScopeLostError` when the re-asserted predicate selects nothing; one that declares `transactional` without implementing it fails closed (`scope-unavailable`). Spec text and acceptance scenarios: `docs/RFC-changeset-v0.3-to-v0.4.md` (CS-018), scenarios B4/B5, tests in `tests/test_v04_scope_norace.py` + the Postgres B4 test in `tests/test_m4_pg_integration.py`.
 
+Both §9.1 and §9.2 are wired live in everything this repo ships: the scripted demo (`acp_demo`), the Accounts-Payable demo (`acp_ap_demo`), and the TCK reference adapter — where the TCK's `freshness` profile certifies the behaviour black-box (docs/12 §4).
+
 ---
 
 ## 10. The condition engine (`when:`)

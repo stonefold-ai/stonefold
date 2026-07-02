@@ -99,6 +99,7 @@ def build_record(
         scopeApplied=list(result.scope_applied),
         gates=list(result.gates),
         decision=result.decision,
+        rule=result.rule,
         approval=approval,
         outcome=outcome,
         resultRefs=list(result_refs or []),

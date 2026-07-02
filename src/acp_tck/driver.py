@@ -30,6 +30,15 @@ CAP_KILL = "kill"  # kill/lift orders
 CAP_AUDIT = "audit"  # audit() returns the decision log
 CAP_CLOCK = "clock"  # set_clock controls time-based gates
 CAP_DISPATCH_FAILURE = "dispatch-failure-injection"  # inject_dispatch_failure()
+# v0.4 CS-017: decision TTL + volatile-gate re-validation are wired, with the
+# REQUIRED TCK freshness config — default TTL 24 hours, irreversible TTL 30
+# minutes (fixture semantics, like the registered functions in docs/12 §3) —
+# and update_named_set() can change a named set between decision and dispatch.
+CAP_FRESHNESS = "freshness"
+# v0.4 CS-018: the scope predicate is re-asserted at dispatch (either declared
+# form — transactional or window pre-dispatch re-resolve; the TCK observes only
+# the outcome: the effect does not land and the settle reason is "scope-lost").
+CAP_SCOPE_REASSERT = "scope-reassert"
 
 ALL_CAPABILITIES = frozenset(
     {
@@ -40,6 +49,8 @@ ALL_CAPABILITIES = frozenset(
         CAP_AUDIT,
         CAP_CLOCK,
         CAP_DISPATCH_FAILURE,
+        CAP_FRESHNESS,
+        CAP_SCOPE_REASSERT,
     }
 )
 
@@ -78,6 +89,11 @@ class AuditEntry:
     resource: str | None
     action: str | None
     outcome: str  # success | failure | not_executed | (impl-specific detail)
+    # The deciding rule/gate or settle reason (RFC §11) — the v0.4 reasons
+    # ("stale-decision", "stale-guard:<gate>", "scope-lost") are normative, so
+    # a driver claiming CAP_FRESHNESS / CAP_SCOPE_REASSERT MUST populate this
+    # for cancelled/failed settle records. Empty otherwise is acceptable.
+    reason: str = ""
 
 
 @dataclass(frozen=True)
@@ -176,4 +192,11 @@ class ConformanceDriver(Protocol):
     def inject_dispatch_failure(self, action: str) -> None:
         """Make the next dispatch of ``action`` fail at the connector —
         exercises compensation staging. (CAP_DISPATCH_FAILURE)"""
+        ...
+
+    def update_named_set(self, name: str, values: Sequence[str]) -> None:
+        """Replace a registry named set's values at runtime — simulates a
+        sanctions-list update landing between decision and dispatch, so the
+        TCK can prove volatile gates are re-validated at claim (v0.4 CS-017).
+        (CAP_FRESHNESS)"""
         ...

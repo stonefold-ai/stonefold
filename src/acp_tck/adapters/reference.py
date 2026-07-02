@@ -12,21 +12,30 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
 import yaml
 
-from acp_core import Actor, InMemoryAuditSink, RequestEnv, Session, load_policy, load_registry
-from acp_core.connector import Connectors
+from acp_core import (
+    Actor,
+    FreshnessConfig,
+    InMemoryAuditSink,
+    InMemoryRegistry,
+    RequestEnv,
+    Session,
+    load_policy,
+    load_registry,
+)
+from acp_core.connector import Connectors, ConnectorResult
 from acp_core.kill import KillScope, KillScopeKind
 from acp_core.linter import PolicyError
 from acp_core.models import RawCall, ResolvedAction
-from acp_core.scope import AttributeScope, ScopeRegistry, make_scope_resolver
+from acp_core.scope import AttributeScope, ScopePredicate, ScopeRegistry, make_scope_resolver
 from acp_gates.base import GateContext
 from acp_gates.content import ContentHookRegistry
-from acp_gates.engine import DefaultGateEngine
+from acp_gates.engine import DefaultGateEngine, make_dispatch_revalidator
 from acp_gateway.transport import Gateway
 from acp_connectors import InMemoryConnector
 from acp_store import DispatchWorker, InMemoryOutboxStore
@@ -41,6 +50,12 @@ from acp_tck.driver import (
 )
 
 _SCHEMA = Path(__file__).resolve().parents[3] / "schema" / "acp.schema.json"
+
+# The REQUIRED TCK freshness config (acp_tck.driver, CAP_FRESHNESS): the D5/D6
+# checks pick their clock advances against exactly these TTLs.
+_TCK_FRESHNESS = FreshnessConfig(
+    default_ttl=timedelta(hours=24), irreversible_ttl=timedelta(minutes=30)
+)
 
 
 # --------------------------------------------------------------------------
@@ -97,17 +112,22 @@ def _flag_set(ctx: GateContext) -> bool:
 
 
 class _FailableConnector(InMemoryConnector):
-    """The world connector, with TCK failure injection for D4."""
+    """The world connector, with TCK failure injection for D4. The injection
+    hooks ``_dispatch`` so it fires on both dispatch forms (plain and the
+    CS-018 ``dispatch_scoped``)."""
 
     def __init__(self) -> None:
         super().__init__()
         self.fail_next: set[str] = set()
 
-    def dispatch(self, action: ResolvedAction, actor: Actor, idempotency_key: str) -> Any:
+    def _dispatch(
+        self, action: ResolvedAction, actor: Actor, idempotency_key: str,
+        scope: ScopePredicate | None,
+    ) -> ConnectorResult:
         if action.action in self.fail_next:
             self.fail_next.discard(action.action or "")
             raise RuntimeError(f"TCK-injected dispatch failure for {action.action!r}")
-        return super().dispatch(action, actor, idempotency_key)
+        return super()._dispatch(action, actor, idempotency_key, scope)
 
 
 class ReferenceDriver:
@@ -125,6 +145,7 @@ class ReferenceDriver:
         self._outbox: InMemoryOutboxStore | None = None
         self._kill: InMemoryKillStore = InMemoryKillStore()
         self._audit: InMemoryAuditSink = InMemoryAuditSink()
+        self._registry: InMemoryRegistry | None = None
 
     # --- driver contract ---------------------------------------------------
     def capabilities(self) -> frozenset[str]:
@@ -156,20 +177,31 @@ class ReferenceDriver:
             hooks=ContentHookRegistry({"tck.rejectMarker": _reject_marker}),
             preconditions={"tck.flagSet": _flag_set},
         )
+        self._registry = registry
+        scopes = make_scope_resolver(policy, _tck_scope_registry())
         self._gateway = Gateway(
             registry=registry,
             audit=self._audit,
             policy=policy,
             gates=engine,
-            scopes=make_scope_resolver(policy, _tck_scope_registry()),
+            scopes=scopes,
             connectors=connectors,
             outbox=self._outbox,
             kill=self._kill,
             env_factory=self._env_factory,
+            freshness=_TCK_FRESHNESS,  # v0.4 CS-017: TTL stamped at staging
             agent=policy.agent,
         )
+        # v0.4 wiring: the worker re-checks TTL + volatile gates inside the
+        # claim (CS-017) and re-asserts scope at dispatch (CS-018).
         self._worker = DispatchWorker(
-            self._outbox, connectors, registry=registry, kill=self._kill
+            self._outbox,
+            connectors,
+            registry=registry,
+            kill=self._kill,
+            clock=self._worker_clock,
+            revalidate=make_dispatch_revalidator(engine, policy),
+            scopes=scopes,
         )
         return LoadResult(ok=True, warnings=warnings)
 
@@ -255,6 +287,7 @@ class ReferenceDriver:
                 resource=r.resource,
                 action=r.action,
                 outcome=r.outcome,
+                reason=r.rule or "",
             )
             for r in self._audit.records
         ]
@@ -262,7 +295,14 @@ class ReferenceDriver:
     def inject_dispatch_failure(self, action: str) -> None:
         self._world.fail_next.add(action)
 
+    def update_named_set(self, name: str, values: Sequence[str]) -> None:
+        assert self._registry is not None, "load() first"
+        self._registry.file.sets[name] = tuple(values)
+
     # --- internals -----------------------------------------------------------
+    def _worker_clock(self) -> datetime:
+        # the TCK's pinned clock; a wall clock only if a check forgot to pin it
+        return self._now or datetime.now(timezone.utc)
     def _env_factory(self, raw: RawCall) -> RequestEnv:
         """Resolve the target row (by ``data.id``) so gates can read
         ``resource.*``; thread the injected clock, sink, and ambient context."""
