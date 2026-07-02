@@ -161,8 +161,6 @@ Models: `claude-haiku-4-5-20251001` (small), `claude-sonnet-5` (mid),
 the exact harness functions (surface construction, probe set, scoring rules) so a
 reader can verify correctness rather than trust this summary.
 
-![Track R pilot — selection accuracy per model (bars) and tokens per call (lines), MCP vs SIF](../bench_results/trackR-pilot.svg)
-
 **Correct capability selection** (fixed surface; per cell: 10 probes × 2 reps):
 
 | Model | Surface | N=10 | N=50 | N=100 |
@@ -256,6 +254,8 @@ failure), `overcall`.
 **Executed:** Claude Haiku 4.5, N ∈ {10, 50}, `mcp` vs `sif`, 2 reps × 10 probes per
 cell (PILOT, below the §5 bar), all configurations over the confusable catalog. Raw
 logs: `bench_results/2026-07-02-trackR-haiku-realism/`; graph: `trackR-pilot.svg`.
+
+![Track R realism battery — selection accuracy per configuration (bars) and tokens per call (right), MCP vs SIF](../bench_results/trackR-pilot.svg)
 
 **Correct capability selection, % (N=10 / N=50):**
 
