@@ -22,6 +22,7 @@ from acp_core import (
     FreshnessConfig,
     InMemoryAuditSink,
     RequestEnv,
+    assert_connector_digests,
     load_policy,
     load_registry,
 )
@@ -76,6 +77,13 @@ def build_gateway(world: World, *, policy_path: Path = SUPPORT_POLICY) -> Gatewa
     outbox = InMemoryOutboxStore(audit=audit)
     kill = InMemoryKillStore()
     connectors = world.connectors()
+    # CS-020: verify any pinned connector digests before serving. A no-op unless
+    # the registry declares digests; a mismatch fails closed here (refuses to come
+    # up) under the policy's failureMode, audited.
+    assert_connector_digests(
+        registry, connectors,
+        failure_mode=policy.policy.defaults.failureMode, audit=audit,
+    )
     engine = DefaultGateEngine(registry)
     scopes = make_scope_resolver(policy)
     gateway = Gateway(

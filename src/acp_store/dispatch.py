@@ -22,6 +22,7 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 
 from acp_core.audit import build_record
+from acp_core.digest import DIGEST_MISMATCH, digest_matches
 from acp_core.connector import (
     SCOPE_LOST,
     ConnectorCancelled,
@@ -131,6 +132,16 @@ class DispatchWorker:
             self._maybe_compensate(claimed)
             return True
 
+        # CS-020: the pinned connector's artifact must still match its digest at
+        # dispatch. A mismatch is a fail-closed dependency failure — the effect
+        # never leaves, and since it never landed nothing is compensated (the same
+        # floor as scope-lost: "authorized state or not at all").
+        if claimed.resolved.connector_digest is not None and not digest_matches(
+            connector, claimed.resolved.connector_digest
+        ):
+            self._settle_digest_failure(claimed)
+            return True
+
         # CS-018 scope no-race (B4/B5): with a resolver wired, re-assert the scope
         # predicate at dispatch. The connector's declared capability picks the
         # form; either way the audit records which one ran.
@@ -231,6 +242,18 @@ class DispatchWorker:
             audit=self._audit_record(
                 row, Decision.DENY, "failure", rule=reason, scope_applied=scope_trace,
             ),
+        )
+
+    def _settle_digest_failure(self, row: PendingAction) -> None:
+        """Settle a row whose connector failed digest verification at dispatch
+        (CS-020). Never stages a compensation: the connector was never called, so
+        the effect did not land and there is nothing to undo."""
+        self._store.settle(
+            row.id,
+            state=PendingState.FAILED,
+            result={"error": DIGEST_MISMATCH},
+            reason=DIGEST_MISMATCH,
+            audit=self._audit_record(row, Decision.DENY, "failure", rule=DIGEST_MISMATCH),
         )
 
     def drain(self, *, max_iterations: int = 1000, kill_check: KillCheck | None = None) -> int:

@@ -19,6 +19,7 @@ from datetime import datetime
 from acp_core.audit import AuditSink, build_record
 from acp_core.compiler import CompiledPolicy
 from acp_core.connector import ConnectorRegistry
+from acp_core.digest import DIGEST_MISMATCH, pinned_connector_mismatch
 from acp_core.enums import Decision, Kind, Outcome
 from acp_core.failure import Unavailable, guard, should_fail_closed
 from acp_core.freshness import FreshnessConfig
@@ -271,6 +272,20 @@ def enforce(
     # observe/record/transition run through the connector now, scope applied
     # below the model (design §5).
     if connectors is not None:
+        # CS-020: a pinned connector whose loaded artifact no longer matches its
+        # digest is a dependency failure (RFC §10) — honour failureMode, with the
+        # irreversible floor, exactly like a connector outage below.
+        if pinned_connector_mismatch(connectors, resolved):
+            if should_fail_closed(resolved, failure_mode):
+                return _terminal(
+                    Decision.DENY, DIGEST_MISMATCH, call, resolved, actor,
+                    session, audit, agent_name, gate_results=gate_trace,
+                    scope_applied=scope_applied,
+                )
+            return _terminal(
+                Decision.ALLOW, authz.rule, call, resolved, actor, session, audit,
+                agent_name, gate_results=gate_trace, scope_applied=scope_applied,
+            )
         executed = guard(
             lambda: connectors.get(resolved.connector).execute(
                 resolved, scope_pred, actor

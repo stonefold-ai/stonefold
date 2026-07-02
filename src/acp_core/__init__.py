@@ -36,6 +36,16 @@ from acp_core.models import (
     Session,
 )
 from acp_core.compiler import AuthzResult, CompiledPolicy, KindMatcher, MatchSpecificity
+from acp_core.digest import (
+    DIGEST_MISMATCH,
+    DigestMismatch,
+    DigestMismatchError,
+    artifact_digest,
+    assert_connector_digests,
+    digest_matches,
+    pinned_connector_mismatch,
+    verify_connector_digests,
+)
 from acp_core.condition import (
     ConditionError,
     ConditionRuntimeError,
@@ -163,6 +173,15 @@ __all__ = [
     "AuthzResult",
     "KindMatcher",
     "MatchSpecificity",
+    # connector digest pinning (CS-020)
+    "DIGEST_MISMATCH",
+    "DigestMismatch",
+    "DigestMismatchError",
+    "artifact_digest",
+    "digest_matches",
+    "pinned_connector_mismatch",
+    "verify_connector_digests",
+    "assert_connector_digests",
     # condition engine
     "parse_condition",
     "validate_condition",

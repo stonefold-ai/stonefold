@@ -15,9 +15,10 @@ can check that every name a policy references exists.
 
 from __future__ import annotations
 
-from typing import Protocol
+from collections.abc import Mapping
+from typing import Any, Protocol
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from acp_core.enums import (
     Emission,
@@ -83,11 +84,34 @@ class RegistryFile(BaseModel):
 
     resources: dict[str, ResourceDef] = Field(default_factory=dict)
     connectors: tuple[str, ...] = ()
+    # CS-020: optional connector→digest pins. The loader accepts either the bare
+    # name list above (no pins) or a map form (``{name: {digest: "sha256:…"}}``,
+    # like the registry/v1.x authoring dialect); the map form's digests are split
+    # out here so ``connectors`` stays a plain name tuple for every other consumer.
+    connector_digests: dict[str, str] = Field(default_factory=dict)
     scopePredicates: tuple[str, ...] = ()
     contentHooks: tuple[str, ...] = ()
     preconditionChecks: tuple[str, ...] = ()
     sets: dict[str, tuple[str, ...]] = Field(default_factory=dict)
     sinks: tuple[str, ...] = ()
+
+    @model_validator(mode="before")
+    @classmethod
+    def _split_connector_digests(cls, data: Any) -> Any:
+        """Normalise a map-form ``connectors`` block into a name tuple plus a
+        ``connector_digests`` map (CS-020). A list stays a list (no pins). An
+        explicit ``connector_digests`` key is honoured and merged."""
+        if not isinstance(data, dict):
+            return data
+        connectors = data.get("connectors")
+        if isinstance(connectors, Mapping):
+            digests = dict(data.get("connector_digests") or {})
+            for name, decl in connectors.items():
+                if isinstance(decl, Mapping) and decl.get("digest") is not None:
+                    digests.setdefault(name, decl["digest"])
+            data = {**data, "connectors": tuple(connectors.keys()),
+                    "connector_digests": digests}
+        return data
 
 
 class Registry(Protocol):
@@ -122,18 +146,29 @@ class InMemoryRegistry:
             raise UnknownActionError(
                 f"unknown action {call.action!r} on resource {call.resource!r}"
             )
+        connector_name = action.connector or resource.connector
         return ResolvedAction(
             kind=action.kind,
             resource=call.resource,
             action=call.action,
             data=dict(call.data),
             attrs=action.attributes(),
-            connector=action.connector or resource.connector,
+            connector=connector_name,
+            connector_digest=self._data.connector_digests.get(connector_name),
             from_states=action.from_states,
             compensation=action.compensation,
         )
 
     # --- registry introspection used by the linter (M1) and gates (M2) ---
+
+    @property
+    def connector_digests(self) -> Mapping[str, str]:
+        """The declared connector→digest pins (CS-020); empty when none are pinned."""
+        return self._data.connector_digests
+
+    def connector_digest(self, name: str) -> str | None:
+        """The pinned artifact digest for a connector, or ``None`` if unpinned."""
+        return self._data.connector_digests.get(name)
 
     def has_scope_predicate(self, name: str) -> bool:
         return name in self._data.scopePredicates

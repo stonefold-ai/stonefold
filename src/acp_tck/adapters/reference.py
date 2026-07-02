@@ -79,8 +79,16 @@ def authoring_to_compact(authoring: Mapping[str, Any]) -> dict[str, Any]:
         actions.setdefault("read", {"kind": "observe"})
         actions.setdefault("create", {"kind": "record"})
         resources[ename] = {"connector": edef.get("dataSource"), "actions": actions}
+    authoring_connectors = dict(authoring.get("connectors") or {})
     return {
-        "connectors": list(dict(authoring.get("connectors") or {}).keys()),
+        "connectors": list(authoring_connectors.keys()),
+        # CS-020: carry any pinned connector digests across the dialect bridge so
+        # the compact loader can verify them (a no-op unless one is declared).
+        "connector_digests": {
+            name: decl["digest"]
+            for name, decl in authoring_connectors.items()
+            if isinstance(decl, Mapping) and decl.get("digest") is not None
+        },
         "scopePredicates": list(authoring.get("scopePredicates") or []),
         "preconditionChecks": list(authoring.get("preconditionChecks") or []),
         "contentHooks": list(authoring.get("hooks") or []),

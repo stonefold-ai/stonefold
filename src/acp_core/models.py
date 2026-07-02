@@ -87,6 +87,10 @@ class ResolvedAction(BaseModel):
     data: dict[str, Any]
     attrs: Attributes
     connector: str
+    # The connector's pinned artifact digest (CS-020), copied from the registry at
+    # resolution so the load-time and dispatch-time checks compare against the same
+    # value that was in force when the action was staged. ``None`` ⇒ not pinned.
+    connector_digest: str | None = None
     # Registry-declared legal from-states for a TRANSITION action (RFC §4.5).
     # Empty for non-transitions. The built-in transition precondition (M2) uses
     # this; it is a MUST-hold check, not optional policy.

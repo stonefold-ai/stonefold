@@ -43,9 +43,10 @@ becomes a fail-closed refusal with an audit record, and changing connector code 
 a registry change — a reviewed, versioned artifact.
 
 **Implementation impact:** gateway verifies digests at load + dispatch when declared
-(reference implementation: pending). TCK: a freshness-style profile check is future
-work for when the reference implements it — a certification claim MUST NOT imply digest
-verification until then.
+(reference implementation: done — `acp_core.digest`, verified at policy load and at
+dispatch; the reference pins each connector's module source bytes, docs/06 §5). TCK: a
+freshness-style profile check is future work for when the reference implements it — a
+certification claim MUST NOT imply digest verification until then.
 
 ## CS-021 — Identity-provider seam (ADDED, architecture decision 11)
 
