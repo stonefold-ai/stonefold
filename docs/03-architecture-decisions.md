@@ -106,5 +106,30 @@ Every place an external system can plug in, and what runs there when nothing doe
 - **`derived` expression grammar is deferred.** Derived attributes/properties (`operativeForce: { derived: "isHighAlert ? 'high' : 'low'" }`) are implementation-defined: pure, deterministic, no I/O (docs/06 §4). Freezing a small derivation grammar (like the §8 condition grammar) is deferred.
 - **Content-check delegation — TODO (RFC wording).** The gateway can validate structure, limits, and set membership deterministically, but it **cannot judge content** — so an implementation SHOULD (not MUST) provide hooks that delegate content checking to third-party systems (DLP, moderation, fraud scoring), executed at the chokepoint under the gateway's failure mode and audit. The reference already ships the seam (`contentCheck` → `ContentHookRegistry`; conformance contract docs/06 §6; positioning docs/13). The open item is the explicit **SHOULD** wording in `docs/01` §7.7 at the next RFC revision — today §7.7 defines the hook without stating the implementation obligation.
 
+## SIF catalogue presentation at scale — open design item (from the benchmark)
+
+- **The finding (docs/15, realism battery, 2026-07-03 note).** When both surfaces
+  carry production-length capability information, per-tool **structured cards** let
+  the model disambiguate look-alike capabilities almost completely (MCP back to
+  90/90% at N=10/50), while the bench's SIF surface — the same information flattened
+  into one long prose list inside a single tool description — scored 80/70% with 15%
+  clarify-hesitation. Same content, worse packaging: models are heavily trained on
+  discriminating among separate structured tool definitions; a prose wall is
+  out-of-distribution (the risk docs/15 §1 pre-registered).
+- **The work item: think about redesigning how the generated SIF surface presents
+  the capability catalogue at scale** so per-capability signal reaches the model as
+  effectively as N tool cards do — without giving up the single-intent-tool
+  structural coverage. Candidates (none chosen): lean on the structured
+  `x-acp-actions` catalogue rather than description prose (the real
+  `submit_intent_schema` already carries it — the bench flattening likely
+  *under-sells* real SIF); group the catalogue by resource; carry per-action `data`
+  schemas in the generated schema; richer enum member descriptions; or a two-step
+  select (resource, then its actions). Constraint: SIF RFC §7's shape (one
+  registry-generated tool) is the invariant; this is about the generated schema's
+  *presentation*, not a new surface.
+- **Acceptance test exists:** the benchmark's `--cards realistic` row
+  (docs/15 realism battery) — the redesign wins when SIF matches structured-card
+  selection while keeping its ~5× token advantage.
+
 ## Out of scope for this concept
 Full domain-modeling/ontology authoring UX; `assess` explainability tooling beyond the `requireExplanation` gate; multi-agent orchestration / durable workflows; full RBAC/ABAC engine; SaaS multi-tenancy, billing, SSO; auto-generation of policy from a schema; production HA/throughput hardening.

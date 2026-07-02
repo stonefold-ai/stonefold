@@ -36,6 +36,49 @@ aggregated rates — the graphing input), `report.md` (rendered matrix), `meta.j
 baseline was not run. Honest pilots, labelled as such — not the publishable
 experiment.
 
+## Interpreting the results — the reasoning, not just the numbers
+
+Read every difference with the sample size in mind: 20 attempts per cell means a
+10-point gap is two trials. The *patterns* below repeat across configurations; the
+exact percentages do not deserve that trust yet.
+
+- **`confusable` — why MCP falls and SIF holds.** With near-duplicate tools
+  (`send_email` vs `dispatch_message`, overlapping one-line descriptions), MCP's
+  discrimination signal is mostly the look-alike *names* — so wrong-tool picks
+  appear (25% at N=50). SIF asks for a typed `resource.action` pair over enums,
+  which keeps some structure (resource first, then action) — it degrades too (the
+  pre-registered risk: the enum contains the same look-alikes) but much less. This
+  is the folklore "tools are unreliable" reproduced under control: **confusability,
+  not count, is the failure driver** (the superseded count pilot showed count alone
+  does nothing).
+- **`explicit` — why MORE detail hurt.** The explicit wordings use verbs like
+  "*transfer* USD 800…" that literally match distractor names (`transfer_…`) —
+  user word choice steering the model toward the wrong look-alike. Found by
+  accident, kept because it is exactly how production misfires happen.
+- **`vague` — why `clarify` is not failure.** On underspecified requests both
+  surfaces mostly *ask a question* instead of acting (45–65%). For an agent that is
+  arguably correct behaviour, so it is scored as its own outcome; among the
+  attempts that DID commit, SIF committed correctly more often.
+- **`distractor` — a clean tie.** Prompts needing no tool produced zero over-calls
+  on either surface. Reported as the tie it is (docs/15 §6).
+- **`realistic` — the most instructive row, and an honest SIF loss.** Production-
+  length tool cards give each MCP tool a structured identity (usage paragraph +
+  typed parameters); that per-tool signal disambiguates the look-alikes almost
+  completely — MCP back to 90/90%. SIF received the *same information* (parity)
+  but flattened into one long prose list inside its single tool description — and
+  scored 80/70% with 15% clarify-hesitation. Same content, worse packaging: models
+  are trained on discriminating separate structured tool cards; a prose wall is
+  out-of-distribution. Two counterweights: MCP's fix costs **5.4× the tokens on
+  every call** (8,251 vs 1,519 at N=50), and the bench flattening likely
+  *under-sells* real SIF, whose generated schema carries the catalogue as
+  structured `x-acp-actions` data, not prose. **Consequence recorded:** this row
+  drives an open design item — rethink how the generated SIF surface presents its
+  capability catalogue at scale (docs/03 → "SIF catalogue presentation at scale");
+  this row is that redesign's acceptance test.
+- **`context2k` — why SIF resists context load.** With ~2,000 tokens of prior
+  conversation, MCP's fifty tool cards compete with the history for attention
+  (75/60%); the single intent tool barely moves (95/90%).
+
 ## Superseded: the count-only pilot
 
 `superseded-count-pilot/` — the first pilot (same day, earlier): tool COUNT alone at
