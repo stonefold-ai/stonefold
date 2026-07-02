@@ -19,6 +19,7 @@ class DraftProperty:
     type: str  # int | decimal | boolean | dateTime | string
     required: bool = False
     hint: str | None = None  # rendered as a trailing ``# TODO(review)`` comment
+    scope_key: bool = False  # a tenancy/ownership column ⇒ a scope-predicate stub
 
 
 @dataclass

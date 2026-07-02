@@ -249,3 +249,24 @@ python -m acp_registry_gen sql     schema.sql --domain payments -o draft.registr
 python -m acp_registry_gen openapi api.yaml   --domain ledger
 python -m acp_registry_gen mcp     tools.json --domain crm
 ```
+
+**Handler stubs (the code behind the declaration).** Drafting the registry solves the
+blank-page problem for *what* the domain declares; the larger adoption cost is the *code*
+that implements it — the connectors, scope predicates, and precondition checks of §5–6.
+The generator drafts that too, from the same inputs: `--stubs handlers.py` on any draw
+command emits a **CRUD connector** stub (SQL) or an **HTTP-dispatch** stub (OpenAPI/MCP)
+plus a **scope-predicate** stub for every tenancy/ownership column, and the `stubs`
+command emits a signature stub for every name an existing registry already declares
+(connectors, `scopePredicates`, `preconditionChecks`, `hooks`):
+
+```
+python -m acp_registry_gen sql   schema.sql --domain payments --stubs handlers.py
+python -m acp_registry_gen stubs payments.registry.yaml -o handlers.py
+```
+
+The three safety rules above apply unchanged: the stubs are **authoring-time only** (never
+imported by the enforcement path), each generated body **raises `NotImplementedError`**
+under a `TODO(review)` marker so an un-completed handler is loud and over-governed (a raised
+handler is a dependency failure the gateway fails closed on, invariant 7) rather than a
+silent allow, and the emitted code is **syntax-validated** before it is written. A reviewer
+implements and signs each handler, and keeps a conformance test per handler (§6).

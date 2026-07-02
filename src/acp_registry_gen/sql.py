@@ -86,12 +86,15 @@ def _column_property(line: str) -> DraftProperty | None:
     rest = " ".join(tokens[2:]).lower()
     required = "not null" in rest or "primary key" in rest
     hint: str | None = None
-    if name.lower() in _SCOPE_KEY_COLUMNS:
+    scope_key = name.lower() in _SCOPE_KEY_COLUMNS
+    if scope_key:
         hint = "possible scope key -- consider a scope predicate over this column (docs/06 sec. 5)"
     elif name.lower().endswith("_id") and name.lower() != "id":
         referenced = pascal([singular(w) for w in split_words(name[:-3])])
         hint = f"reference -- consider `type: {referenced}` (entity reference)"
-    return DraftProperty(name=name, type=_map_sql_type(sql_type), required=required, hint=hint)
+    return DraftProperty(
+        name=name, type=_map_sql_type(sql_type), required=required, hint=hint, scope_key=scope_key
+    )
 
 
 def draft_from_sql(ddl: str, *, domain: str) -> DraftRegistry:

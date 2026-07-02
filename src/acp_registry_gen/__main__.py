@@ -1,14 +1,19 @@
-"""CLI: draft a registry from SQL DDL, an OpenAPI spec, or an MCP tool list.
+"""CLI: draft a registry (and its handler stubs) from what an integrator has.
 
 Usage (from the repo checkout)::
 
-    python -m acp_registry_gen sql     schema.sql        --domain payments -o draft.registry.yaml
-    python -m acp_registry_gen openapi api.yaml          --domain ledger
-    python -m acp_registry_gen mcp     tools.json        --domain crm
+    python -m acp_registry_gen sql     schema.sql   --domain payments -o draft.registry.yaml
+    python -m acp_registry_gen openapi api.yaml     --domain ledger
+    python -m acp_registry_gen mcp     tools.json   --domain crm
+    # draft the registry AND the connector/scope-predicate code stubs (G1):
+    python -m acp_registry_gen sql     schema.sql   --domain payments --stubs handlers.py
+    # stubs for every declared name in an existing authoring registry:
+    python -m acp_registry_gen stubs   payments.registry.yaml -o handlers.py
 
-The output is a DRAFT: every guessed kind/attribute carries a TODO(review)
-marker. The draft is schema-validated before it is written; a validation
-failure is a generator bug and exits non-zero.
+The output is a DRAFT: every guessed kind/attribute carries a TODO(review) marker
+and every generated handler raises NotImplementedError (fail closed until a human
+completes it). Drafts are validated before they are written (registry -> the JSON
+schema; stubs -> Python syntax); a validation failure is a generator bug, exit 1.
 """
 
 from __future__ import annotations
@@ -24,6 +29,12 @@ from acp_registry_gen.emit import emit_yaml, validate_registry_yaml
 from acp_registry_gen.importers import draft_from_mcp_tools, draft_from_openapi
 from acp_registry_gen.model import DraftRegistry
 from acp_registry_gen.sql import draft_from_sql
+from acp_registry_gen.stubs import (
+    emit_stubs,
+    plan_from_draft,
+    plan_from_registry,
+    validate_stub_code,
+)
 
 
 def _load_structured(path: Path) -> Any:
@@ -39,21 +50,36 @@ def _build(source: str, path: Path, domain: str) -> DraftRegistry:
     return draft_from_mcp_tools(_load_structured(path), domain=domain)
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        prog="acp_registry_gen",
-        description="Draft an ACP registry (authoring format, docs/06) from existing artefacts.",
-    )
-    parser.add_argument("source", choices=("sql", "openapi", "mcp"), help="input artefact type")
-    parser.add_argument("input", type=Path, help="DDL file, OpenAPI spec, or MCP tool list")
-    parser.add_argument("--domain", default=None, help="registry domain (default: input file stem)")
-    parser.add_argument("-o", "--out", type=Path, default=None, help="output file (default: stdout)")
-    args = parser.parse_args(argv)
+def _emit_stub_file(text: str, out: Path | None, *, what: str) -> int:
+    """Validate emitted stub code and write it (or print to stdout)."""
+    problems = validate_stub_code(text)
+    if problems:  # a generator bug — never ship an unparsable stub
+        for p in problems:
+            print(f"error: {p}", file=sys.stderr)
+        return 1
+    if out is None:
+        sys.stdout.write(text)
+    else:
+        out.write_text(text, encoding="utf-8", newline="\n")
+        print(f"wrote {out} ({what}) — implement every NotImplementedError before use",
+              file=sys.stderr)
+    return 0
 
-    domain = args.domain or args.input.stem
-    draft = _build(args.source, args.input, domain)
+
+def _run_stubs_from_registry(input_path: Path, out: Path | None) -> int:
+    doc = _load_structured(input_path)
+    if not isinstance(doc, dict):
+        print(f"error: {input_path} is not a registry document", file=sys.stderr)
+        return 1
+    plan = plan_from_registry(doc)
+    return _emit_stub_file(emit_stubs(plan), out, what="handler stubs")
+
+
+def _run_draft(source: str, input_path: Path, domain: str, out: Path | None,
+               stubs_out: Path | None) -> int:
+    draft = _build(source, input_path, domain)
     if not draft.entities:
-        print(f"error: no entities/actions found in {args.input}", file=sys.stderr)
+        print(f"error: no entities/actions found in {input_path}", file=sys.stderr)
         return 1
 
     text = emit_yaml(draft)
@@ -63,18 +89,44 @@ def main(argv: list[str] | None = None) -> int:
             print(f"error: generated draft fails registry.schema.json: {p}", file=sys.stderr)
         return 1
 
-    if args.out is None:
+    if out is None:
         sys.stdout.write(text)
     else:
-        args.out.write_text(text, encoding="utf-8", newline="\n")
         entities = len(draft.entities)
         actions = sum(len(e.actions) for e in draft.entities)
+        out.write_text(text, encoding="utf-8", newline="\n")
         print(
-            f"wrote {args.out} ({entities} entities, {actions} drafted actions) — "
+            f"wrote {out} ({entities} entities, {actions} drafted actions) — "
             f"review every TODO(review) before use",
             file=sys.stderr,
         )
+
+    if stubs_out is not None:  # G1: also draft the handler code
+        return _emit_stub_file(emit_stubs(plan_from_draft(draft)), stubs_out, what="handler stubs")
     return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        prog="acp_registry_gen",
+        description="Draft an ACP registry + handler stubs (authoring format, docs/06) "
+                    "from existing artefacts.",
+    )
+    parser.add_argument("source", choices=("sql", "openapi", "mcp", "stubs"),
+                        help="input artefact type ('stubs' reads an authoring registry)")
+    parser.add_argument("input", type=Path,
+                        help="DDL / OpenAPI / MCP tool list, or (for 'stubs') a registry")
+    parser.add_argument("--domain", default=None, help="registry domain (default: input file stem)")
+    parser.add_argument("-o", "--out", type=Path, default=None, help="output file (default: stdout)")
+    parser.add_argument("--stubs", type=Path, default=None,
+                        help="also draft connector/scope-predicate code stubs to this file (G1)")
+    args = parser.parse_args(argv)
+
+    if args.source == "stubs":
+        return _run_stubs_from_registry(args.input, args.out)
+
+    domain = args.domain or args.input.stem
+    return _run_draft(args.source, args.input, domain, args.out, args.stubs)
 
 
 if __name__ == "__main__":
