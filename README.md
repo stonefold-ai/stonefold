@@ -151,7 +151,7 @@ The full version of this argument — the PDP/PEP category error, the four-verdi
 - **[Implementation design](docs/02-implementation-design.md)** — how the gateway executes it, including the stop button in full.
 - **[Architecture decisions](docs/03-architecture-decisions.md)** — the chosen stack and structure.
 - **[Registry & domain model](docs/06-registry-domain-model.md)** — how to declare your resources/actions, and the generator that drafts a registry from SQL DDL, OpenAPI, or an MCP tool list.
-- **[Positioning vs OPA / Cedar / IAM / AgentCore](docs/10-positioning-policy-engines.md)** — why a decision engine alone can't govern an agent, and how they compose.
+- **[Positioning vs OPA / Cedar / IAM / AgentCore / agent passports](docs/10-positioning-policy-engines.md)** — why a decision engine alone can't govern an agent, the same gap attack-by-attack, and how they all compose with the gateway.
 - **[Conformance TCK](docs/12-conformance-tck.md)** — certify a gateway in any language against the RFC: one small driver adapter (Python protocol or 15 JSON endpoints), one report, named profiles.
 - **[Who is this for](docs/13-who-is-this-for.md)** — the industries ranked by fit, each one's blocking risk mapped to the mechanisms that answer it, who buys, and where ACP is the wrong tool.
 - **[EU AI Act mapping](docs/14-eu-ai-act-mapping.md)** — the high-risk logging and human-oversight obligations, mechanism by mechanism (draft; citations pending verification).

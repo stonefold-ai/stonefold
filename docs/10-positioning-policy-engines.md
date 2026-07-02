@@ -74,6 +74,39 @@ ACP's bet is not "a better policy language." It is that agent governance is **80
 
 ---
 
-## 5. The one-paragraph version for the meeting
+## 5. The gap, attack by attack
+
+§2's table says what differs; this section says what the difference *stops*. Every entry lives in the same structural gap: the space between "the decision was correct" and "reality obeyed the decision." A PDP is not there when that space is attacked; a gateway that owns dispatch is.
+
+1. **Bypass / coverage gaps.** PDP enforcement holds only if every call site remembers to ask — an unwrapped tool or a new code path is a silent full bypass, the perennial PDP failure mode. SIF-native has no unwrapped path to forget: coverage is structural, not a per-integration promise.
+2. **TOCTOU / stale decisions.** A verdict at time T, execution at T+n, nothing re-checks — a payee sanctioned after approval, a record that changed tenants between check and write. Dispatch-time re-validation inside a serialized transaction (RFC §12, §6.3) is only buildable because the decider owns dispatch; a PDP architecturally isn't present when the window closes.
+3. **Salami-slicing / aggregates.** Fifty refunds each under the limit. A stateless PDP needs external counter plumbing fed to it — which is where these controls quietly rot. `rate`/`quota`/`spendLimit`/`quantityCap` are first-class and stateful because the gateway owns the store.
+4. **Result-side exfiltration.** A PDP authorizes the request and never sees the response — but data leaks through results. The `disclosure` post-check withholds rows on the return path (RFC §7.12); nothing else in the stack sits on the return path at all.
+5. **Hold-and-approve.** allow/deny is not a big enough verdict space. Approval, dual authorization, and timeouts are stateful workflows needing staged execution underneath — bolting them onto a PDP means building this gateway around it.
+6. **Kill with no race.** Halting means reaching actions *already authorized but not yet dispatched* — the locked `PENDING → DISPATCHING` transition. A PDP can flip a policy for future queries; it cannot reach actions past the decision point, because it never held them.
+7. **Repudiation.** PDP decision logs are a best-effort side channel; effect-without-record is possible under crash or partition. Transactional audit (CS-006) is only expressible because the auditor and the executor share a transaction.
+8. **Pre-decision containment.** A PDP evaluates whatever arrives — a hallucinated field or an attacker-supplied internal ID has already reached the enforcement point. Enum injection means undeclared names can't be *emitted*; `resolve` means the agent never handles raw identifiers it could be tricked into swapping.
+9. **Lifecycle out-of-order.** A PDP can express a from-state rule but must trust the caller to supply the state — the classic trust-the-input hole. The gateway reads the resource's current state itself.
+
+None of this makes OPA/Cedar deficient — they are a different component (see §4, and the seam in §3). The one-liner: **a policy engine answers questions; the gateway makes reality match the answers.**
+
+---
+
+## 6. Pre-action authorization credentials (OAP-style passports)
+
+A newer neighbour deserves its own comparison: **agent passport schemes** (Open Agent Passport and similar) — a portable, cryptographically verifiable credential stating who the agent is and what capabilities/limits it carries, evaluated by a `before_tool_call` hook or hosted decision API that returns a signed allow/deny. The framing overlaps this project's; the layer does not. A passport scheme deliberately does **not own execution** — the caller receives the verdict and is trusted to obey it. That reproduces the §5 gap list, and in places sharpens it:
+
+- **In-process enforcement.** The hook runs inside the agent's own process, per framework — the enforcement code shares a process with the very component assumed hijackable. An unwrapped tool, an unintegrated framework, or a direct API call never fires it. (§5.1, worse.)
+- **Cached decisions.** Passport specs explicitly allow relying parties to cache allow-verdicts until expiry (hour-scale in their own examples) — a revocation, sanction, or exhausted limit inside that window still executes. (§5.2, codified.)
+- **Advisory verdicts.** A signed decision object proves a decision was *issued*, not that reality matched it: no staged effects, no hold state, no kill reaching in-flight actions, no transactional audit. Notably, the escalate-to-human path in such schemes tends to be specified but unimplemented — because human-in-the-loop *requires* a staging substrate underneath the decision service. (§5.5–5.7.)
+- **Trust-the-caller context.** Passport limits are checked against caller-supplied parameters and context; no target resolution, no scope injection below the model, no lifecycle state read from the system of record. (§5.8–5.9.) Partial credit: daily caps live in the passport schema, so aggregates are at least addressed — in tension with the decision-caching model.
+
+And the honesty column, which matters more here than with OPA: **passport schemes have what this project lacks entirely** — cryptographically verifiable, portable identity (DIDs, W3C Verifiable Credentials, assurance levels) and cross-organizational attestation. This gateway takes `agent:` and `actor:` as authenticated-session facts and verifies nothing cryptographic about them; in any scenario where you must verify *someone else's* agent, the passport addresses a problem this design doesn't touch.
+
+Which is why the two compose rather than compete: **a passport proves who the agent is and issues a verdict; this gateway makes reality obey verdicts.** Concretely: the passport slots in as the identity input at the gateway's `actor:`/`agent:` seam, and the passport's escalation path is this gateway's shipped `hold` + staged execution. Passport control, versus the vault door and the ledger.
+
+---
+
+## 7. The one-paragraph version for the meeting
 
 > OPA and Cedar answer "is this allowed?" — statelessly, assuming someone else intercepts the action and enforces the answer. For an AI agent, nothing intercepts by default, "allowed" isn't binary (actions must be *held* for humans and *halted* by operators), and the risk lives in parameters and instances IAM can't see. The ACP gateway is the interception layer plus the four-verdict machinery — typed intents, staged effects, approval holds, a race-free kill, transactional audit — with a deliberately small built-in policy language and a protocol seam where OPA or Cedar can serve as the authorization step if your organisation already standardises on one. Keep IAM as the outer ring; add ACP as the agent's chokepoint; plug in your policy engine if you have one.
