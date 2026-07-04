@@ -42,7 +42,7 @@ The key observation: **Stele already has this operation.** `extends` composition
 - **Foreign agents** (another organisation's agent, A2A protocols): not delegates. A remote agent is an **external system** — reach it through a connector, gate it like any effect. Attenuation applies only inside one trust domain.
 - **Trust negotiation / capability marketplaces** — far out.
 
-## 5. Open questions (why this is v0.5, not v0.4)
+## 5. Open questions (why this remains a future revision — v0.5 shipped without it)
 
 1. Is the meet computed **at spawn time** (compile once, fast, but stale if the parent's policy changes mid-run) or **per request** (always fresh, needs the chain walk on the hot path)?
 2. Do child-declared **standing** rules survive the meet, or is context-conditional authority a root-only construct?
