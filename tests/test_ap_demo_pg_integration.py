@@ -38,15 +38,15 @@ DEMO_NOW = datetime(2026, 6, 28, 12, 0, 0, tzinfo=timezone.utc)
 
 @pytest.fixture(scope="module")
 def stack() -> Iterator[tuple[PostgresContainer, RedisContainer]]:
-    with PostgresContainer("postgres:16-alpine", username="acp", password="acp",
-                           dbname="acp") as pg, RedisContainer("redis:7-alpine") as rc:
+    with PostgresContainer("postgres:16-alpine", username="stonefold", password="stonefold",
+                           dbname="stonefold") as pg, RedisContainer("redis:7-alpine") as rc:
         yield pg, rc
 
 
 def _connect(pg: PostgresContainer) -> Any:
     return psycopg.connect(
         host=pg.get_container_host_ip(), port=int(pg.get_exposed_port(5432)),
-        user="acp", password="acp", dbname="acp", autocommit=True,
+        user="stonefold", password="stonefold", dbname="stonefold", autocommit=True,
     )
 
 

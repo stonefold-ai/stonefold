@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 class RedisCounterStore:
     """A ``CounterStore`` whose state lives in Redis (shared across gateways)."""
 
-    def __init__(self, client: "Redis", *, namespace: str = "acp:ctr") -> None:
+    def __init__(self, client: "Redis", *, namespace: str = "stonefold:ctr") -> None:
         self._r = client
         self._ns = namespace
 

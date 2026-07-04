@@ -141,7 +141,7 @@ class _FailableConnector(InMemoryConnector):
 class ReferenceDriver:
     """``ConformanceDriver`` over the in-process reference stack."""
 
-    implementation = "acp-reference (python)"
+    implementation = "stonefold-reference (python)"
 
     def __init__(self) -> None:
         self._now: datetime | None = None

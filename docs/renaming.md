@@ -1,10 +1,12 @@
 # Renaming — from "Agent Control Policy" / `agent-control-protocol`
 
-**Date:** July 2026. **Status: DECIDED, NOT YET EXECUTED** — this records the rename
-decision ahead of its execution; every artifact in the repo still carries the ACP names
-until the mechanical sweep runs. Once executed, this page is kept permanently as the
-honesty artifact: anyone who saw an old name can confirm this is the same project, and
-the history is visibly not hidden.
+**Date:** July 2026. **Status: EXECUTED** — the mechanical and semantic sweeps have run
+(branch `rename/stonefold-stele`); the repo now carries the Stonefold/Stele names
+throughout. This page is kept permanently as the honesty artifact: anyone who saw an old
+name can confirm this is the same project, and the history is visibly not hidden.
+Historical change sets (`docs/RFC-changeset-*.md` up to v0.4) keep their original ACP
+wording by design (see "What deliberately does NOT change" below). Still open: renaming
+the GitHub repository itself (`agent-control-protocol` → `stonefold`).
 
 > **Supersedes the earlier "Interlock" proposal.** A prior revision of this page recorded
 > *Interlock* (product) / *Interlock Policy Language* (spec) as the decided names, gated on

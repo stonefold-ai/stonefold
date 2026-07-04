@@ -159,7 +159,7 @@ def submit_intent_schema(registry: InMemoryRegistry) -> dict[str, Any]:
 
     The agent can name only declared resources/actions (enum-injected), so it can
     emit nothing the registry doesn't know — the structural-coverage property.
-    ``x-acp-actions`` carries the resource→actions catalogue for richer clients.
+    ``x-stonefold-actions`` carries the resource→actions catalogue for richer clients.
     """
     catalogue = {
         name: sorted(rdef.actions) for name, rdef in registry.file.resources.items()
@@ -181,7 +181,7 @@ def submit_intent_schema(registry: InMemoryRegistry) -> dict[str, Any]:
             "required": ["resource", "action"],
             "additionalProperties": False,
         },
-        "x-acp-actions": catalogue,
+        "x-stonefold-actions": catalogue,
     }
 
 

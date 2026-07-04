@@ -57,7 +57,7 @@ make down                     # stop everything, remove volumes
 
 ```bash
 docker compose up -d --build
-docker compose exec -T postgres psql -U acp -d acp < seed/ledger_seed.sql
+docker compose exec -T postgres psql -U stonefold -d stonefold < seed/ledger_seed.sql
 docker compose run --rm agent python -m stonefold_ap_demo.agent_cli --scenario inbox
 docker compose run --rm agent python -m stonefold_ap_demo            # walkthrough
 docker compose down -v

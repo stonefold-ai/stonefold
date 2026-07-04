@@ -1,7 +1,7 @@
 """CLI: export an audit evidence pack (implementation-plan Workstream G3).
 
     python -m stonefold_evidence --jsonl audit.jsonl --policy examples/payments-ops.stele.yaml -o pack.md
-    python -m stonefold_evidence --postgres "postgresql://acp@localhost/acp" -o pack.md
+    python -m stonefold_evidence --postgres "postgresql://stonefold@localhost/stonefold" -o pack.md
 
 Read-only over the audit store; writes a Markdown report keyed to the docs/14 controls.
 Every regulatory `[VERIFY]` marker is printed verbatim — the citations are the author's

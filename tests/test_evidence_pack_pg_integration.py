@@ -38,14 +38,14 @@ def _connect(container: PostgresContainer) -> Any:
     return psycopg.connect(
         host=container.get_container_host_ip(),
         port=int(container.get_exposed_port(5432)),
-        user="acp", password="acp", dbname="acp", autocommit=True,
+        user="stonefold", password="stonefold", dbname="stonefold", autocommit=True,
     )
 
 
 @pytest.fixture(scope="module")
 def container() -> Iterator[PostgresContainer]:
     with PostgresContainer(
-        "postgres:16-alpine", username="acp", password="acp", dbname="acp"
+        "postgres:16-alpine", username="stonefold", password="stonefold", dbname="stonefold"
     ) as pg:
         conn = _connect(pg)
         create_audit_schema(conn)

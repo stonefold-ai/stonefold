@@ -9,7 +9,7 @@ their deliverable.
 # from a JSONL audit export (one AuditRecord per line):
 python -m stonefold_evidence --jsonl audit.jsonl --policy examples/payments-ops.stele.yaml -o pack.md
 # from a live Postgres audit_log table:
-python -m stonefold_evidence --postgres "postgresql://acp@localhost/acp" -o pack.md
+python -m stonefold_evidence --postgres "postgresql://stonefold@localhost/stonefold" -o pack.md
 ```
 
 What the pack contains, one section per docs/14 row:

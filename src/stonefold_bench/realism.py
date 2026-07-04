@@ -254,7 +254,7 @@ def realistic_mcp(caps: tuple[Capability, ...]) -> list[ToolDef]:
 def realistic_sif(caps: tuple[Capability, ...]) -> list[ToolDef]:
     """The SIF condition at the same information parity: one ``submit_intent`` whose
     description carries each capability's one-line purpose and parameter names (the
-    real generated schema carries the x-acp-actions catalogue)."""
+    real generated schema carries the x-stonefold-actions catalogue)."""
     resources = sorted({c.resource for c in caps})
     actions = sorted({c.action for c in caps})
     lines = []

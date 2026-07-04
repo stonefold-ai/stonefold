@@ -17,7 +17,7 @@ from stonefold_tck.http_driver import HttpDriver
 
 
 def test_reference_certifies_every_profile() -> None:
-    report = run_conformance(ReferenceDriver(), implementation="acp-reference (python)")
+    report = run_conformance(ReferenceDriver(), implementation="stonefold-reference (python)")
     assert not report.failures, "\n" + report.render()
     assert set(report.certified_profiles()) == set(ALL_PROFILES), "\n" + report.render()
 
@@ -28,7 +28,7 @@ def test_wire_binding_certifies_end_to_end() -> None:
     gateway exercises, minus the socket."""
     from fastapi.testclient import TestClient
 
-    app = create_tck_harness(ReferenceDriver(), implementation="acp-reference (http)")
+    app = create_tck_harness(ReferenceDriver(), implementation="stonefold-reference (http)")
     client = TestClient(app)
 
     def transport(method: str, path: str, payload: Mapping[str, Any] | None) -> Mapping[str, Any]:

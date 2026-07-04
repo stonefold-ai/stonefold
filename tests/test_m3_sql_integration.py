@@ -43,14 +43,14 @@ pytestmark = pytest.mark.integration
 @pytest.fixture(scope="module")
 def pg_conn() -> Iterator[Any]:
     with PostgresContainer(
-        "postgres:16-alpine", username="acp", password="acp", dbname="acp"
+        "postgres:16-alpine", username="stonefold", password="stonefold", dbname="stonefold"
     ) as container:
         conn = psycopg.connect(
             host=container.get_container_host_ip(),
             port=int(container.get_exposed_port(5432)),
-            user="acp",
-            password="acp",
-            dbname="acp",
+            user="stonefold",
+            password="stonefold",
+            dbname="stonefold",
             autocommit=True,
         )
         with conn.cursor() as cur:

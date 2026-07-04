@@ -71,7 +71,7 @@ exact percentages do not deserve that trust yet.
   out-of-distribution. Two counterweights: MCP's fix costs **5.4× the tokens on
   every call** (8,251 vs 1,519 at N=50), and the bench flattening likely
   *under-sells* real SIF, whose generated schema carries the catalogue as
-  structured `x-acp-actions` data, not prose. **Consequence recorded:** this row
+  structured `x-stonefold-actions` data, not prose. **Consequence recorded:** this row
   drives an open design item — rethink how the generated SIF surface presents its
   capability catalogue at scale (docs/03 → "SIF catalogue presentation at scale");
   this row is that redesign's acceptance test.

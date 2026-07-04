@@ -43,7 +43,7 @@ becomes a fail-closed refusal with an audit record, and changing connector code 
 a registry change — a reviewed, versioned artifact.
 
 **Implementation impact:** gateway verifies digests at load + dispatch when declared
-(reference implementation: done — `acp_core.digest`, verified at policy load and at
+(reference implementation: done — `stonefold_core.digest`, verified at policy load and at
 dispatch; the reference pins each connector's module source bytes, docs/06 §5). TCK: a
 digest profile check is future work — a certification claim MUST NOT imply digest
 verification until it exists.
@@ -64,7 +64,7 @@ Names the seam; changes nothing about how identity is used downstream. Invariant
 (identity never from the agent payload) is restated as binding on every provider.
 
 **Implementation impact:** protocol definition + the trivial built-in + fakes in tests
-(reference implementation: done — `acp_gateway.identity`, wired at the `submit_intent`
+(reference implementation: done — `stonefold_gateway.identity`, wired at the `submit_intent`
 route ahead of the pipeline; the built-in reproduces the prior transport-header
 behaviour, so the default is unchanged).
 
@@ -89,7 +89,7 @@ which is safe by default. Open design questions remain listed in docs/03.
 ## CS-023 — Batch decision semantics (ADDED, §12; SIF §5)
 
 **What:** what happens when one operation of a SIF batch is refused was unspecified
-(SIF §5 promises transactional record/transition batches; ACP §11 decomposes a batch
+(SIF §5 promises transactional record/transition batches; Stele §11 decomposes a batch
 into independently authorized actions — neither said what a mid-batch DENY or HOLD does).
 Now specified in §12: the gateway decides **every** operation first (steps 1–5, each with
 its own audit record); any **DENY or HALT refuses the whole batch** before anything
@@ -138,9 +138,9 @@ One batch of text fixes, no semantic inventions:
 - **Approver `role:` namespace** (§7.8, §13 rule 1): resolves at the identity seam
   (decision 11), not the registry; explicitly exempt from lint rule 1.
 - **`window` absolute form documented** (§7.10): `from`/`to` — already in
-  `acp.schema.json` and the catalog row ("date range"), previously unexemplified.
+  `stele.schema.json` and the catalog row ("date range"), previously unexemplified.
 - **Gate table row 13** corrected to pass/fail/hold (matches §7.13 / CS-011).
 - **Catalog approval examples re-keyed on stakes** (`operativeForce == high`) — §7's own
   examples used the reversibility-keyed anti-pattern the §5 note warns against.
 - **CS-020/CS-021 changelog status** corrected from "pending" to shipped
-  (`acp_core.digest`, `acp_gateway.identity`).
+  (`stonefold_core.digest`, `stonefold_gateway.identity`).

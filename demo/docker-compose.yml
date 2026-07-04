@@ -12,15 +12,15 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: acp
-      POSTGRES_PASSWORD: acp
-      POSTGRES_DB: acp
+      POSTGRES_USER: stonefold
+      POSTGRES_PASSWORD: stonefold
+      POSTGRES_DB: stonefold
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U acp -d acp"]
+      test: ["CMD-SHELL", "pg_isready -U stonefold -d stonefold"]
       interval: 3s
       timeout: 3s
       retries: 20
@@ -40,7 +40,7 @@ services:
       context: ..
       dockerfile: demo/gateway/Dockerfile
     environment:
-      DATABASE_URL: postgresql://acp:acp@postgres:5432/acp
+      DATABASE_URL: postgresql://stonefold:stonefold@postgres:5432/stonefold
       REDIS_URL: redis://redis:6379/0
       LLM_PROVIDER: ${LLM_PROVIDER:-auto}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
@@ -63,7 +63,7 @@ services:
       dockerfile: demo/agent/Dockerfile
     environment:
       GATEWAY_URL: http://gateway:8088
-      DATABASE_URL: postgresql://acp:acp@postgres:5432/acp
+      DATABASE_URL: postgresql://stonefold:stonefold@postgres:5432/stonefold
       REDIS_URL: redis://redis:6379/0
       LLM_PROVIDER: ${LLM_PROVIDER:-auto}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}

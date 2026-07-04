@@ -67,7 +67,7 @@ def sif_surface(caps: tuple[Capability, ...]) -> list[ToolDef]:
     capabilities — **both** the ``resource`` and ``action`` enums are injected, and the
     valid ``resource.action`` pairs are named in the description (parity with the real
     ``submit_intent_schema``, which enum-injects every name and carries the
-    ``x-acp-actions`` catalogue). Undeclared names cannot be emitted — the
+    ``x-stonefold-actions`` catalogue). Undeclared names cannot be emitted — the
     structural-coverage property that also kills A6. The action enum matters
     empirically, not just principially: the 2026-07-02 pilot showed that with a
     free-string ``action`` the model sometimes writes the qualified pair

@@ -17,7 +17,7 @@ up:
 	@echo "Gateway + UI:  http://localhost:8088"
 
 seed:
-	$(COMPOSE) exec -T postgres psql -U acp -d acp < seed/ledger_seed.sql
+	$(COMPOSE) exec -T postgres psql -U stonefold -d stonefold < seed/ledger_seed.sql
 	@echo "ledger seeded (vendors, accounts, invoices)"
 
 demo:

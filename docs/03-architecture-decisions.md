@@ -17,7 +17,7 @@ These are decided for this **concept deliverable** (proof-of-concept, not a hard
 
 ## Module layout (Python packages under `src/`)
 ```
-acp/
+stonefold/
 ├── pyproject.toml
 ├── src/stonefold_core/        # value types (pydantic), registry, policy compiler, condition engine, pipeline — NO I/O, NO LLM
 ├── src/stonefold_gates/       # the 14 gate implementations (depend on stonefold_core + store protocols)
@@ -120,7 +120,7 @@ Every place an external system can plug in, and what runs there when nothing doe
   the capability catalogue at scale** so per-capability signal reaches the model as
   effectively as N tool cards do — without giving up the single-intent-tool
   structural coverage. Candidates (none chosen): lean on the structured
-  `x-acp-actions` catalogue rather than description prose (the real
+  `x-stonefold-actions` catalogue rather than description prose (the real
   `submit_intent_schema` already carries it — the bench flattening likely
   *under-sells* real SIF); group the catalogue by resource; carry per-action `data`
   schemas in the generated schema; richer enum member descriptions; or a two-step

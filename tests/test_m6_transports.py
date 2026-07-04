@@ -58,7 +58,7 @@ def test_submit_intent_schema_lists_registry_actions() -> None:
     assert schema["name"] == "submit_intent"
     enum = schema["parameters"]["properties"]["resource"]["enum"]
     assert "Customer" in enum and "Email" in enum
-    assert schema["x-acp-actions"]["Email"] == ["sendEmail"]
+    assert schema["x-stonefold-actions"]["Email"] == ["sendEmail"]
     # the single-tool property: the agent gets exactly one tool name.
     assert schema["parameters"]["additionalProperties"] is False
 
