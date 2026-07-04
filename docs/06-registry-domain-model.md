@@ -233,7 +233,7 @@ Worked registries: [`../examples/payments.registry.yaml`](../examples/payments.r
 
 ## 9. Authoring tooling — drafting a registry from what you already have
 
-Writing a registry from scratch is the adoption cost of the whole model, so the repo ships an **authoring-time generator**, `src/stonefold_registry_gen/` (`python -m stonefold_registry_gen`). It drafts a registry in this spec's format from artefacts an integrator already has:
+Writing a registry from scratch is the adoption cost of the whole model, so the [reference repo](https://github.com/stonefold-ai/stonefold) ships an **authoring-time generator**, `src/stonefold_registry_gen/` (`python -m stonefold_registry_gen`). It drafts a registry in this spec's format from artefacts an integrator already has:
 
 | Input | What it becomes |
 |---|---|

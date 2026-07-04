@@ -2,7 +2,7 @@
 
 *How a gateway — in **any language** — proves it conforms to the Stele RFC.*
 
-The TCK (`src/stonefold_tck/`) is an implementation-independent, black-box test suite. You do not port the reference gateway's tests; you implement ONE small adapter — the **driver** — and the kit runs every acceptance scenario against your gateway, then reports which **conformance profiles** you certify. The Python reference implementation is certified by the same kit (`tests/test_tck_reference.py`), both in-process and through the wire binding.
+The TCK (`src/stonefold_tck/` in the [reference repo](https://github.com/stonefold-ai/stonefold)) is an implementation-independent, black-box test suite: the kit ships alongside the reference for convenience, but its core imports nothing from it. You do not port the reference gateway's tests; you implement ONE small adapter — the **driver** — and the kit runs every acceptance scenario against your gateway, then reports which **conformance profiles** you certify. The Python reference implementation is certified by the same kit (`tests/test_tck_reference.py`), both in-process and through the wire binding.
 
 ---
 

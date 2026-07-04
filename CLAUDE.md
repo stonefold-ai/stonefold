@@ -7,10 +7,11 @@ The **Stonefold Gateway**: a deterministic enforcement point between an AI agent
 
 ## Sources of truth (priority order)
 
-> **Canonical spec home:** the specs, schemas, examples, and TCK are published from
+> **Canonical spec home:** the specs, schemas, and examples are published from
 > [stonefold-ai/spec](https://github.com/stonefold-ai/spec); the copies in this repo are
 > the implementation's working set. On any divergence, the spec repo wins — sync from it,
-> don't fork the wording here.
+> don't fork the wording here. The runnable TCK code is the exception: it lives **here**
+> (`src/stonefold_tck/`); the spec repo carries only its specification (docs/12).
 1. `docs/00-RFC-sif-intent-format.md` — the SIF intent format (the five kinds + the shape the agent emits), **v1.0**. The lower layer; canonical home for the kinds.
 2. `docs/01-RFC-agent-control-policy.md` — Stele policy semantics (*what's allowed*), **v0.4** (changelogs at top); references SIF for the kinds. Deltas for older builds: `docs/RFC-changeset-v0.1-to-v0.2.md`, then `docs/RFC-changeset-v0.2-to-v0.3.md`, then `docs/RFC-changeset-v0.3-to-v0.4.md`; a **draft** set for the next revision accumulates in `docs/RFC-changeset-v0.4-to-v0.5.md`. A Change Set wins on any conflict with older wording.
 3. `docs/02-implementation-design.md` — mechanism (*how*). Code snippets there are illustrative pseudocode; realise them in the pinned Python stack.

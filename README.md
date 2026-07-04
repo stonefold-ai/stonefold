@@ -1,6 +1,6 @@
 # Stonefold
 
-> **Status:** working proof-of-concept. The specifications' **canonical home is [stonefold-ai/spec](https://github.com/stonefold-ai/spec)** (SIF, Stele, the JSON Schemas, worked examples, and the conformance TCK); this repo carries working copies in [`docs/`](docs/) alongside the Python reference implementation (`src/`, tested against real Postgres/Redis), a runnable real-LLM demo ([`demo/`](demo/)), and the [conformance kit](docs/12-conformance-tck.md) it is certified by. On any divergence, the spec repo wins. Not production-hardened.
+> **Status:** working proof-of-concept. The specifications' **canonical home is [stonefold-ai/spec](https://github.com/stonefold-ai/spec)** (SIF, Stele, the JSON Schemas, and worked examples); this repo carries working copies in [`docs/`](docs/) alongside the Python reference implementation (`src/`, tested against real Postgres/Redis), a runnable real-LLM demo ([`demo/`](demo/)), and the runnable [conformance kit (TCK)](docs/12-conformance-tck.md) — the kit's code lives here (`src/stonefold_tck/`, importing nothing from the reference), its specification in the spec repo. On any doc divergence, the spec repo wins. Not production-hardened.
 
 ## What it is
 
