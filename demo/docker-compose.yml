@@ -5,8 +5,9 @@
 #   redis    - rate/spend counters + kill propagation
 #   agent    - the real-LLM agent runner, launched on demand (profile "tools")
 #
-# Build context is the repo root (..) so the images get src/, examples/, registry/,
-# schema/ and demo/. Bring it up with `make up`; everything else via the Makefile.
+# Build context is the repo root (..) so the images get src/, spec/ (the submodule
+# with examples/registry/schema) and demo/. Bring it up with `make up`; everything
+# else via the Makefile.
 
 services:
   postgres:

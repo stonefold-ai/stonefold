@@ -18,9 +18,9 @@ from stonefold_store import CounterStore, InMemoryCounterStore
 
 FIXTURES = Path(__file__).parent / "fixtures"
 PROJECT_ROOT = Path(__file__).parent.parent
-EXAMPLES = PROJECT_ROOT / "examples"
-REGISTRY_DIR = PROJECT_ROOT / "registry"
-SCHEMA = PROJECT_ROOT / "schema" / "stele.schema.json"
+EXAMPLES = PROJECT_ROOT / "spec" / "examples"
+REGISTRY_DIR = PROJECT_ROOT / "spec" / "registry"
+SCHEMA = PROJECT_ROOT / "spec" / "schema" / "stele.schema.json"
 
 
 def load_yaml(path: Path) -> dict[str, Any]:

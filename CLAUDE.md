@@ -7,23 +7,25 @@ The **Stonefold Gateway**: a deterministic enforcement point between an AI agent
 
 ## Sources of truth (priority order)
 
-> **Canonical spec home:** the specs, schemas, and examples are published from
-> [stonefold-ai/spec](https://github.com/stonefold-ai/spec); the copies in this repo are
-> the implementation's working set. On any divergence, the spec repo wins — sync from it,
-> don't fork the wording here. The runnable TCK code is the exception: it lives **here**
-> (`src/stonefold_tck/`); the spec repo carries only its specification (docs/12).
-1. `docs/00-RFC-sif-intent-format.md` — the SIF intent format (the five kinds + the shape the agent emits), **v1.0**. The lower layer; canonical home for the kinds.
-2. `docs/01-RFC-agent-control-policy.md` — Stele policy semantics (*what's allowed*), **v0.4** (changelogs at top); references SIF for the kinds. Deltas for older builds: `docs/RFC-changeset-v0.1-to-v0.2.md`, then `docs/RFC-changeset-v0.2-to-v0.3.md`, then `docs/RFC-changeset-v0.3-to-v0.4.md`; a **draft** set for the next revision accumulates in `docs/RFC-changeset-v0.4-to-v0.5.md`. A Change Set wins on any conflict with older wording.
+> **Specs live in one place only:** [stonefold-ai/spec](https://github.com/stonefold-ai/spec),
+> vendored here as the **`spec/` git submodule** (clone with `--recurse-submodules`;
+> `git submodule update --init` if `spec/` is empty). There are no copies: `spec/docs/…`,
+> `spec/schema/…`, `spec/examples/…` below resolve into the submodule. To change spec
+> wording, schemas, or fixtures: commit in the spec repo, then bump the submodule pointer
+> here. The runnable TCK code is the reverse case: it lives **here**
+> (`src/stonefold_tck/`); the spec repo carries only its specification (spec/docs/12).
+1. `spec/docs/00-RFC-sif-intent-format.md` — the SIF intent format (the five kinds + the shape the agent emits), **v1.0**. The lower layer; canonical home for the kinds.
+2. `spec/docs/01-RFC-agent-control-policy.md` — Stele policy semantics (*what's allowed*), **v0.4** (changelogs at top); references SIF for the kinds. Deltas for older builds: `spec/docs/RFC-changeset-v0.1-to-v0.2.md`, then `spec/docs/RFC-changeset-v0.2-to-v0.3.md`, then `spec/docs/RFC-changeset-v0.3-to-v0.4.md`; a **draft** set for the next revision accumulates in `spec/docs/RFC-changeset-v0.4-to-v0.5.md`. A Change Set wins on any conflict with older wording.
 3. `docs/02-implementation-design.md` — mechanism (*how*). Code snippets there are illustrative pseudocode; realise them in the pinned Python stack.
 4. `docs/03-architecture-decisions.md` — pinned stack & layout (Python: FastAPI + pydantic + Postgres + Redis).
-5. `schema/sif.schema.json`, `schema/stele.schema.json`, `schema/registry.schema.json` — the JSON Schemas for intents, policies, and registries. Every `examples/*` must validate against the matching schema.
-6. `registry/stonefold-registry.yaml` (+ `examples/*.registry.yaml`) — the declared vocabulary (resources, actions with their kind/attributes, states, scope predicates, named sets) a policy resolves against.
-7. `examples/*.stele.yaml` — the RFC's worked policies, used as fixtures.
+5. `spec/schema/sif.schema.json`, `spec/schema/stele.schema.json`, `spec/schema/registry.schema.json` — the JSON Schemas for intents, policies, and registries. Every `spec/examples/*` must validate against the matching schema.
+6. `spec/registry/stonefold-registry.yaml` (+ `spec/examples/*.registry.yaml`) — the declared vocabulary (resources, actions with their kind/attributes, states, scope predicates, named sets) a policy resolves against.
+7. `spec/examples/*.stele.yaml` — the RFC's worked policies, used as fixtures.
 8. `docs/05-demo-spec.md` — the runnable Accounts-Payable demo spec (matches the shipped `demo/`: minimal scripted walkthrough plus the tested attack-refusal, invite-attack, and kill paths).
 9. `tests/acceptance-scenarios.md` — the acceptance bar.
-10. `docs/12-conformance-tck.md` + `src/stonefold_tck/` — the conformance test kit: how ANY gateway (any language) certifies against the RFC. The kit core imports nothing from the reference; the reference is certified by it (`tests/test_tck_reference.py`), in-process and over the wire binding.
+10. `spec/docs/12-conformance-tck.md` + `src/stonefold_tck/` — the conformance test kit: how ANY gateway (any language) certifies against the RFC. The kit core imports nothing from the reference; the reference is certified by it (`tests/test_tck_reference.py`), in-process and over the wire binding.
 
-Supporting docs (context, not normative): `docs/04-domains-and-use-cases.md`, `docs/06-registry-domain-model.md`, `docs/07-artifacts-and-schemas.md`, `docs/08-glossary.md`, `docs/09-mental-models.md`, `docs/10-positioning-policy-engines.md`, `docs/11-delegation-multi-agent.md` (exploration), `docs/13-who-is-this-for.md` (industries & buyers), `docs/14-eu-ai-act-mapping.md` (DRAFT — citations unverified), `docs/15-benchmark-design.md` (design only; no results exist), `docs/16-incremental-adoption.md`, `docs/17-interception-mapping.md` (how Stonefold interprets ordinary MCP/tool calls via the declared mapping), `docs/renaming.md` (the executed ACP → Stonefold/Stele rename record).
+Supporting docs (context, not normative): `docs/04-domains-and-use-cases.md`, `spec/docs/06-registry-domain-model.md`, `spec/docs/07-artifacts-and-schemas.md`, `spec/docs/08-glossary.md`, `docs/09-mental-models.md`, `docs/10-positioning-policy-engines.md`, `docs/11-delegation-multi-agent.md` (exploration), `docs/13-who-is-this-for.md` (industries & buyers), `docs/14-eu-ai-act-mapping.md` (DRAFT — citations unverified), `docs/15-benchmark-design.md` (design only; no results exist), `docs/16-incremental-adoption.md`, `spec/docs/17-interception-mapping.md` (how Stonefold interprets ordinary MCP/tool calls via the declared mapping), `docs/renaming.md` (the executed ACP → Stonefold/Stele rename record).
 
 ## Non-negotiable invariants (treat a violation as a P0 bug)
 1. **Deterministic enforcement.** No LLM / nondeterminism inside `enforce()`.
@@ -38,7 +40,7 @@ Supporting docs (context, not normative): `docs/04-domains-and-use-cases.md`, `d
 ## Definition of done (every task)
 - Tests written first (from `tests/acceptance-scenarios.md` + the cited RFC section) and passing.
 - Full suite green, including integration tests against real Postgres + Redis (`testcontainers-python`).
-- All `examples/*.stele.yaml` and `examples/*.registry.yaml` still load and validate against their schemas (`schema/stele.schema.json` / `schema/registry.schema.json`).
+- All `spec/examples/*.stele.yaml` and `spec/examples/*.registry.yaml` still load and validate against their schemas (`spec/schema/stele.schema.json` / `spec/schema/registry.schema.json`).
 - `mypy --strict` clean; no invariant above violated; any unavoidable ambiguity marked `# STONEFOLD-AMBIGUITY:` with the RFC reference.
 - Public types/functions typed and docstring'd; a short note on which RFC sections the change implements.
 

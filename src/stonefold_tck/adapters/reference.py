@@ -49,7 +49,7 @@ from stonefold_tck.driver import (
     TckActor,
 )
 
-_SCHEMA = Path(__file__).resolve().parents[3] / "schema" / "stele.schema.json"
+_SCHEMA = Path(__file__).resolve().parents[3] / "spec" / "schema" / "stele.schema.json"
 
 # The REQUIRED TCK freshness config (stonefold_tck.driver, CAP_FRESHNESS): the D5/D6
 # checks pick their clock advances against exactly these TTLs.

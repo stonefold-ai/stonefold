@@ -77,9 +77,9 @@ from stonefold_ap_demo.seed import ACCOUNTS, INBOX, PAYEES
 from stonefold_ap_demo.trace import TraceBus
 
 _ROOT = Path(__file__).resolve().parents[2]
-_REGISTRY = _ROOT / "registry" / "stonefold-registry.yaml"
-_SCHEMA = _ROOT / "schema" / "stele.schema.json"
-PAYMENTS_POLICY = _ROOT / "examples" / "payments-ops.stele.yaml"
+_REGISTRY = _ROOT / "spec" / "registry" / "stonefold-registry.yaml"
+_SCHEMA = _ROOT / "spec" / "schema" / "stele.schema.json"
+PAYMENTS_POLICY = _ROOT / "spec" / "examples" / "payments-ops.stele.yaml"
 
 
 def _load_yaml(path: Path) -> dict[str, Any]:

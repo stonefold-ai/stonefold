@@ -16,6 +16,8 @@ the kill no-race transaction, transactional audit, fail closed, and the frozen v
 ## Development setup
 
 ```
+git clone --recurse-submodules https://github.com/stonefold-ai/stonefold.git
+                               # the spec/ submodule carries the schemas + fixtures
 pip install -e ".[dev]"        # Python 3.11+
 docker compose up -d           # Postgres + Redis (integration tests / local runs)
 pytest -q -m "not integration" # fast suite
@@ -28,17 +30,18 @@ make demo                      # scripted adversarial demo
 
 - Tests first, from `tests/acceptance-scenarios.md` and the cited RFC section; full suite
   green including integration.
-- All `examples/*` still validate against their schemas.
+- All `spec/examples/*` still validate against their schemas.
 - `mypy --strict` clean; public types/functions typed and docstring'd.
 - The PR notes which RFC sections (or `CS-nnn` change-set items) it implements. Any
   unavoidable ambiguity is marked `# STONEFOLD-AMBIGUITY:` with the RFC reference.
-- Spec documents under `docs/` are working copies — if your change needs spec wording to
-  move, land it in the spec repo first and sync.
+- Specs (documents, schemas, fixtures) live only in the `spec/` submodule — if your change
+  needs spec wording, a schema, or a fixture to move, land it in the
+  [spec repo](https://github.com/stonefold-ai/spec) first, then bump the submodule pointer.
 
 ## Certifying your own gateway
 
 You don't need to touch this repo's internals: implement one TCK driver (or the HTTP
-harness for non-Python gateways) and run the kit — see `docs/12-conformance-tck.md`. The
+harness for non-Python gateways) and run the kit — see `spec/docs/12-conformance-tck.md`. The
 kit's core (`src/stonefold_tck/`) imports nothing from the reference implementation.
 
 ## License

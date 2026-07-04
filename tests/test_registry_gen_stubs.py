@@ -30,7 +30,7 @@ from stonefold_registry_gen.__main__ import main
 from stonefold_registry_gen.stubs import _ident
 
 _ROOT = Path(__file__).resolve().parents[1]
-PAYMENTS_REGISTRY = _ROOT / "examples" / "payments.registry.yaml"
+PAYMENTS_REGISTRY = _ROOT / "spec" / "examples" / "payments.registry.yaml"
 
 _DDL = """
 CREATE TABLE accounts (

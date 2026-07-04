@@ -10,9 +10,7 @@ ENV PYTHONUNBUFFERED=1 \
 
 COPY pyproject.toml ./
 COPY src ./src
-COPY examples ./examples
-COPY registry ./registry
-COPY schema ./schema
+COPY spec ./spec
 COPY demo ./demo
 
 RUN pip install -e ".[demo]"

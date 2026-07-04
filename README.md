@@ -1,6 +1,6 @@
 # Stonefold
 
-> **Status:** working proof-of-concept. The specifications' **canonical home is [stonefold-ai/spec](https://github.com/stonefold-ai/spec)** (SIF, Stele, the JSON Schemas, and worked examples); this repo carries working copies in [`docs/`](docs/) alongside the Python reference implementation (`src/`, tested against real Postgres/Redis), a runnable real-LLM demo ([`demo/`](demo/)), and the runnable [conformance kit (TCK)](docs/12-conformance-tck.md) — the kit's code lives here (`src/stonefold_tck/`, importing nothing from the reference), its specification in the spec repo. On any doc divergence, the spec repo wins. Not production-hardened.
+> **Status:** working proof-of-concept. The specifications live in **one place only**: [stonefold-ai/spec](https://github.com/stonefold-ai/spec) (SIF, Stele, the JSON Schemas, and worked examples), vendored here as the `spec/` git submodule — clone with `--recurse-submodules`. This repo carries the Python reference implementation (`src/`, tested against real Postgres/Redis), the implementation docs ([`docs/`](docs/)), a runnable real-LLM demo ([`demo/`](demo/)), and the runnable [conformance kit (TCK)](https://github.com/stonefold-ai/spec/blob/main/docs/12-conformance-tck.md) — the kit's code lives here (`src/stonefold_tck/`, importing nothing from the reference), its specification in the spec repo. Not production-hardened.
 
 ## What it is
 
@@ -10,7 +10,7 @@ The slogan: **the AI proposes; a machine you control disposes.**
 
 Three names, once, so the rest of this page and the docs line up: **Stonefold** is the product this repo specifies — the deterministic checkpoint between an agent and the systems it acts on. The component that enforces the rules is the **gateway**; the rulebook language you write is **Stele**; the request-slip format the agent emits is **SIF** (Structured Intent Format). That's the whole vocabulary.
 
-If you're coming from the MCP world: **SIF runs on MCP** — the SIF-native binding *is* an MCP server, exposing exactly one registry-typed tool (`submit_intent`, SIF RFC §7). It replaces the tool sprawl, not the transport: instead of an agent facing dozens of tools it can be tricked into misusing, the agent faces one provable surface whose vocabulary is generated from your domain model. An existing MCP tool estate doesn't have to migrate first — interception mode governs it as-is (unmapped calls are denied), and the [registry generator](docs/06-registry-domain-model.md) drafts a governance model straight from your `tools/list`.
+If you're coming from the MCP world: **SIF runs on MCP** — the SIF-native binding *is* an MCP server, exposing exactly one registry-typed tool (`submit_intent`, SIF RFC §7). It replaces the tool sprawl, not the transport: instead of an agent facing dozens of tools it can be tricked into misusing, the agent faces one provable surface whose vocabulary is generated from your domain model. An existing MCP tool estate doesn't have to migrate first — interception mode governs it as-is (unmapped calls are denied), and the [registry generator](https://github.com/stonefold-ai/spec/blob/main/docs/06-registry-domain-model.md) drafts a governance model straight from your `tools/list`.
 
 ## The analogy
 
@@ -146,20 +146,20 @@ The full version of this argument — the PDP/PEP category error, the four-verdi
 
 ## Learn more
 
-- **[SIF — the intent format](docs/00-RFC-sif-intent-format.md)** — the five action kinds and the shape the agent emits; the layer everything else builds on.
-- **[Stele — the policy language](docs/01-RFC-agent-control-policy.md)** — the rulebook language, with worked examples across five domains.
+- **[SIF — the intent format](https://github.com/stonefold-ai/spec/blob/main/docs/00-RFC-sif-intent-format.md)** — the five action kinds and the shape the agent emits; the layer everything else builds on.
+- **[Stele — the policy language](https://github.com/stonefold-ai/spec/blob/main/docs/01-RFC-agent-control-policy.md)** — the rulebook language, with worked examples across five domains.
 - **[Implementation design](docs/02-implementation-design.md)** — how the gateway executes it, including the stop button in full.
 - **[Architecture decisions](docs/03-architecture-decisions.md)** — the chosen stack and structure.
-- **[Registry & domain model](docs/06-registry-domain-model.md)** — how to declare your resources/actions, and the generator that drafts a registry from SQL DDL, OpenAPI, or an MCP tool list.
+- **[Registry & domain model](https://github.com/stonefold-ai/spec/blob/main/docs/06-registry-domain-model.md)** — how to declare your resources/actions, and the generator that drafts a registry from SQL DDL, OpenAPI, or an MCP tool list.
 - **[Positioning vs OPA / Cedar / IAM / AgentCore / agent passports](docs/10-positioning-policy-engines.md)** — why a decision engine alone can't govern an agent, the same gap attack-by-attack, and how they all compose with the gateway.
-- **[Conformance TCK](docs/12-conformance-tck.md)** — certify a gateway in any language against the RFC: one small driver adapter (Python protocol or fourteen JSON endpoints), one report, named profiles.
+- **[Conformance TCK](https://github.com/stonefold-ai/spec/blob/main/docs/12-conformance-tck.md)** — certify a gateway in any language against the RFC: one small driver adapter (Python protocol or fourteen JSON endpoints), one report, named profiles.
 - **[Who is this for](docs/13-who-is-this-for.md)** — the industries ranked by fit, each one's blocking risk mapped to the mechanisms that answer it, who buys, and where Stonefold is the wrong tool.
 - **[EU AI Act mapping](docs/14-eu-ai-act-mapping.md)** — the high-risk logging and human-oversight obligations, mechanism by mechanism (draft; citations pending verification).
 - **[Incremental adoption](docs/16-incremental-adoption.md)** — the ramp from an existing MCP tool estate to structural containment: draft → intercept → migrate entity-by-entity → SIF-native, with the honest coverage guarantee at each stage.
 - **[Benchmark: SIF vs tool surface](docs/15-benchmark-design.md)** — the experiment design and the **[pilot run records](docs/15-benchmark-design.md#realism-battery--2026-07-02-same-day-track-r-supersedes-the-count-pilot-as-headline)** on real models. The first pilot showed tool *count* alone doesn't break selection on current models (three Claude tiers, N up to 100); the **realism battery** then added what production actually has — look-alike capabilities, vague wording, 2k tokens of prior context — and the surfaces separated: with confusable capabilities Haiku picks correctly **95/80%** under SIF vs **75/55%** under MCP tools (N=10/50), stays at **95/90%** under SIF with 2k context while MCP drops to 75/60%, and production-length tool cards fix MCP's selection (90%) *but at 5.4× the tokens per call* — an honest trade reported both ways, next to two clean ties (nobody over-calls; realistic-card selection favours MCP). **The test data and harness for verifying the method are in the repo**: every model call's raw log in [`bench_results/`](bench_results/), the scoring/surface code pointers in its README, one command to re-run any cell with your own key. Pilot only — one model, small sample, labelled as such.
 
   ![Track R realism battery — selection accuracy per configuration (bars) and tokens per call (right), MCP vs SIF](bench_results/trackR-pilot.svg)
-- **Changelogs:** [v0.1 → v0.2](docs/RFC-changeset-v0.1-to-v0.2.md) · [v0.2 → v0.3](docs/RFC-changeset-v0.2-to-v0.3.md) · [v0.3 → v0.4](docs/RFC-changeset-v0.3-to-v0.4.md) (decision freshness + scope no-race, both implemented) · [v0.4 → v0.5 — draft, accumulating](docs/RFC-changeset-v0.4-to-v0.5.md) (trust boundary, connector digest pinning + identity seam — shipped; kill-axes reconciliation, batch semantics, classification ordering — specified, implementations pending).
+- **Changelogs:** [v0.1 → v0.2](https://github.com/stonefold-ai/spec/blob/main/docs/RFC-changeset-v0.1-to-v0.2.md) · [v0.2 → v0.3](https://github.com/stonefold-ai/spec/blob/main/docs/RFC-changeset-v0.2-to-v0.3.md) · [v0.3 → v0.4](https://github.com/stonefold-ai/spec/blob/main/docs/RFC-changeset-v0.3-to-v0.4.md) (decision freshness + scope no-race, both implemented) · [v0.4 → v0.5 — draft, accumulating](https://github.com/stonefold-ai/spec/blob/main/docs/RFC-changeset-v0.4-to-v0.5.md) (trust boundary, connector digest pinning + identity seam — shipped; kill-axes reconciliation, batch semantics, classification ordering — specified, implementations pending).
 
 ## License
 

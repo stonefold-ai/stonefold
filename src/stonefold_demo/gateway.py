@@ -34,9 +34,9 @@ from stonefold_store.kill_memory import InMemoryKillStore
 from stonefold_demo.world import World
 
 _ROOT = Path(__file__).resolve().parents[2]
-_REGISTRY = _ROOT / "registry" / "stonefold-registry.yaml"
-_SCHEMA = _ROOT / "schema" / "stele.schema.json"
-SUPPORT_POLICY = _ROOT / "examples" / "support-assistant.stele.yaml"
+_REGISTRY = _ROOT / "spec" / "registry" / "stonefold-registry.yaml"
+_SCHEMA = _ROOT / "spec" / "schema" / "stele.schema.json"
+SUPPORT_POLICY = _ROOT / "spec" / "examples" / "support-assistant.stele.yaml"
 
 # The gateway injects the clock that time-based gates (rate/window) read — never
 # the agent. A *fixed* instant keeps the demo deterministic (invariant 1): a real

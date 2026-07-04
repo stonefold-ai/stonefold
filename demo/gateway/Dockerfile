@@ -13,13 +13,12 @@ ENV PYTHONUNBUFFERED=1 \
 # Install deps first (cache-friendly): copy metadata + source the package needs.
 COPY pyproject.toml ./
 COPY src ./src
-COPY examples ./examples
-COPY registry ./registry
-COPY schema ./schema
+COPY spec ./spec
 COPY demo ./demo
 
 # Editable install so the gateway's Path(__file__).parents[2] still resolves to
-# /app (where examples/, registry/, schema/ live).
+# /app (where the spec submodule's examples/, registry/, schema/ live — clone
+# with --recurse-submodules or the build has nothing to copy).
 RUN pip install -e ".[demo]"
 
 EXPOSE 8088

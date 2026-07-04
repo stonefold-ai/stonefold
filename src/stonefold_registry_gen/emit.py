@@ -104,7 +104,7 @@ def emit_yaml(draft: DraftRegistry) -> str:
 def _registry_schema() -> dict[str, Any]:
     # dev/src layout: src/stonefold_registry_gen/emit.py → repo root / schema.
     # Authoring-time tool: run from the repo checkout is the supported mode.
-    path = Path(__file__).resolve().parents[2] / "schema" / "registry.schema.json"
+    path = Path(__file__).resolve().parents[2] / "spec" / "schema" / "registry.schema.json"
     return dict(json.loads(path.read_text(encoding="utf-8")))
 
 
