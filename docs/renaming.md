@@ -4,9 +4,11 @@
 (branch `rename/stonefold-stele`); the repo now carries the Stonefold/Stele names
 throughout. This page is kept permanently as the honesty artifact: anyone who saw an old
 name can confirm this is the same project, and the history is visibly not hidden.
-Historical change sets (`docs/RFC-changeset-*.md` up to v0.4) keep their original ACP
-wording by design (see "What deliberately does NOT change" below). Still open: renaming
-the GitHub repository itself (`agent-control-protocol` → `stonefold`).
+Historical change sets (`docs/RFC-changeset-*.md` up to v0.4) were initially kept in
+their original ACP wording, then swept too (July 2026): the project was not yet public,
+so preserving pre-rename names would only confuse readers — this page, not the old
+identifiers, is the historical record. The GitHub repository rename is done
+(`agent-control-protocol` → `stonefold`, under the `stonefold-ai` org).
 
 > **Supersedes the earlier "Interlock" proposal.** A prior revision of this page recorded
 > *Interlock* (product) / *Interlock Policy Language* (spec) as the decided names, gated on
@@ -89,9 +91,11 @@ are carved in Stele — and nothing else can act.**
 - **All normative semantics.** The rename changes identifiers, titles, and file names only.
   No MUST/SHOULD/MAY wording moves. Version numbers are not bumped by the rename;
   `stele/v0.1` accepts exactly the files `acp/v0.1` accepted.
-- **The historical change sets** (`docs/RFC-changeset-*.md`) keep their original wording,
-  including old names — they describe past versions, and rewriting them would falsify
-  history.
+- ~~**The historical change sets** (`docs/RFC-changeset-*.md`) keep their original
+  wording, including old names.~~ **Revised (July 2026):** the change sets were swept to
+  the new names too — identifiers, titles, and file references only; no semantic wording
+  moved. The project had no public users of the old names, so keeping them served no
+  reader; the rename history is preserved by this page, not by stale identifiers.
 
 ## Standardization posture (recorded so it isn't re-litigated)
 

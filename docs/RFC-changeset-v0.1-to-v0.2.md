@@ -1,8 +1,8 @@
-# ACP RFC — Change Set v0.1 → v0.2
+# RFC Change Set — v0.1 → v0.2
 
 **Purpose.** This is the *delta* for an implementation that already builds RFC v0.1. Apply these items to reach v0.2. The full consolidated spec is `docs/01-RFC-agent-control-policy.md` (now v0.3; its "Changelog — v0.1 → v0.2" table matches this document); this is the actionable work order. To continue past v0.2, apply `docs/RFC-changeset-v0.2-to-v0.3.md` next.
 
-**Scope of the change.** All nine items are **semantic / behavioural** clarifications. **No policy-file syntax changed** — `apiVersion: acp/v0.1` files remain valid, `schema/acp.schema.json` and all `examples/*.acp.yaml` are unchanged. You are changing *gateway behaviour and tests*, not the language. (CS-008 touches the **registry** side: a `compensation` declaration and a linter rule; CS-009 adds a field to the **audit record**.)
+**Scope of the change.** All nine items are **semantic / behavioural** clarifications. **No policy-file syntax changed** — `apiVersion: stele/v0.1` files remain valid, `schema/stele.schema.json` and all `examples/*.stele.yaml` are unchanged. You are changing *gateway behaviour and tests*, not the language. (CS-008 touches the **registry** side: a `compensation` declaration and a linter rule; CS-009 adds a field to the **audit record**.)
 
 **Precedence.** Where this Change Set conflicts with any older v0.1 wording, **the Change Set wins**.
 
@@ -87,5 +87,5 @@
 ## Applying this Change Set
 1. Read each item; update or add the cited acceptance scenario test **first**.
 2. Implement the behaviour; keep the policy syntax, schema, and example files untouched.
-3. Re-run the full suite; confirm all `examples/*.acp.yaml` still validate (they should — no syntax changed).
+3. Re-run the full suite; confirm all `examples/*.stele.yaml` still validate (they should — no syntax changed).
 4. When done, the system conforms to RFC v0.2 (`docs/01`). Note in your commit which CS items it covers.

@@ -1,10 +1,10 @@
-# ACP RFC — Change Set v0.3 → v0.4 (ACCEPTED)
+# RFC Change Set — v0.3 → v0.4 (ACCEPTED)
 
-**Status: ACCEPTED — merged into `docs/01` v0.4 (2026-07-02); the RFC text is now normative and this document is the delta record. Both items are implemented in the reference: CS-017 (scenarios D5/D6, `acp_core/freshness.py`, outbox/dispatch) and CS-018 (scenarios B4/B5, connector `ScopeCapability` + `dispatch_scoped`, dispatch worker).** This document promoted the two deferred timing guarantees (`docs/03` → "Decision freshness", "Scope no-race") from *documented boundary* to *specified behaviour*.
+**Status: ACCEPTED — merged into `docs/01` v0.4 (2026-07-02); the RFC text is now normative and this document is the delta record. Both items are implemented in the reference: CS-017 (scenarios D5/D6, `stonefold_core/freshness.py`, outbox/dispatch) and CS-018 (scenarios B4/B5, connector `ScopeCapability` + `dispatch_scoped`, dispatch worker).** This document promoted the two deferred timing guarantees (`docs/03` → "Decision freshness", "Scope no-race") from *documented boundary* to *specified behaviour*.
 
 **Why these two.** They are the questions a payments/healthcare buyer opens with, and both close the same shape of gap: a fact that was true at **decision time** stops being true before **dispatch/commit time**. v0.3 handles that window honestly (documented, kill-only); v0.4 closes it where it can be closed and prices it where it can't.
 
-**Scope of the change.** No policy-file syntax changes; `schema/acp.schema.json` untouched. CS-017 adds gateway behaviour + deployment config; CS-018 adds a declared connector capability (registry/connector metadata, additive).
+**Scope of the change.** No policy-file syntax changes; `schema/stele.schema.json` untouched. CS-017 adds gateway behaviour + deployment config; CS-018 adds a declared connector capability (registry/connector metadata, additive).
 
 ---
 
