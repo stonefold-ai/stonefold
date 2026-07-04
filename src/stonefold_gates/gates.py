@@ -189,8 +189,54 @@ def disclosure(cfg: Any, gctx: GateContext) -> GateResult:
     """Pre-check form (design §6 review note): the action's sensitivity is known
     from the registry, so we can block *before* execution when the requested sink
     is not permitted. The ``when:`` (e.g. sensitivity == restricted) is evaluated
-    by the engine; reaching here means the result is sensitive."""
+    by the engine; reaching here means the result is sensitive.
+
+    ``maxClassification`` (CS-024) compares the action's declared
+    ``resultSensitivity`` against a ceiling, by the registry's DECLARED
+    classification order (built-in ``public < internal < confidential <
+    restricted``; a domain's substituted labels are ordered by their value-set
+    position). The ceiling is a literal label or a condition path (e.g.
+    ``actor.clearance``); either side missing from the declared order fails
+    closed (RFC §8)."""
+    if isinstance(cfg, dict) and cfg.get("maxClassification") is not None:
+        verdict = _classification_check(cfg["maxClassification"], gctx)
+        if verdict is not None:
+            return verdict
     return _disclosure_decide(cfg, gctx.env.sink)
+
+
+def _classification_check(ceiling_ref: Any, gctx: GateContext) -> GateResult | None:
+    """FAIL when the action's sensitivity exceeds the ceiling or either label is
+    outside the declared order (fail closed, CS-024); ``None`` to fall through to
+    the sink check."""
+    ceiling = ceiling_ref
+    if not isinstance(ceiling, str):
+        return failed("disclosure", f"fail-closed: bad maxClassification {ceiling_ref!r}")
+    if gctx.registry.classification_rank(ceiling) is None:
+        # not a literal label — resolve it as a condition path (§7.12's
+        # ``maxClassification: actor.clearance`` form); unresolvable ⇒ fail closed
+        try:
+            ceiling = str(resolve_field(ceiling, gctx))
+        except (MissingValueError, ConditionRuntimeError) as exc:
+            return failed("disclosure", f"fail-closed: {exc}")
+    max_rank = gctx.registry.classification_rank(ceiling)
+    if max_rank is None:
+        return failed(
+            "disclosure",
+            f"fail-closed: classification {ceiling!r} not in the declared order",
+        )
+    sensitivity = gctx.resolved.attrs.resultSensitivity
+    rank = gctx.registry.classification_rank(sensitivity)
+    if rank is None:
+        return failed(
+            "disclosure",
+            f"fail-closed: classification {sensitivity!r} not in the declared order",
+        )
+    if rank > max_rank:
+        return failed(
+            "disclosure", f"result classification {sensitivity!r} exceeds {ceiling!r}"
+        )
+    return None
 
 
 def disclosure_post_check(

@@ -22,6 +22,8 @@ PROFILE_STAGING = "staging"  # outbox, approvals, dual-auth
 PROFILE_KILL = "kill"  # kill-switch semantics (serialized form)
 PROFILE_AUDIT = "audit"  # decision log completeness & consistency
 PROFILE_FRESHNESS = "freshness"  # v0.4 CS-017/018: decision TTL, volatile re-validation, scope no-race
+PROFILE_BATCH = "batch"  # v0.5 CS-023: atomic batch decision semantics
+PROFILE_DIGEST = "digest"  # v0.5 CS-020: connector digest pinning (load + dispatch)
 
 ALL_PROFILES = (
     PROFILE_CORE,
@@ -31,6 +33,8 @@ ALL_PROFILES = (
     PROFILE_KILL,
     PROFILE_AUDIT,
     PROFILE_FRESHNESS,
+    PROFILE_BATCH,
+    PROFILE_DIGEST,
 )
 
 
@@ -69,6 +73,16 @@ def check(
 
 def all_checks() -> tuple[Check, ...]:
     # import for side effects: each module registers its checks
-    from stonefold_tck.checks import audit, core, freshness, kill, lint, scope, staging  # noqa: F401
+    from stonefold_tck.checks import (  # noqa: F401
+        audit,
+        batch,
+        core,
+        digest,
+        freshness,
+        kill,
+        lint,
+        scope,
+        staging,
+    )
 
     return tuple(_CHECKS)

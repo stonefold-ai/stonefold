@@ -29,6 +29,7 @@ from stonefold_core.models import (
     Attributes,
     AuditRecord,
     Compensation,
+    BatchResult,
     EvalResult,
     GateResult,
     RawCall,
@@ -103,7 +104,7 @@ from stonefold_core.scope import (
 )
 from stonefold_core.linter import LintFinding, LintReport, PolicyError, Severity, lint
 from stonefold_core.loader import SchemaError, load_policy, merge_extends, validate_only
-from stonefold_core.pipeline import enforce
+from stonefold_core.pipeline import enforce, enforce_batch
 from stonefold_core.policy import (
     AuditLevel,
     Defaults,
@@ -140,6 +141,7 @@ __all__ = [
     "Actor",
     "Session",
     "GateResult",
+    "BatchResult",
     "EvalResult",
     "AuditRecord",
     # registry
@@ -255,4 +257,5 @@ __all__ = [
     "SchemaError",
     # pipeline
     "enforce",
+    "enforce_batch",
 ]

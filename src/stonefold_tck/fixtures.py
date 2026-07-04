@@ -202,6 +202,20 @@ gates:
     valueLimit: { field: data.amount, max: 100000, when: "resource.no_such_field == 1" }
 """
 
+# C10 (v0.5 CS-024): disclosure.maxClassification compares by the DECLARED
+# classification order; the ceiling here resolves from the session-supplied
+# actor claim (the §7.12 ``actor.clearance`` form).
+POLICY_CLASSIFICATION = """\
+apiVersion: stele/v0.1
+agent: tck-agent
+defaults: { failureMode: closed, audit: full }
+allow:
+  - observe: [Widget, Sealed]
+gates:
+  readSealed:
+    disclosure: { maxClassification: actor.clearance }
+"""
+
 # Lint fixtures — each MUST refuse to load (ERROR) or report (WARN).
 POLICY_INVALID_OPEN_IRREVERSIBLE = """\
 apiVersion: stele/v0.1

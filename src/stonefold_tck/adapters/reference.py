@@ -29,6 +29,11 @@ from stonefold_core import (
     load_registry,
 )
 from stonefold_core.connector import Connectors, ConnectorResult
+from stonefold_core.digest import (
+    DigestMismatchError,
+    artifact_digest,
+    assert_connector_digests,
+)
 from stonefold_core.kill import KillScope, KillScopeKind
 from stonefold_core.linter import PolicyError
 from stonefold_core.models import RawCall, ResolvedAction
@@ -43,6 +48,7 @@ from stonefold_store.kill_memory import InMemoryKillStore
 from stonefold_tck.driver import (
     ALL_CAPABILITIES,
     AuditEntry,
+    BatchSubmitResult,
     LoadResult,
     Operation,
     SubmitResult,
@@ -80,7 +86,15 @@ def authoring_to_compact(authoring: Mapping[str, Any]) -> dict[str, Any]:
         actions.setdefault("create", {"kind": "record"})
         resources[ename] = {"connector": edef.get("dataSource"), "actions": actions}
     authoring_connectors = dict(authoring.get("connectors") or {})
+    compact_extra: dict[str, Any] = {}
+    # CS-024: a domain substituting its own classification labels declares them
+    # as an ORDERED value set (docs/06 §4); carry the order across the bridge so
+    # ``disclosure.maxClassification`` compares by it.
+    value_sets = dict(authoring.get("valueSets") or {})
+    if value_sets.get("resultSensitivity"):
+        compact_extra["classifications"] = list(value_sets["resultSensitivity"])
     return {
+        **compact_extra,
         "connectors": list(authoring_connectors.keys()),
         # CS-020: carry any pinned connector digests across the dialect bridge so
         # the compact loader can verify them (a no-op unless one is declared).
@@ -154,6 +168,7 @@ class ReferenceDriver:
         self._kill: InMemoryKillStore = InMemoryKillStore()
         self._audit: InMemoryAuditSink = InMemoryAuditSink()
         self._registry: InMemoryRegistry | None = None
+        self._connectors: Connectors | None = None
 
     # --- driver contract ---------------------------------------------------
     def capabilities(self) -> frozenset[str]:
@@ -180,6 +195,7 @@ class ReferenceDriver:
         self._kill = InMemoryKillStore()
         self._world = _FailableConnector()
         connectors = Connectors({"tck-data": self._world, "tck-effects": self._world})
+        self._connectors = connectors
         engine = DefaultGateEngine(
             registry,
             hooks=ContentHookRegistry({"tck.rejectMarker": _reject_marker}),
@@ -200,6 +216,16 @@ class ReferenceDriver:
             freshness=_TCK_FRESHNESS,  # v0.4 CS-017: TTL stamped at staging
             agent=policy.agent,
         )
+        # CS-020: the load-time digest gate — a pinned connector that fails
+        # verification refuses the load (fail closed), like a lint ERROR.
+        try:
+            assert_connector_digests(
+                registry, connectors,
+                failure_mode=policy.policy.defaults.failureMode,
+                audit=self._audit, agent=policy.agent,
+            )
+        except DigestMismatchError as exc:
+            return LoadResult(ok=False, errors=[str(exc)])
         # v0.4 wiring: the worker re-checks TTL + volatile gates inside the
         # claim (CS-017) and re-asserts scope at dispatch (CS-018).
         self._worker = DispatchWorker(
@@ -233,15 +259,62 @@ class ReferenceDriver:
             actor=Actor(id=actor.id, roles=set(actor.roles), claims=dict(actor.claims)),
             session=Session(id=session_id),
         )
-        rows: Sequence[Mapping[str, Any]] | None = None
-        output = result.output
-        if output is not None:
-            rows = getattr(output, "rows", None)
-            if rows is None and isinstance(output, list):
-                rows = output
         return SubmitResult(
-            decision=result.decision.value, ticket=result.ticket, rows=rows, reason=result.rule
+            decision=result.decision.value, ticket=result.ticket,
+            rows=self._rows_of(result.output), reason=result.rule,
         )
+
+    @staticmethod
+    def _rows_of(output: Any) -> Sequence[Mapping[str, Any]] | None:
+        if output is None:
+            return None
+        rows: Sequence[Mapping[str, Any]] | None = getattr(output, "rows", None)
+        if rows is None and isinstance(output, list):
+            rows = output
+        return rows
+
+    def submit_batch(
+        self, actor: TckActor, session_id: str, ops: Sequence[Operation]
+    ) -> BatchSubmitResult:
+        assert self._gateway is not None, "load() first"
+        if ops:
+            self._sink = ops[0].sink
+            self._context = dict(ops[0].context)
+        operations = []
+        for op in ops:
+            data = dict(op.data)
+            if op.target is not None:
+                data["id"] = op.target
+            operations.append(
+                {"resource": op.resource, "action": op.action or "read", "data": data}
+            )
+        batch = self._gateway.submit_batch(
+            operations,
+            actor=Actor(id=actor.id, roles=set(actor.roles), claims=dict(actor.claims)),
+            session=Session(id=session_id),
+        )
+        return BatchSubmitResult(
+            decision=batch.decision.value,
+            failing_index=batch.failing_index,
+            results=[
+                SubmitResult(decision=r.decision.value, ticket=r.ticket,
+                             rows=self._rows_of(r.output), reason=r.rule)
+                for r in batch.results
+            ],
+        )
+
+    def connector_digest(self, name: str) -> str:
+        assert self._connectors is not None, "load() first"
+        return artifact_digest(self._connectors.get(name))
+
+    def tamper_connector(self, name: str) -> None:
+        assert self._connectors is not None, "load() first"
+        # Swap in an implementation from a DIFFERENT module (the plain
+        # in-memory connector) so its artifact digest no longer matches the
+        # pinned one — the reference pins module source bytes. Test-only glue,
+        # so reaching into the registry's private map is deliberate: production
+        # code has no swap hook, which is rather the point.
+        self._connectors._connectors[name] = InMemoryConnector()
 
     def approve(self, ticket: str, approver_id: str) -> bool:
         assert self._outbox is not None

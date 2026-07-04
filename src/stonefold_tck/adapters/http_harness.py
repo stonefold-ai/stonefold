@@ -66,6 +66,51 @@ def create_tck_harness(driver: ConformanceDriver, *, implementation: str) -> Fas
             "reason": result.reason,
         }
 
+    @app.post("/tck/submit-batch")
+    def submit_batch(body: dict[str, Any]) -> dict[str, Any]:
+        actor_raw = dict(body["actor"])
+        result = driver.submit_batch(
+            TckActor(
+                id=str(actor_raw["id"]),
+                roles=frozenset(str(r) for r in actor_raw.get("roles", [])),
+                claims=dict(actor_raw.get("claims", {})),
+            ),
+            str(body["sessionId"]),
+            [
+                Operation(
+                    resource=str(op["resource"]),
+                    action=op.get("action"),
+                    data=dict(op.get("data", {})),
+                    target=op.get("target"),
+                    sink=op.get("sink"),
+                    context=dict(op.get("context", {})),
+                )
+                for op in body["ops"]
+            ],
+        )
+        return {
+            "decision": result.decision,
+            "failingIndex": result.failing_index,
+            "results": [
+                {
+                    "decision": r.decision,
+                    "ticket": r.ticket,
+                    "rows": None if r.rows is None else [dict(row) for row in r.rows],
+                    "reason": r.reason,
+                }
+                for r in result.results
+            ],
+        }
+
+    @app.get("/tck/connector-digest/{name}")
+    def connector_digest(name: str) -> dict[str, Any]:
+        return {"digest": driver.connector_digest(name)}
+
+    @app.post("/tck/tamper-connector")
+    def tamper_connector(body: dict[str, Any]) -> dict[str, Any]:
+        driver.tamper_connector(str(body["name"]))
+        return {}
+
     @app.post("/tck/approve")
     def approve(body: dict[str, Any]) -> dict[str, Any]:
         return {"accepted": driver.approve(str(body["ticket"]), str(body["approverId"]))}

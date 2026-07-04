@@ -14,8 +14,13 @@ from stonefold_tck.checks._util import (
     setup,
     submit,
 )
-from stonefold_tck.driver import CAP_CLOCK, ConformanceDriver, Operation
-from stonefold_tck.fixtures import POLICY_DENY_WINS, POLICY_GATE_LAYERS, POLICY_MISSING_PATH
+from stonefold_tck.driver import CAP_CLOCK, ConformanceDriver, Operation, TckActor
+from stonefold_tck.fixtures import (
+    POLICY_CLASSIFICATION,
+    POLICY_DENY_WINS,
+    POLICY_GATE_LAYERS,
+    POLICY_MISSING_PATH,
+)
 
 
 @check("A1", "default deny: unlisted and unknown actions are refused", PROFILE_CORE)
@@ -127,3 +132,24 @@ def c9_precondition_check(driver: ConformanceDriver) -> None:
     r = submit(driver, Operation(resource="Med", action="administer",
                                  data={"drug": "x", "patientId": "x"}, target="M4"))
     expect_decision(r, "deny", "tck.flagSet on a target with flag=false")
+
+
+@check("C10", "maxClassification compares by the declared order; unknown fails closed",
+       PROFILE_CORE)
+def c10_classification_order(driver: ConformanceDriver) -> None:
+    # v0.5 CS-024: built-in order public < internal < confidential < restricted;
+    # the ceiling resolves from the actor's clearance claim (session-supplied).
+    setup(driver, policy=POLICY_CLASSIFICATION)
+    sealed = Operation(resource="Sealed", action="readSealed", target="S1")
+    cleared = TckActor(id="carol", claims={"clearance": "restricted"})
+    limited = TckActor(id="dave", claims={"clearance": "internal"})
+    unlabelled = TckActor(id="erin")  # no clearance claim at all
+
+    expect_decision(submit(driver, sealed, actor=cleared), "allow",
+                    "restricted read within a restricted clearance")
+    expect_decision(submit(driver, sealed, actor=limited), "deny",
+                    "restricted read above an internal clearance")
+    # a ceiling that resolves to nothing is OUTSIDE the declared order ⇒ the
+    # gate fails CLOSED (RFC §8 runtime resolution), never open
+    expect_decision(submit(driver, sealed, actor=unlabelled), "deny",
+                    "unresolvable clearance fails closed")

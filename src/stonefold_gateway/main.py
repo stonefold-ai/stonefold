@@ -43,6 +43,25 @@ class SubmitIntentBody(BaseModel):
     data: dict[str, Any] = Field(default_factory=dict)
 
 
+class SubmitBatchBody(BaseModel):
+    """The SIF wire form (SIF §5): ``{"operations": [...]}``. Decided atomically
+    per RFC §12 / CS-023 — any DENY/HALT refuses the whole batch before anything
+    commits or stages."""
+
+    operations: list[SubmitIntentBody] = Field(min_length=1)
+
+
+def _render(result: Any) -> dict[str, Any]:
+    """One operation's result in the wire shape (shared by single and batch)."""
+    return {
+        "decision": result.decision.value,
+        "rule": result.rule,
+        "ticket": result.ticket,
+        "output": result.output,
+        "scopeApplied": list(result.scope_applied),
+    }
+
+
 def create_app(
     gateway: Gateway,
     *,
@@ -71,7 +90,7 @@ def create_app(
 
     @app.post("/submit_intent")
     def submit_intent(
-        body: SubmitIntentBody,
+        body: SubmitBatchBody | SubmitIntentBody,
         x_actor_id: str = Header(..., alias="X-Actor-Id"),
         x_session_id: str = Header(..., alias="X-Session-Id"),
         x_correlation_id: str | None = Header(None, alias="X-Correlation-Id"),
@@ -89,17 +108,37 @@ def create_app(
             )
         except IdentityRejected as exc:
             raise HTTPException(status_code=401, detail=str(exc))
+
+        if isinstance(body, SubmitBatchBody):
+            # SIF wire form (SIF §5): the batch is decided atomically (CS-023);
+            # a refusal's structured error names the failing operation (SIF §6).
+            batch = sif.submit_intent_batch(
+                [op.model_dump() for op in body.operations],
+                actor=who.actor, session=who.session,
+            )
+            response: dict[str, Any] = {
+                "decision": batch.decision.value,
+                "operations": [_render(r) for r in batch.results],
+            }
+            if batch.failing_index is not None:
+                failing = batch.results[batch.failing_index]
+                response["error"] = {
+                    "code": "BATCH_REFUSED",
+                    "pointer": f"operations[{batch.failing_index}]",
+                    "message": (
+                        f"operation {batch.failing_index} was refused "
+                        f"({failing.decision.value}: {failing.rule}); "
+                        "a batch commits atomically — nothing was applied "
+                        "(submit independent intents for independent outcomes)"
+                    ),
+                }
+            return response
+
         result = sif.submit_intent(
             {"resource": body.resource, "action": body.action, "data": body.data},
             actor=who.actor, session=who.session,
         )
-        return {
-            "decision": result.decision.value,
-            "rule": result.rule,
-            "ticket": result.ticket,
-            "output": result.output,
-            "scopeApplied": list(result.scope_applied),
-        }
+        return _render(result)
 
     @app.get("/", response_class=HTMLResponse)
     def index() -> str:

@@ -27,6 +27,7 @@ from typing import Any
 from stonefold_core import (
     Actor,
     AuditSink,
+    BatchResult,
     CompiledPolicy,
     Connectors,
     Decision,
@@ -40,6 +41,7 @@ from stonefold_core import (
     Session,
     build_record,
     enforce,
+    enforce_batch,
 )
 from stonefold_core.freshness import FreshnessConfig
 from stonefold_core.scope import ScopeResolver
@@ -118,6 +120,51 @@ class Gateway:
             policy=self._policy,
             gates=self._gates,
             env=env,
+            scopes=self._scopes,
+            connectors=self._connectors,
+            outbox=self._outbox,
+            kill=self._kill,
+            freshness=self._freshness,
+            agent=self._agent,
+        )
+
+    def submit_batch(
+        self,
+        operations: Sequence[Mapping[str, Any]],
+        *,
+        actor: Actor,
+        session: Session,
+    ) -> BatchResult:
+        """Enforce a SIF batch atomically (RFC §12, CS-023; SIF §5).
+
+        Every operation is decided first; any DENY/HALT refuses the whole batch
+        before anything commits or stages. Same identity rule as ``submit``:
+        actor/session come from the authenticated transport, never the payload.
+        """
+        raws = [
+            RawCall(
+                resource=str(op.get("resource", "")),
+                action=op.get("action"),
+                data=dict(op.get("data") or {}),
+            )
+            for op in operations
+        ]
+        envs: Sequence[RequestEnv | None] | None
+        if self._env_factory is not None:
+            envs = [self._env_factory(raw) for raw in raws]
+        elif self._env is not None:
+            envs = [self._env] * len(raws)
+        else:
+            envs = None
+        return enforce_batch(
+            raws,
+            actor,
+            session,
+            registry=self._registry,
+            audit=self._audit,
+            policy=self._policy,
+            gates=self._gates,
+            envs=envs,
             scopes=self._scopes,
             connectors=self._connectors,
             outbox=self._outbox,
@@ -206,6 +253,13 @@ class SifNativeTransport:
             actor=actor,
             session=session,
         )
+
+    def submit_intent_batch(
+        self, operations: Sequence[Mapping[str, Any]], *, actor: Actor, session: Session
+    ) -> BatchResult:
+        """The SIF wire form ``{"operations": [...]}`` (SIF §5) — decided
+        atomically per RFC §12 / CS-023."""
+        return self._gateway.submit_batch(operations, actor=actor, session=session)
 
 
 # --- Interception / MCP proxy (design §1.2) -------------------------------

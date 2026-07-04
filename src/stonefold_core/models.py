@@ -150,6 +150,27 @@ class EvalResult(BaseModel):
     scope_applied: tuple[str, ...] = ()
 
 
+class BatchResult(BaseModel):
+    """The terminal verdict of one ``enforce_batch`` call (RFC §12, CS-023).
+
+    A SIF batch is decided atomically: every operation is decided first, then
+    the batch either commits as a whole or is refused as a whole. ``results``
+    carries one ``EvalResult`` per operation, in submission order — each backed
+    by its own audit record (RFC §11).
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    # The batch verdict: the first refusing operation's DENY/HALT; else HOLD
+    # when any operation is held (the batch committed, approvals pending); else
+    # ALLOW.
+    decision: Decision
+    # Index of the refusing operation (the SIF §6 error pointer
+    # ``operations[i]``). ``None`` when the batch committed.
+    failing_index: int | None = None
+    results: tuple[EvalResult, ...] = ()
+
+
 class AuditRecord(BaseModel):
     """One append-only audit record (RFC §11).
 

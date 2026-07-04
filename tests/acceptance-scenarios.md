@@ -111,6 +111,14 @@ Translate each scenario into an automated test **before** implementing the featu
 - Given a gate `when: "resource.foo == 1"` where `resource.foo` is absent at runtime
 - When evaluated → the gate fails closed (`DENY`), distinct from "condition false."
 
+**C9 — named precondition check gates the action**
+- Given `administer` with `precondition: [tck.flagSet]` and a target whose `flag` is false
+- When enforced → `DENY` (the registered check's verdict binds).
+
+**C10 — classification ordering for `disclosure` (v0.5 CS-024)**
+- Given `disclosure: { maxClassification: actor.clearance }` on a `restricted` read, and the declared order `public < internal < confidential < restricted`
+- When enforced → an actor cleared `restricted` reads it; an actor cleared `internal` is `DENY`d ("exceeds"); an actor with **no** clearance claim (or a label outside the declared order, either side) is `DENY`d — fail closed (RFC §8), never open.
+
 ---
 
 ## D. Effects, outbox, approvals (M4)
@@ -181,6 +189,42 @@ Translate each scenario into an automated test **before** implementing the featu
 **F3 — fail closed on audit/outbox DB down**
 - Given the outbox/audit DB is unavailable
 - When an effect is attempted → fail closed (deny/halt), audited best-effort to the fallback sink.
+
+---
+
+## H. Batch decision semantics (v0.5 CS-023 — RFC §12, SIF §5)
+
+**H1 — any DENY refuses the whole batch, before anything commits or stages**
+- Given a batch of [a permitted `record`, a denied `effect`]
+- When submitted as one intent → the batch decision is `DENY` naming operation 1 (the SIF §6 pointer `operations[1]`); the record op **did not commit** (a subsequent read shows no row) and no effect staged or dispatched. Every operation has its own audit record: the denied op with its rule, the rest with their own decision and outcome `batch-refused`.
+
+**H2 — a HALT refuses the whole batch the same way**
+- Given an active kill matching one operation of an otherwise-permitted batch
+- When submitted → the batch is refused with `HALT` naming that operation; nothing committed or staged; per-op audit records as in H1.
+
+**H3 — a HOLD does not refuse the batch**
+- Given a batch of [a permitted `record`, an `effect` above the approval threshold]
+- When submitted → the batch commits: the record op **is applied**, the effect stages `PENDING_APPROVAL` with a ticket, and the batch decision is `HOLD`. Nothing dispatches until approval; on approval the effect dispatches.
+
+**H4 — a later rejection does not roll back the committed ops**
+- Given H3's committed batch with its held effect
+- When the held effect is rejected (or its TTL expires, CS-017) → the effect never dispatches, but the record op committed in H3 **remains applied** — each operation was independently authorized; `correlationId` ties them for downstream reconciliation (RFC §11).
+
+---
+
+## I. Connector digest pinning (v0.5 CS-020 — registry §5, RFC §10)
+
+**I1 — a pinned digest mismatch fails closed at load**
+- Given a registry that pins a connector to a digest that does not match the loaded implementation
+- When the policy+registry pair is loaded (closed failure mode) → the load is refused; the gateway does not come up trusting an unverified connector.
+
+**I2 — a dispatch-time mismatch cancels the staged effect, audited**
+- Given a registry pinning the connector's *correct* digest, and an allowed effect staged through it
+- When the connector's implementation is swapped after the decision (supply-chain replacement) and the worker dispatches → the effect **does not leave**; the row settles with reason `connector-digest-mismatch`, audited; nothing partial.
+
+**I3 — a matching pin dispatches normally (no false refusals)**
+- Given the same pinned registry with the implementation untouched
+- When the staged effect dispatches → it executes exactly once, as an unpinned connector would.
 
 ---
 

@@ -28,11 +28,16 @@ Wire protocol (all JSON; camelCase keys):
 | GET    | /tck/audit                      | → {records: [{decision, resource, action, outcome, reason?}]} |
 | POST   | /tck/inject-dispatch-failure    | {action} → {} |
 | POST   | /tck/update-set                 | {name, values: [str]} → {} |
+| POST   | /tck/submit-batch               | {actor, sessionId, ops: [op]} → {decision, failingIndex?, results: [{decision, ticket?, rows?, reason}]} |
+| GET    | /tck/connector-digest/{name}    | → {digest: "sha256:<hex>"} |
+| POST   | /tck/tamper-connector           | {name} → {} |
 
 Omit an endpoint (404/501) only if its capability is not advertised.
 (``reason`` carries the deciding rule/settle reason; required for the
 ``freshness``/``scope-reassert`` capabilities. ``/tck/update-set`` backs
-``freshness``.)
+``freshness``; ``/tck/submit-batch`` backs ``batch`` (v0.5 CS-023);
+``/tck/connector-digest`` + ``/tck/tamper-connector`` back ``digest-pinning``
+(v0.5 CS-020).)
 """
 
 from __future__ import annotations
@@ -45,6 +50,7 @@ from typing import Any
 
 from stonefold_tck.driver import (
     AuditEntry,
+    BatchSubmitResult,
     LoadResult,
     Operation,
     SubmitResult,
@@ -201,6 +207,57 @@ class HttpDriver:
             )
             for r in body.get("records", [])
         ]
+
+    def submit_batch(
+        self, actor: TckActor, session_id: str, ops: Sequence[Operation]
+    ) -> BatchSubmitResult:
+        body = self._call(
+            "POST",
+            "/tck/submit-batch",
+            {
+                "actor": {
+                    "id": actor.id,
+                    "roles": sorted(actor.roles),
+                    "claims": dict(actor.claims),
+                },
+                "sessionId": session_id,
+                "ops": [
+                    {
+                        "resource": op.resource,
+                        "action": op.action,
+                        "data": dict(op.data),
+                        "target": op.target,
+                        "sink": op.sink,
+                        "context": dict(op.context),
+                    }
+                    for op in ops
+                ],
+            },
+        )
+        results = []
+        for r in body.get("results", []):
+            rows = r.get("rows")
+            results.append(
+                SubmitResult(
+                    decision=str(r.get("decision", "")),
+                    ticket=r.get("ticket"),
+                    rows=None if rows is None else [dict(row) for row in rows],
+                    reason=str(r.get("reason", "")),
+                )
+            )
+        failing = body.get("failingIndex")
+        return BatchSubmitResult(
+            decision=str(body.get("decision", "")),
+            failing_index=None if failing is None else int(failing),
+            results=results,
+        )
+
+    def connector_digest(self, name: str) -> str:
+        body = self._call("GET", f"/tck/connector-digest/{name}", None)
+        return str(body["digest"])
+
+    def tamper_connector(self, name: str) -> None:
+        self._call("POST", "/tck/tamper-connector", {"name": name})
 
     def inject_dispatch_failure(self, action: str) -> None:
         self._call("POST", "/tck/inject-dispatch-failure", {"action": action})

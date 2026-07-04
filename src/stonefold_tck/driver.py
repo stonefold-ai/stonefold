@@ -39,6 +39,16 @@ CAP_FRESHNESS = "freshness"
 # form — transactional or window pre-dispatch re-resolve; the TCK observes only
 # the outcome: the effect does not land and the settle reason is "scope-lost").
 CAP_SCOPE_REASSERT = "scope-reassert"
+# v0.5 CS-023: multi-operation SIF intents are decided atomically —
+# ``submit_batch`` submits one batch and reports the batch verdict plus the
+# per-operation results.
+CAP_BATCH = "batch"
+# v0.5 CS-020: connector digest pinning is verified at policy load and at
+# dispatch. ``connector_digest``/``tamper_connector`` let the TCK pin the real
+# artifact and then simulate its supply-chain replacement; a dispatch-time
+# mismatch MUST settle with reason ``connector-digest-mismatch`` (normative,
+# like the v0.4 settle reasons).
+CAP_DIGEST = "digest-pinning"
 
 ALL_CAPABILITIES = frozenset(
     {
@@ -51,6 +61,8 @@ ALL_CAPABILITIES = frozenset(
         CAP_DISPATCH_FAILURE,
         CAP_FRESHNESS,
         CAP_SCOPE_REASSERT,
+        CAP_BATCH,
+        CAP_DIGEST,
     }
 )
 
@@ -79,6 +91,22 @@ class SubmitResult:
     ticket: str | None = None
     rows: Sequence[Mapping[str, Any]] | None = None
     reason: str = ""
+
+
+@dataclass(frozen=True)
+class BatchSubmitResult:
+    """Normalized outcome of one submitted batch (v0.5 CS-023).
+
+    ``decision`` is the batch verdict: the first refusing operation's
+    ``deny``/``halt``, else ``hold`` when any operation held, else ``allow``.
+    ``failing_index`` names the refusing operation (the SIF §6 pointer
+    ``operations[i]``); ``None`` when the batch committed. ``results`` carries
+    one ``SubmitResult`` per operation, in submission order.
+    """
+
+    decision: str
+    failing_index: int | None = None
+    results: Sequence[SubmitResult] = ()
 
 
 @dataclass(frozen=True)
@@ -199,4 +227,25 @@ class ConformanceDriver(Protocol):
         sanctions-list update landing between decision and dispatch, so the
         TCK can prove volatile gates are re-validated at claim (v0.4 CS-017).
         (CAP_FRESHNESS)"""
+        ...
+
+    def submit_batch(
+        self, actor: TckActor, session_id: str, ops: Sequence[Operation]
+    ) -> BatchSubmitResult:
+        """Submit one multi-operation SIF batch as ``actor`` (v0.5 CS-023) —
+        decided atomically, same identity rule as ``submit``. (CAP_BATCH)"""
+        ...
+
+    def connector_digest(self, name: str) -> str:
+        """The content digest (``sha256:<64 hex>``) of the artifact currently
+        implementing connector ``name`` — computed exactly the way the gateway
+        verifies a registry pin, so the TCK can author a registry that pins the
+        real implementation. (CAP_DIGEST)"""
+        ...
+
+    def tamper_connector(self, name: str) -> None:
+        """Swap/modify the implementation of connector ``name`` in place,
+        WITHOUT reloading policy, so its artifact no longer matches any pinned
+        digest — the supply-chain replacement CS-020 defends against. Takes
+        effect for subsequent dispatches until the next ``load``. (CAP_DIGEST)"""
         ...

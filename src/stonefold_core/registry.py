@@ -94,6 +94,17 @@ class RegistryFile(BaseModel):
     preconditionChecks: tuple[str, ...] = ()
     sets: dict[str, tuple[str, ...]] = Field(default_factory=dict)
     sinks: tuple[str, ...] = ()
+    # CS-024: the DECLARED ORDER of classification labels (lowest first) that
+    # ``disclosure.maxClassification`` compares by. The default is the built-in
+    # ``resultSensitivity`` order (RFC §7.12); a domain substituting its own
+    # labels MUST declare them as an ordered value set (docs/06 §4 — order is
+    # list position). A label missing from the order makes the gate fail closed.
+    classifications: tuple[str, ...] = (
+        "public",
+        "internal",
+        "confidential",
+        "restricted",
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -187,6 +198,15 @@ class InMemoryRegistry:
 
     def has_sink(self, name: str) -> bool:
         return name in self._data.sinks
+
+    def classification_rank(self, label: str) -> int | None:
+        """The label's position in the declared classification order (CS-024),
+        lowest first — or ``None`` for a label not in the order, which the
+        ``disclosure`` gate treats as fail-closed (RFC §8 runtime resolution)."""
+        try:
+            return self._data.classifications.index(label)
+        except ValueError:
+            return None
 
     def action_def(self, resource: str, action: str) -> ActionDef | None:
         res = self._data.resources.get(resource)

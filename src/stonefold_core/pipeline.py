@@ -4,14 +4,26 @@ This is the spine: one ``enforce`` call per attempted action, always ending in a
 audited terminal decision. The function is **pure and total** — no LLM, no
 nondeterminism inside the decision logic (invariant 1).
 
-Implemented through M1: step 1 (resolve) and step 2 (authorize: default-deny →
-deny-wins → most-specific allow). Scope (M3), gates (M2), kill (M5), and
-execution/outbox (M4) slot in at the marked points. When no ``policy`` is
-supplied the function behaves as the M0 stub (default-deny everything).
+The pipeline is split into two phases so a SIF batch can be decided atomically
+(RFC §12, CS-023):
+
+* ``_decide`` runs steps 1–5 (resolve → authorize → scope → gates → kill) and
+  produces the operation's verdict **without committing anything** — no staging,
+  no connector call, no audit write.
+* ``_commit`` performs step 6/7 for one decided operation: stage a held or
+  allowed effect, execute an allowed read/write, and write the audit record.
+
+``enforce`` composes them once (single operation — the pre-batch behaviour,
+unchanged). ``enforce_batch`` decides **every** operation first; any DENY or
+HALT refuses the whole batch before anything commits or stages, otherwise every
+operation commits in submission order (a HOLD stages ``PENDING_APPROVAL`` and
+does not refuse the batch).
 """
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Any
 
 from datetime import datetime
@@ -27,6 +39,7 @@ from stonefold_core.gating import ApprovalSpec, GateEngine, RequestEnv
 from stonefold_core.kill import KillStore, KillTarget
 from stonefold_core.models import (
     Actor,
+    BatchResult,
     EvalResult,
     GateResult,
     RawCall,
@@ -34,8 +47,35 @@ from stonefold_core.models import (
     Session,
 )
 from stonefold_core.outbox import OutboxStore, PendingState
+from stonefold_core.policy import FailureMode
 from stonefold_core.registry import Registry, UnknownActionError
 from stonefold_core.scope import ScopePredicate, ScopeResolver
+
+# The audit ``outcome`` for an operation that was individually decided
+# ALLOW/HOLD but never committed because another operation refused its batch
+# (CS-023: every operation gets its own audit record; the batch refusal is
+# visible on each).
+BATCH_REFUSED = "batch-refused"
+
+
+@dataclass(frozen=True)
+class _Decided:
+    """One operation's steps-1–5 verdict, before anything commits (CS-023).
+
+    For a DENY/HALT the decision is terminal as-is; for ALLOW/HOLD the commit
+    phase stages/executes it. Nothing has been staged, executed, or audited
+    when this object exists.
+    """
+
+    call: RawCall
+    resolved: ResolvedAction | None
+    decision: Decision
+    rule: str
+    outcome: str = "not_executed"  # audit outcome if refused terminal
+    gate_results: tuple[GateResult, ...] = ()
+    approval: ApprovalSpec | None = None
+    scope_pred: ScopePredicate | None = None
+    scope_applied: tuple[str, ...] = ()
 
 
 def enforce(
@@ -65,6 +105,157 @@ def enforce(
     """
 
     agent_name = policy.agent if policy is not None else agent
+    failure_mode = (
+        policy.policy.defaults.failureMode if policy is not None else FailureMode.CLOSED
+    )
+    decided = _decide(
+        call, actor, session, registry=registry, policy=policy, gates=gates,
+        env=env, scopes=scopes, connectors=connectors, kill=kill,
+        agent_name=agent_name, failure_mode=failure_mode,
+    )
+    return _commit(
+        decided, actor, session, audit=audit, connectors=connectors,
+        outbox=outbox, freshness=freshness, env=env, agent_name=agent_name,
+        failure_mode=failure_mode,
+    )
+
+
+def enforce_batch(
+    calls: Sequence[RawCall],
+    actor: Actor,
+    session: Session,
+    *,
+    registry: Registry,
+    audit: AuditSink,
+    policy: CompiledPolicy | None = None,
+    gates: GateEngine | None = None,
+    envs: Sequence[RequestEnv | None] | None = None,
+    scopes: ScopeResolver | None = None,
+    connectors: ConnectorRegistry | None = None,
+    outbox: OutboxStore | None = None,
+    kill: KillStore | None = None,
+    freshness: FreshnessConfig | None = None,
+    agent: str = "unknown",
+) -> BatchResult:
+    """Evaluate a SIF batch atomically (RFC §12, CS-023; SIF §5).
+
+    Every operation is decided first (steps 1–5, each getting its own audit
+    record); any DENY or HALT refuses the **whole batch** before anything
+    commits or stages — the refused batch's other operations are audited with
+    their own decision and outcome ``batch-refused``. A HOLD does **not**
+    refuse the batch: the held effect stages ``PENDING_APPROVAL`` and the
+    remaining operations commit alongside it. ``envs`` supplies the per-request
+    environment for each operation, aligned by index (``None`` entries are
+    legal — same meaning as ``enforce`` with no ``env``).
+
+    A SIF batch has at least one operation (``sif.schema.json`` ``minItems``);
+    an empty ``calls`` is a caller bug, not a policy decision.
+    """
+    if not calls:
+        raise ValueError("a SIF batch carries at least one operation (SIF §5)")
+    if envs is not None and len(envs) != len(calls):
+        raise ValueError("envs must align with calls, one entry per operation")
+
+    agent_name = policy.agent if policy is not None else agent
+    failure_mode = (
+        policy.policy.defaults.failureMode if policy is not None else FailureMode.CLOSED
+    )
+    env_of = (lambda i: envs[i]) if envs is not None else (lambda i: None)
+
+    # Phase 1 — decide every operation (steps 1–5). Nothing commits or stages.
+    decided = [
+        _decide(
+            call, actor, session, registry=registry, policy=policy, gates=gates,
+            env=env_of(i), scopes=scopes, connectors=connectors, kill=kill,
+            agent_name=agent_name, failure_mode=failure_mode,
+        )
+        for i, call in enumerate(calls)
+    ]
+
+    failing = next(
+        (i for i, d in enumerate(decided) if d.decision in (Decision.DENY, Decision.HALT)),
+        None,
+    )
+    if failing is not None:
+        # Phase 2a — refuse the whole batch (CS-023): no record/transition
+        # applies, no effect stages. Each operation still gets its own audit
+        # record: refusals with their own rule/outcome, the rest with the
+        # decision they earned and outcome ``batch-refused``.
+        results = []
+        for d in decided:
+            if d.decision in (Decision.DENY, Decision.HALT):
+                results.append(
+                    _terminal(
+                        d.decision, d.rule, d.call, d.resolved, actor, session,
+                        audit, agent_name, gate_results=d.gate_results,
+                        scope_applied=d.scope_applied, outcome=d.outcome,
+                    )
+                )
+            else:
+                results.append(
+                    _terminal(
+                        d.decision, d.rule, d.call, d.resolved, actor, session,
+                        audit, agent_name, gate_results=d.gate_results,
+                        scope_applied=d.scope_applied, outcome=BATCH_REFUSED,
+                    )
+                )
+        return BatchResult(
+            decision=decided[failing].decision,
+            failing_index=failing,
+            results=tuple(results),
+        )
+
+    # Phase 2b — commit: stage every hold/effect, execute every read/write, in
+    # submission order. Per §4.4 the record ops commit atomically with the
+    # staging — the in-memory reference approximates that shared transaction by
+    # committing sequentially after the all-operations decision above; the
+    # SQL-class connector binds them in one database transaction.
+    # STONEFOLD-AMBIGUITY: RFC §12/CS-023 defines batch atomicity for the
+    # *decision*; a dependency failure mid-commit (outbox/connector down after
+    # earlier operations committed) is governed per-operation by §10 and is not
+    # rolled back here.
+    results = [
+        _commit(
+            d, actor, session, audit=audit, connectors=connectors, outbox=outbox,
+            freshness=freshness, env=env_of(i), agent_name=agent_name,
+            failure_mode=failure_mode,
+        )
+        for i, d in enumerate(decided)
+    ]
+    commit_failure = next(
+        (i for i, r in enumerate(results) if r.decision in (Decision.DENY, Decision.HALT)),
+        None,
+    )
+    if commit_failure is not None:
+        return BatchResult(
+            decision=results[commit_failure].decision,
+            failing_index=commit_failure,
+            results=tuple(results),
+        )
+    decision = (
+        Decision.HOLD
+        if any(r.decision is Decision.HOLD for r in results)
+        else Decision.ALLOW
+    )
+    return BatchResult(decision=decision, failing_index=None, results=tuple(results))
+
+
+def _decide(
+    call: RawCall,
+    actor: Actor,
+    session: Session,
+    *,
+    registry: Registry,
+    policy: CompiledPolicy | None,
+    gates: GateEngine | None,
+    env: RequestEnv | None,
+    scopes: ScopeResolver | None,
+    connectors: ConnectorRegistry | None,
+    kill: KillStore | None,
+    agent_name: str,
+    failure_mode: FailureMode,
+) -> _Decided:
+    """Steps 1–5 for one operation (RFC §12) — the verdict, nothing committed."""
 
     # 1. RESOLVE (RFC §12 step 1) — done *first* so every terminal record, even a
     # halt or a refusal, carries the resolved kind/resource/action the audit
@@ -74,9 +265,7 @@ def enforce(
     try:
         resolved = registry.resolve(call)
     except UnknownActionError:
-        return _terminal(
-            Decision.DENY, "unknown-action", call, None, actor, session, audit, agent_name
-        )
+        return _Decided(call, None, Decision.DENY, "unknown-action")
 
     # 0. KILL pre-check (design §8.3 point 1): short-circuit a fully-killed
     # global/agent/session before the policy/scope/gate work. ACTION_CLASS orders
@@ -90,28 +279,18 @@ def enforce(
         except Exception:
             pre_order = None
         if pre_order is not None:
-            return _terminal(
-                Decision.HALT, f"kill:{pre_order.id}", call, resolved, actor,
-                session, audit, agent_name, outcome="halted",
+            return _Decided(
+                call, resolved, Decision.HALT, f"kill:{pre_order.id}", outcome="halted"
             )
 
     # No policy loaded ⇒ nothing is explicitly allowed ⇒ default deny (M0).
     if policy is None:
-        return _terminal(
-            Decision.DENY, "default-deny", call, resolved, actor, session, audit, agent_name
-        )
+        return _Decided(call, resolved, Decision.DENY, "default-deny")
 
     # 2. AUTHORIZE — RFC §6.2: deny-wins → default-deny → allow.
     authz = policy.authorize(resolved)
     if not authz.allowed:
-        return _terminal(
-            Decision.DENY, authz.rule, call, resolved, actor, session, audit, agent_name
-        )
-
-    # The policy's failure mode governs every dependency-failure branch below
-    # (RFC §10, design §12). ``should_fail_closed`` applies it, with the
-    # irreversible-effect floor.
-    failure_mode = policy.policy.defaults.failureMode
+        return _Decided(call, resolved, Decision.DENY, authz.rule)
 
     # 3. SCOPE — derive the predicate from the actor (never the payload). For an
     # effect this is a pre-resolution authorization check (design §5): the target
@@ -133,65 +312,33 @@ def enforce(
                     # dependency failure ⇒ honour failureMode (invariant 7). Open
                     # skips the scope pre-check; closed (and any irreversible) denies.
                     if should_fail_closed(resolved, failure_mode):
-                        return _terminal(
-                            Decision.DENY, "scope-unavailable", call, resolved, actor,
-                            session, audit, agent_name, scope_applied=scope_applied,
+                        return _Decided(
+                            call, resolved, Decision.DENY, "scope-unavailable",
+                            scope_applied=scope_applied,
                         )
                 elif probe.value is None:
-                    return _terminal(
-                        Decision.DENY, "scope-denied", call, resolved, actor,
-                        session, audit, agent_name, scope_applied=scope_applied,
+                    return _Decided(
+                        call, resolved, Decision.DENY, "scope-denied",
+                        scope_applied=scope_applied,
                     )
 
     # 4. GATES — evaluate the matching gates (RFC §7/§12 step 4). Any FAIL ⇒
-    # DENY (short-circuited before approvals); else any HOLD ⇒ HOLD.
+    # DENY (short-circuited before approvals); else any HOLD ⇒ HOLD (staged at
+    # commit).
     gate_trace: tuple[GateResult, ...] = ()
     if gates is not None:
         outcome = gates.evaluate(resolved, actor, session, policy, env or RequestEnv())
         if outcome.outcome is Outcome.FAIL:
-            return _terminal(
-                Decision.DENY, outcome.reason or "gate-fail", call, resolved,
-                actor, session, audit, agent_name,
-                gate_results=outcome.results, scope_applied=scope_applied,
+            return _Decided(
+                call, resolved, Decision.DENY, outcome.reason or "gate-fail",
+                gate_results=outcome.results, scope_pred=scope_pred,
+                scope_applied=scope_applied,
             )
         if outcome.outcome is Outcome.HOLD:
-            # A HOLD suspends the action: stage it as PENDING_APPROVAL so a human
-            # can release it later (design §7). The ticket is returned to the agent.
-            ticket = None
-            if outbox is not None:
-                ob = outbox
-                expiry = _staging_expiry(freshness, env, resolved)
-                if isinstance(expiry, Unavailable):
-                    return _terminal(
-                        Decision.DENY, "freshness-unavailable", call, resolved, actor,
-                        session, audit, agent_name, gate_results=outcome.results,
-                        scope_applied=scope_applied,
-                    )
-                expires_at: datetime | None = expiry
-                held = guard(
-                    lambda: ob.stage(
-                        resolved=resolved, actor=actor, session_id=session.id,
-                        agent=agent_name, state=PendingState.PENDING_APPROVAL,
-                        correlation_id=session.correlation_id,
-                        gates=outcome.results, approval=outcome.approval,
-                        expires_at=expires_at,
-                    ),
-                    reason="outbox-unavailable",
-                )
-                if isinstance(held, Unavailable):
-                    # can't durably suspend the action ⇒ fail closed (design §11/§12).
-                    return _terminal(
-                        Decision.DENY, "outbox-unavailable", call, resolved, actor,
-                        session, audit, agent_name, gate_results=outcome.results,
-                        scope_applied=scope_applied,
-                    )
-                ticket = held.value.id
-            return _terminal(
-                Decision.HOLD, outcome.reason or "gate-hold", call, resolved,
-                actor, session, audit, agent_name,
-                gate_results=outcome.results, ticket=ticket,
-                scope_applied=scope_applied,
-                approval=_approval_audit(outcome.approval, ticket),
+            return _Decided(
+                call, resolved, Decision.HOLD, outcome.reason or "gate-hold",
+                gate_results=outcome.results, approval=outcome.approval,
+                scope_pred=scope_pred, scope_applied=scope_applied,
             )
         gate_trace = outcome.results
 
@@ -210,25 +357,98 @@ def enforce(
         )
         if isinstance(kill_probe, Unavailable):
             if should_fail_closed(resolved, failure_mode):
-                return _terminal(
-                    Decision.HALT, "kill-unavailable", call, resolved, actor,
-                    session, audit, agent_name, gate_results=gate_trace,
-                    scope_applied=scope_applied, outcome="halted",
+                return _Decided(
+                    call, resolved, Decision.HALT, "kill-unavailable",
+                    outcome="halted", gate_results=gate_trace,
+                    scope_pred=scope_pred, scope_applied=scope_applied,
                 )
             order = None
         else:
             order = kill_probe.value
         if order is not None:
-            return _terminal(
-                Decision.HALT, f"kill:{order.id}", call, resolved, actor,
-                session, audit, agent_name, gate_results=gate_trace,
-                scope_applied=scope_applied, outcome="halted",
+            return _Decided(
+                call, resolved, Decision.HALT, f"kill:{order.id}",
+                outcome="halted", gate_results=gate_trace,
+                scope_pred=scope_pred, scope_applied=scope_applied,
             )
 
-    # 6. EXECUTE.
+    return _Decided(
+        call, resolved, Decision.ALLOW, authz.rule, gate_results=gate_trace,
+        scope_pred=scope_pred, scope_applied=scope_applied,
+    )
+
+
+def _commit(
+    decided: _Decided,
+    actor: Actor,
+    session: Session,
+    *,
+    audit: AuditSink,
+    connectors: ConnectorRegistry | None,
+    outbox: OutboxStore | None,
+    freshness: FreshnessConfig | None,
+    env: RequestEnv | None,
+    agent_name: str,
+    failure_mode: FailureMode,
+) -> EvalResult:
+    """Step 6/7 for one decided operation: stage/execute, then audit (RFC §12)."""
+
+    call, resolved = decided.call, decided.resolved
+
+    # A steps-1–5 refusal is terminal as-is.
+    if decided.decision in (Decision.DENY, Decision.HALT):
+        return _terminal(
+            decided.decision, decided.rule, call, resolved, actor, session, audit,
+            agent_name, gate_results=decided.gate_results,
+            scope_applied=decided.scope_applied, outcome=decided.outcome,
+        )
+
+    assert resolved is not None  # ALLOW/HOLD always carries the resolved action
+
+    if decided.decision is Decision.HOLD:
+        # A HOLD suspends the action: stage it as PENDING_APPROVAL so a human
+        # can release it later (design §7). The ticket is returned to the agent.
+        ticket = None
+        if outbox is not None:
+            ob = outbox
+            expiry = _staging_expiry(freshness, env, resolved)
+            if isinstance(expiry, Unavailable):
+                return _terminal(
+                    Decision.DENY, "freshness-unavailable", call, resolved, actor,
+                    session, audit, agent_name, gate_results=decided.gate_results,
+                    scope_applied=decided.scope_applied,
+                )
+            expires_at: datetime | None = expiry
+            held = guard(
+                lambda: ob.stage(
+                    resolved=resolved, actor=actor, session_id=session.id,
+                    agent=agent_name, state=PendingState.PENDING_APPROVAL,
+                    correlation_id=session.correlation_id,
+                    gates=decided.gate_results, approval=decided.approval,
+                    expires_at=expires_at,
+                ),
+                reason="outbox-unavailable",
+            )
+            if isinstance(held, Unavailable):
+                # can't durably suspend the action ⇒ fail closed (design §11/§12).
+                return _terminal(
+                    Decision.DENY, "outbox-unavailable", call, resolved, actor,
+                    session, audit, agent_name, gate_results=decided.gate_results,
+                    scope_applied=decided.scope_applied,
+                )
+            ticket = held.value.id
+        return _terminal(
+            Decision.HOLD, decided.rule, call, resolved, actor, session, audit,
+            agent_name, gate_results=decided.gate_results, ticket=ticket,
+            scope_applied=decided.scope_applied,
+            approval=_approval_audit(decided.approval, ticket),
+        )
+
+    # 6. EXECUTE (decision is ALLOW).
     # Effects are staged via the outbox by default (invariant 4): on ALLOW we
     # write a PENDING row and return an accepted/pending receipt — the dispatch
     # worker sends it (design §9). Without an outbox the effect is not dispatched.
+    gate_trace = decided.gate_results
     if resolved.kind is Kind.EFFECT:
         if outbox is not None:
             ob = outbox
@@ -237,7 +457,7 @@ def enforce(
                 return _terminal(
                     Decision.DENY, "freshness-unavailable", call, resolved, actor,
                     session, audit, agent_name, gate_results=gate_trace,
-                    scope_applied=scope_applied,
+                    scope_applied=decided.scope_applied,
                 )
             effect_expires_at: datetime | None = expiry
             staged = guard(
@@ -257,16 +477,17 @@ def enforce(
                 return _terminal(
                     Decision.DENY, "outbox-unavailable", call, resolved, actor,
                     session, audit, agent_name, gate_results=gate_trace,
-                    scope_applied=scope_applied,
+                    scope_applied=decided.scope_applied,
                 )
             return _terminal(
-                Decision.ALLOW, authz.rule, call, resolved, actor, session, audit,
-                agent_name, gate_results=gate_trace, scope_applied=scope_applied,
+                Decision.ALLOW, decided.rule, call, resolved, actor, session, audit,
+                agent_name, gate_results=gate_trace,
+                scope_applied=decided.scope_applied,
                 ticket=staged.value.id, outcome="staged",
             )
         return _terminal(
-            Decision.ALLOW, authz.rule, call, resolved, actor, session, audit,
-            agent_name, gate_results=gate_trace, scope_applied=scope_applied,
+            Decision.ALLOW, decided.rule, call, resolved, actor, session, audit,
+            agent_name, gate_results=gate_trace, scope_applied=decided.scope_applied,
         )
 
     # observe/record/transition run through the connector now, scope applied
@@ -280,15 +501,16 @@ def enforce(
                 return _terminal(
                     Decision.DENY, DIGEST_MISMATCH, call, resolved, actor,
                     session, audit, agent_name, gate_results=gate_trace,
-                    scope_applied=scope_applied,
+                    scope_applied=decided.scope_applied,
                 )
             return _terminal(
-                Decision.ALLOW, authz.rule, call, resolved, actor, session, audit,
-                agent_name, gate_results=gate_trace, scope_applied=scope_applied,
+                Decision.ALLOW, decided.rule, call, resolved, actor, session, audit,
+                agent_name, gate_results=gate_trace,
+                scope_applied=decided.scope_applied,
             )
         executed = guard(
             lambda: connectors.get(resolved.connector).execute(
-                resolved, scope_pred, actor
+                resolved, decided.scope_pred, actor
             ),
             reason="connector-unavailable",
         )
@@ -299,23 +521,24 @@ def enforce(
                 return _terminal(
                     Decision.DENY, "connector-unavailable", call, resolved, actor,
                     session, audit, agent_name, gate_results=gate_trace,
-                    scope_applied=scope_applied,
+                    scope_applied=decided.scope_applied,
                 )
             return _terminal(
-                Decision.ALLOW, authz.rule, call, resolved, actor, session, audit,
-                agent_name, gate_results=gate_trace, scope_applied=scope_applied,
+                Decision.ALLOW, decided.rule, call, resolved, actor, session, audit,
+                agent_name, gate_results=gate_trace,
+                scope_applied=decided.scope_applied,
             )
         cresult = executed.value
         output: Any = cresult.rows if cresult.kind == "rows" else cresult.receipt
         return _terminal(
-            Decision.ALLOW, authz.rule, call, resolved, actor, session, audit,
-            agent_name, gate_results=gate_trace, scope_applied=scope_applied,
+            Decision.ALLOW, decided.rule, call, resolved, actor, session, audit,
+            agent_name, gate_results=gate_trace, scope_applied=decided.scope_applied,
             output=output, outcome="success",
         )
 
     return _terminal(
-        Decision.ALLOW, authz.rule, call, resolved, actor, session, audit,
-        agent_name, gate_results=gate_trace, scope_applied=scope_applied,
+        Decision.ALLOW, decided.rule, call, resolved, actor, session, audit,
+        agent_name, gate_results=gate_trace, scope_applied=decided.scope_applied,
     )
 
 
