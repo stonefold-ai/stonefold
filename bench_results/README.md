@@ -93,18 +93,18 @@ formatting finding, docs/15 Amendment A1).
 
 | What to check | Where |
 |---|---|
-| The two surfaces expose the same N capabilities, with the SAME descriptions (parity) | `src/acp_bench/tracks.py` (`mcp_surface`/`sif_surface`), `src/acp_bench/realism.py` (`realistic_mcp`/`realistic_sif`); asserted in `tests/test_bench_harness.py` |
-| The confusable catalog (synonym verbs/resources, overlapping descriptions) | `src/acp_bench/realism.py` — `confusable_fillers` |
+| The two surfaces expose the same N capabilities, with the SAME descriptions (parity) | `src/stonefold_bench/tracks.py` (`mcp_surface`/`sif_surface`), `src/stonefold_bench/realism.py` (`realistic_mcp`/`realistic_sif`); asserted in `tests/test_bench_harness.py` |
+| The confusable catalog (synonym verbs/resources, overlapping descriptions) | `src/stonefold_bench/realism.py` — `confusable_fillers` |
 | The task set, phrasings, gold argument values, no-tool distractors | `reliability.PROBES`, `realism._PROMPTS` / `GOLD_VALUES` / `DISTRACTOR_PROMPTS` |
-| The scoring rules (correct / wrong_tool / wrong_args / hallucinated / malformed / no_call / clarify / overcall) | `src/acp_bench/reliability.py` — `_score`, unit-tested |
+| The scoring rules (correct / wrong_tool / wrong_args / hallucinated / malformed / no_call / clarify / overcall) | `src/stonefold_bench/reliability.py` — `_score`, unit-tested |
 | SIF is scored on picking the right `resource.action` PAIR — calling the single tool earns nothing | `_score`'s SIF branch; the `chose` column in every trials.jsonl |
 | The deterministic 2k-token context prefix | `realism.build_context` + `_CONTEXT_TURNS` |
-| Token numbers are an ESTIMATE (~4 chars/token) | `src/acp_bench/model.py` — `MeteredProvider` docstring |
+| Token numbers are an ESTIMATE (~4 chars/token) | `src/stonefold_bench/model.py` — `MeteredProvider` docstring |
 
 Reproduce any cell (your own Anthropic key):
 
 ```
-python -m acp_bench --track r --run --models small --reps 2 --ns 10,50 \
+python -m stonefold_bench --track r --run --models small --reps 2 --ns 10,50 \
     --surfaces mcp,sif --fillers confusable [--phrasing vague] [--cards realistic] \
     [--context-tokens 2000] [--probe-set distractor] --out mydir
 ```

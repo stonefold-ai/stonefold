@@ -5,7 +5,7 @@ M0 DoD: enforce() denies-by-default with an audit stub; unknown ⇒ DENY.
 
 from __future__ import annotations
 
-from acp_core import (
+from stonefold_core import (
     Actor,
     Decision,
     InMemoryAuditSink,

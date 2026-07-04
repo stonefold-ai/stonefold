@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://acp.dev/schema/v1.0/registry.schema.json",
+  "$id": "https://stonefold.io/schema/v1.0/registry.schema.json",
   "title": "Registry (Domain Model) v1.0",
   "description": "Schema for a registry/domain-model document. Semantics in docs/06-registry-domain-model.md. Structural checks only; cross-reference checks are performed by the linter.",
   "type": "object",

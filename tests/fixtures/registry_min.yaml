@@ -1,5 +1,5 @@
 # Minimal registry fixture for M0 unit tests (resolve + value model).
-# The full example-covering registry lives at registry/acp-registry.yaml (M1).
+# The full example-covering registry lives at registry/stonefold-registry.yaml (M1).
 connectors: [in_memory, sql, email]
 scopePredicates: [assignedToCurrentUser]
 contentHooks: [dlp.basic]

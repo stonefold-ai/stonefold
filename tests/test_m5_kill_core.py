@@ -1,6 +1,6 @@
 """M5 — kill-switch core matching (design §8.2, RFC §9).
 
-Unit-tests the pure ``acp_core.kill`` value types: scope matching for the four
+Unit-tests the pure ``stonefold_core.kill`` value types: scope matching for the four
 scopes (GLOBAL / AGENT / SESSION / ACTION_CLASS), the optional §8 predicate, the
 lift semantics, and the fail-closed behaviour when a predicate cannot be
 evaluated. No I/O — this is all in the kernel.
@@ -10,8 +10,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from acp_core import Actor, RawCall, Session
-from acp_core.kill import (
+from stonefold_core import Actor, RawCall, Session
+from stonefold_core.kill import (
     KillOrder,
     KillScope,
     KillScopeKind,
@@ -19,7 +19,7 @@ from acp_core.kill import (
     order_matches,
     scope_matches,
 )
-from acp_store.kill_memory import InMemoryKillStore
+from stonefold_store.kill_memory import InMemoryKillStore
 from tests.conftest import full_registry
 
 
@@ -59,7 +59,7 @@ def test_action_class_matches_by_facets() -> None:
 
 
 def test_action_class_kind_facet_is_a_wildcard_over_resources() -> None:
-    from acp_core.enums import Kind
+    from stonefold_core.enums import Kind
 
     scope = KillScope.for_action_class(kind=Kind.EFFECT)
     assert scope_matches(scope, _target("Email", "sendEmail"))  # an effect

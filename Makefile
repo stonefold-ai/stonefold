@@ -1,7 +1,7 @@
 # ACP Gateway — developer tasks. See docs/03 for the pinned stack.
 #
 # `make demo` is the M-DEMO milestone: the adversarial demo end to end.
-# On Windows without `make`, run the same thing with:  python -m acp_demo
+# On Windows without `make`, run the same thing with:  python -m stonefold_demo
 
 # Prefer the project venv if present, else the active interpreter.
 ifeq ($(OS),Windows_NT)
@@ -14,7 +14,7 @@ PYTHON := $(if $(wildcard $(VENV_PY)),$(VENV_PY),python)
 .PHONY: demo test test-unit typecheck examples
 
 demo:               ## run the adversarial demo (G1 injection, G2 kill, G3 invite-attack)
-	$(PYTHON) -m acp_demo
+	$(PYTHON) -m stonefold_demo
 
 test:               ## full suite (needs Docker for the integration tests)
 	$(PYTHON) -m pytest -q

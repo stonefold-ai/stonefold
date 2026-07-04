@@ -1,0 +1,37 @@
+apiVersion: stele/v0.1
+agent: ward-nurse-assistant
+defaults: { failureMode: closed, audit: full }
+killable: true
+
+allow:
+  - observe:    [Patient, Medication, Observation, Order]
+  - assess:     [triage]
+  - record:     [Observation]                 # e.g. vitals
+  - effect:     [administer, pageOnCall]
+  - transition: { Order: [sign], Encounter: [discharge] }
+deny:
+  - effect:     [prescribe, discontinue]
+  - transition: { Medication: [prescribe] }
+
+scope:
+  Patient:     inWard(actor.ward)
+  Observation: forPatientInWard(actor.ward)
+
+gates:
+  observe:
+    disclosure:
+      when: "action.resultSensitivity == restricted"   # psych / HIV records
+      allowSink: [careTeam]
+    requireApproval:
+      when: "action.resultSensitivity == restricted and not exists context.breakGlass"
+      approvers: role:charge-nurse
+  triage:                                      # assess
+    requireExplanation: true
+    requireApproval: { when: "data.acuity <= 2", mode: confirm, approvers: role:clinician }
+  administer:                                  # effect, irreversible
+    precondition: [fiveRightsVerified, notDiscontinued]
+    quantityCap:  { per: resource.patientId, limit: 3, window: 24h, of: data.drug }
+    requireApproval: { when: "action.operativeForce == high", approvers: role:clinician }
+  Order.sign:                                  # transition, operative
+    precondition: { from: [draft] }
+    requireApproval: { approvers: role:clinician }

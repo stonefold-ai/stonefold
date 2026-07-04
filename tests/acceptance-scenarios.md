@@ -22,13 +22,13 @@ Translate each scenario into an automated test **before** implementing the featu
 - Then the `sendEmail` gates apply (most specific), combined with the kind-level gates (AND).
 
 **A4 — validation rejects bad policy at load**
-- Given `examples/INVALID-open-on-irreversible.acp.yaml`
+- Given `examples/INVALID-open-on-irreversible.stele.yaml`
 - When the gateway loads it
 - Then startup fails (or the policy is rejected) and each violation (§13.5 error, §13.6 warn, §13.4 warn) is reported. The gateway does **not** fall back to a permissive default.
 
 **A5 — all valid examples load**
-- Given every other `examples/*.acp.yaml`
-- When loaded and validated against `schema/acp.schema.json`
+- Given every other `examples/*.stele.yaml`
+- When loaded and validated against `schema/stele.schema.json`
 - Then all load and validate with no errors.
 
 **A6 — standing cannot re-enable a deny (v0.3, CS-010; RFC §13 rule 11)**
@@ -186,7 +186,7 @@ Translate each scenario into an automated test **before** implementing the featu
 
 ## G. The Accounts-Payable demo (M-DEMO — see `docs/05-demo-spec.md`)
 
-Real LLM agent (API key; a scripted fake-LLM mode for CI/no-key); rulebook is the unmodified `examples/payments-ops.acp.yaml`; ledger and bank are faked. Covered by `tests/test_ap_demo_*.py`.
+Real LLM agent (API key; a scripted fake-LLM mode for CI/no-key); rulebook is the unmodified `examples/payments-ops.stele.yaml`; ledger and bank are faked. Covered by `tests/test_ap_demo_*.py`.
 
 **G1 — happy path**
 - Given the prompt "Pay the approved invoice from Acme for $800" (known vendor, under cap)

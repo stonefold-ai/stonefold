@@ -130,11 +130,11 @@ gateway vendor can rerun it and be forced to accept the number.
 
 ### Implementation status (harness built, no results)
 
-The harness is implemented in `src/acp_bench/` (run `python -m acp_bench --smoke`), on
+The harness is implemented in `src/stonefold_bench/` (run `python -m stonefold_bench --smoke`), on
 the demo agent, the AP demo (docs/05), and `make demo`. It realizes the design; the
 parts §4.4/§7 assign to the author are built as **flagged slots**, never faked:
 Track S rungs S0 and S3 are wired, **S1/S2 are UNCONFIGURED** until the author supplies
-their good-faith baseline policies (`src/acp_bench/policies/README.md`); attack **A2**
+their good-faith baseline policies (`src/stonefold_bench/policies/README.md`); attack **A2**
 (invite-to-wire) is wired, **A1/A3–A7 are UNWIRED** slots pending scenario sourcing;
 token counts are a build-time estimate to be replaced by SDK usage on a real run; and
 the Track-R surfaces, task set, and scorer are built and have driven real models (the
@@ -145,7 +145,7 @@ output for graphing: every finished trial is appended to `trials.jsonl` immediat
 and the aggregated cells are rewritten as `cells.json`/`cells.csv` after every
 completed round — a run cut short keeps everything finished so far (repetition is the
 outermost loop, so a partial run is a complete matrix at fewer reps). Field schemas:
-`src/acp_bench/README.md`. No result is produced or committed — the smoke output is
+`src/stonefold_bench/README.md`. No result is produced or committed — the smoke output is
 labelled as such (§6). *(This is a status note, not a design change; the design above
 is unchanged.)*
 
@@ -302,7 +302,7 @@ single-turn. The §5-bar experiment still requires ≥5 reps, more models, the
 retrieval condition, SDK token usage, and the fairness sign-off.
 
 **Amendment A2 (2026-07-02).** Harness additions as listed above
-(`acp_bench.realism`; CLI flags `--fillers/--cards/--phrasing/--context-tokens/`
+(`stonefold_bench.realism`; CLI flags `--fillers/--cards/--phrasing/--context-tokens/`
 `--probe-set`); anchor capabilities now carry one-line descriptions on **both**
 surfaces; system prompts neutralized. Recorded per §7. The count-pilot runs remain
 published under `bench_results/superseded-count-pilot/`.

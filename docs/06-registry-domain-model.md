@@ -200,8 +200,8 @@ The five kinds of named function the registry can declare. Each: what it is · w
 
 Bucket B is hand-written, security-critical code the gateway invokes on every matching action, so it gets the same treatment as a policy:
 
-1. **Prefer the stock factories.** The common shapes ship pre-written and pre-verified in `acp_gates.stock` — `resource_state_in` (state membership), `cooling_off_elapsed` (the new-payee pattern, RFC §14.4), `data_field_present` (explanation-required). Each is pure, deterministic, and **fails closed** (missing field / unparsable value / absent injected clock ⇒ `False`, never an exception). Most deployments should write no bespoke check code at all.
-2. **Run the conformance kit over anything bespoke.** `acp_gates.conformance` is a test-time harness (`check_precondition` / `check_content_hook` / `check_scope_predicate` + `assert_conformant`) that holds each function to the contract this section states: **deterministic** (same input ⇒ same result), **total** over its golden cases (an exception is a *dependency failure* that trips `failureMode` — never how a verdict is expressed), **read-only** (inputs are not mutated), and **golden-pinned** (the author declares expected results for known inputs). A deployment SHOULD keep a conformance test per registered function in its own suite.
+1. **Prefer the stock factories.** The common shapes ship pre-written and pre-verified in `stonefold_gates.stock` — `resource_state_in` (state membership), `cooling_off_elapsed` (the new-payee pattern, RFC §14.4), `data_field_present` (explanation-required). Each is pure, deterministic, and **fails closed** (missing field / unparsable value / absent injected clock ⇒ `False`, never an exception). Most deployments should write no bespoke check code at all.
+2. **Run the conformance kit over anything bespoke.** `stonefold_gates.conformance` is a test-time harness (`check_precondition` / `check_content_hook` / `check_scope_predicate` + `assert_conformant`) that holds each function to the contract this section states: **deterministic** (same input ⇒ same result), **total** over its golden cases (an exception is a *dependency failure* that trips `failureMode` — never how a verdict is expressed), **read-only** (inputs are not mutated), and **golden-pinned** (the author declares expected results for known inputs). A deployment SHOULD keep a conformance test per registered function in its own suite.
 3. **Review and sign like a policy.** A registered function can widen scope or pass a gate just as surely as an `allow` line; where policy signing is enabled (docs/07 §5), the registered-function set SHOULD be part of the signed bundle, and a change to one SHOULD get the same review as a policy change.
 
 ---
@@ -233,7 +233,7 @@ Worked registries: [`../examples/payments.registry.yaml`](../examples/payments.r
 
 ## 9. Authoring tooling — drafting a registry from what you already have
 
-Writing a registry from scratch is the adoption cost of the whole model, so the repo ships an **authoring-time generator**, `src/acp_registry_gen/` (`python -m acp_registry_gen`). It drafts a registry in this spec's format from artefacts an integrator already has:
+Writing a registry from scratch is the adoption cost of the whole model, so the repo ships an **authoring-time generator**, `src/stonefold_registry_gen/` (`python -m stonefold_registry_gen`). It drafts a registry in this spec's format from artefacts an integrator already has:
 
 | Input | What it becomes |
 |---|---|
@@ -248,9 +248,9 @@ Three rules keep it safe:
 3. **The generator is never in the enforcement path.** It runs at authoring time only; drafts are schema-validated (`schema/registry.schema.json`) before they are written, and the linter still gates the reviewed result at load.
 
 ```
-python -m acp_registry_gen sql     schema.sql --domain payments -o draft.registry.yaml
-python -m acp_registry_gen openapi api.yaml   --domain ledger
-python -m acp_registry_gen mcp     tools.json --domain crm
+python -m stonefold_registry_gen sql     schema.sql --domain payments -o draft.registry.yaml
+python -m stonefold_registry_gen openapi api.yaml   --domain ledger
+python -m stonefold_registry_gen mcp     tools.json --domain crm
 ```
 
 **Handler stubs (the code behind the declaration).** Drafting the registry solves the
@@ -263,8 +263,8 @@ command emits a signature stub for every name an existing registry already decla
 (connectors, `scopePredicates`, `preconditionChecks`, `hooks`):
 
 ```
-python -m acp_registry_gen sql   schema.sql --domain payments --stubs handlers.py
-python -m acp_registry_gen stubs payments.registry.yaml -o handlers.py
+python -m stonefold_registry_gen sql   schema.sql --domain payments --stubs handlers.py
+python -m stonefold_registry_gen stubs payments.registry.yaml -o handlers.py
 ```
 
 The three safety rules above apply unchanged: the stubs are **authoring-time only** (never

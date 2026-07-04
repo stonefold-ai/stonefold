@@ -11,15 +11,15 @@ from __future__ import annotations
 import threading
 from typing import Any
 
-from acp_core import Actor, Connectors, InMemoryAuditSink, PendingState, RawCall
-from acp_core.connector import ConnectorCancelled, ConnectorResult
-from acp_core.kill import KillScope
-from acp_core.models import ResolvedAction
-from acp_core.scope import ScopePredicate
-from acp_store import DispatchWorker, InMemoryOutboxStore
-from acp_store.inflight import InFlightRegistry
-from acp_store.kill_memory import InMemoryKillStore
-from acp_gateway.kill_service import KillService
+from stonefold_core import Actor, Connectors, InMemoryAuditSink, PendingState, RawCall
+from stonefold_core.connector import ConnectorCancelled, ConnectorResult
+from stonefold_core.kill import KillScope
+from stonefold_core.models import ResolvedAction
+from stonefold_core.scope import ScopePredicate
+from stonefold_store import DispatchWorker, InMemoryOutboxStore
+from stonefold_store.inflight import InFlightRegistry
+from stonefold_store.kill_memory import InMemoryKillStore
+from stonefold_gateway.kill_service import KillService
 from tests.conftest import full_registry
 
 

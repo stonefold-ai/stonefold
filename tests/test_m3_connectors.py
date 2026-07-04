@@ -6,8 +6,8 @@ tests drive each connector directly with a scope predicate.
 
 from __future__ import annotations
 
-from acp_core import Actor, AttributeScope, RawCall, ResolvedAction
-from acp_connectors import EmailConnector, HttpConnector, InMemoryConnector
+from stonefold_core import Actor, AttributeScope, RawCall, ResolvedAction
+from stonefold_connectors import EmailConnector, HttpConnector, InMemoryConnector
 from tests.conftest import full_registry
 
 OWNER = AttributeScope("assignedToCurrentUser", "owner_id", "id")

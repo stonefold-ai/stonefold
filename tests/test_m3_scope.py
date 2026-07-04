@@ -4,7 +4,7 @@ from a policy's ``scope`` block."""
 
 from __future__ import annotations
 
-from acp_core import (
+from stonefold_core import (
     Actor,
     AttributeScope,
     ScopeResolver,

@@ -27,9 +27,9 @@ import redis as redislib  # noqa: E402
 from testcontainers.postgres import PostgresContainer  # noqa: E402
 from testcontainers.redis import RedisContainer  # noqa: E402
 
-from acp_core import Actor, Decision, KillScope  # noqa: E402
-from acp_ap_demo.gateway import APBundle, build_postgres_bundle  # noqa: E402
-from acp_ap_demo.principals import AP_OPERATOR, PAYMENTS_MANAGER  # noqa: E402
+from stonefold_core import Actor, Decision, KillScope  # noqa: E402
+from stonefold_ap_demo.gateway import APBundle, build_postgres_bundle  # noqa: E402
+from stonefold_ap_demo.principals import AP_OPERATOR, PAYMENTS_MANAGER  # noqa: E402
 
 pytestmark = pytest.mark.integration
 

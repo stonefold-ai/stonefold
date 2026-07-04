@@ -11,10 +11,10 @@ This exercises the mechanism in-process (a ``KillBus`` of in-memory subscribers)
 
 from __future__ import annotations
 
-from acp_core import Actor, RawCall, Session
-from acp_core.kill import KillOrder, KillScope, KillTarget
-from acp_store.kill_cached import CachedKillStore, KillBus
-from acp_store.kill_memory import InMemoryKillStore
+from stonefold_core import Actor, RawCall, Session
+from stonefold_core.kill import KillOrder, KillScope, KillTarget
+from stonefold_store.kill_cached import CachedKillStore, KillBus
+from stonefold_store.kill_memory import InMemoryKillStore
 from tests.conftest import full_registry
 
 

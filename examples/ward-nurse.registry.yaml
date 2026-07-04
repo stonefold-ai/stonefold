@@ -1,6 +1,6 @@
 apiVersion: registry/v1.0
 domain: ward-nurse
-# Domain model for the ward-nurse example. Pairs with ward-nurse.acp.yaml.
+# Domain model for the ward-nurse example. Pairs with ward-nurse.stele.yaml.
 # Shows assess / record / effect / transition actions named directly.
 
 connectors:

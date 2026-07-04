@@ -21,7 +21,7 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-from acp_core import (
+from stonefold_core import (
     Actor,
     Connectors,
     Decision,
@@ -30,18 +30,18 @@ from acp_core import (
     Session,
     load_policy,
 )
-from acp_connectors import InMemoryConnector
-from acp_gates.engine import DefaultGateEngine
-from acp_gateway.identity import (
+from stonefold_connectors import InMemoryConnector
+from stonefold_gates.engine import DefaultGateEngine
+from stonefold_gateway.identity import (
     Identity,
     IdentityProvider,
     IdentityRejected,
     SessionIdentityProvider,
     TransportCredential,
 )
-from acp_gateway.main import create_app
-from acp_gateway.transport import Gateway
-from acp_store import InMemoryOutboxStore
+from stonefold_gateway.main import create_app
+from stonefold_gateway.transport import Gateway
+from stonefold_store import InMemoryOutboxStore
 from tests.conftest import full_registry, load_schema
 
 

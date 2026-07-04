@@ -8,19 +8,19 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from acp_bench.attacks import ATTACKS, ATTACKER_IBAN, INVITE_WIRE
-from acp_bench.conditions import CONDITIONS, Condition, Rung, build_arena, is_configured
-from acp_bench.harness import run_security, unconfigured_rungs, unwired_attacks
-from acp_bench.matrix import aggregate
-from acp_bench.model import MeteredProvider, ModelSpec, build_provider, model_by_key
-from acp_bench.raw_log import read_jsonl, write_jsonl
-from acp_bench.report import ReportMeta, render
-from acp_bench.runner import (
+from stonefold_bench.attacks import ATTACKS, ATTACKER_IBAN, INVITE_WIRE
+from stonefold_bench.conditions import CONDITIONS, Condition, Rung, build_arena, is_configured
+from stonefold_bench.harness import run_security, unconfigured_rungs, unwired_attacks
+from stonefold_bench.matrix import aggregate
+from stonefold_bench.model import MeteredProvider, ModelSpec, build_provider, model_by_key
+from stonefold_bench.raw_log import read_jsonl, write_jsonl
+from stonefold_bench.report import ReportMeta, render
+from stonefold_bench.runner import (
     BENIGN_LABEL,
     run_attack_trial,
     run_benign_trial,
 )
-from acp_bench.tracks import (
+from stonefold_bench.tracks import (
     TOOL_COUNTS,
     capability_set,
     mcp_surface,
@@ -154,7 +154,7 @@ def test_track_r_surfaces_have_capability_parity() -> None:
 
 
 def test_reliability_scorer() -> None:
-    from acp_ap_demo.agent import AgentResult, AgentStep
+    from stonefold_ap_demo.agent import AgentResult, AgentStep
 
     result = AgentResult(final_text="", steps=[
         AgentStep(tool="submit_intent", args={"resource": "R", "action": "read"}, result={}),
@@ -168,7 +168,7 @@ def test_reliability_scorer() -> None:
 
 # --- the CLI smoke path exits clean ---------------------------------------
 def test_cli_smoke_runs(tmp_path: Path) -> None:
-    from acp_bench.__main__ import main
+    from stonefold_bench.__main__ import main
     assert main(["--smoke", "--out", str(tmp_path)]) == 0
 
 
@@ -178,7 +178,7 @@ def test_model_spec_label() -> None:
 
 # --- Track R reliability runner -------------------------------------------
 def test_reliability_surfaces_keep_capability_parity() -> None:
-    from acp_bench.reliability import MCP, MCP_RETRIEVAL, PROBES, SIF, RETRIEVAL_K, surface_for
+    from stonefold_bench.reliability import MCP, MCP_RETRIEVAL, PROBES, SIF, RETRIEVAL_K, surface_for
 
     probe = PROBES[1]  # pay-invoice
     mcp = surface_for(MCP, 30, probe)
@@ -190,8 +190,8 @@ def test_reliability_surfaces_keep_capability_parity() -> None:
 
 
 def test_reliability_scoring() -> None:
-    from acp_ap_demo.llm import ToolCall
-    from acp_bench.reliability import (
+    from stonefold_ap_demo.llm import ToolCall
+    from stonefold_bench.reliability import (
         CORRECT, HALLUCINATED, MALFORMED, MCP, PROBES, SIF, WRONG_TOOL, _score, surface_for,
     )
 
@@ -211,10 +211,10 @@ def test_reliability_scoring() -> None:
 
 
 def test_reliability_matrix_and_runner_mechanics() -> None:
-    from acp_bench.reliability import MCP, SIF, reliability_matrix, run_reliability
+    from stonefold_bench.reliability import MCP, SIF, reliability_matrix, run_reliability
 
     trials = run_reliability((FAKE,), (10,), conditions=(MCP, SIF), reps=1)
-    assert len(trials) == 2 * len(__import__("acp_bench.reliability", fromlist=["PROBES"]).PROBES)
+    assert len(trials) == 2 * len(__import__("stonefold_bench.reliability", fromlist=["PROBES"]).PROBES)
     cells = reliability_matrix(trials)
     assert {c.condition for c in cells} == {MCP, SIF}
     assert all(0.0 <= c.correct <= 1.0 for c in cells)
@@ -222,7 +222,7 @@ def test_reliability_matrix_and_runner_mechanics() -> None:
 
 # --- streaming output: per-trial flush, per-round cells --------------------
 def test_jsonl_writer_flushes_each_line(tmp_path: Path) -> None:
-    from acp_bench.raw_log import JsonlWriter
+    from stonefold_bench.raw_log import JsonlWriter
 
     path = tmp_path / "t.jsonl"
     with JsonlWriter(path) as writer:
@@ -235,7 +235,7 @@ def test_jsonl_writer_flushes_each_line(tmp_path: Path) -> None:
 
 def test_write_json_and_csv(tmp_path: Path) -> None:
     import json as _json
-    from acp_bench.raw_log import write_csv, write_json
+    from stonefold_bench.raw_log import write_csv, write_json
 
     j = write_json(tmp_path / "x.json", {"b": 2, "a": 1})
     assert _json.loads(j.read_text(encoding="utf-8")) == {"a": 1, "b": 2}
@@ -262,7 +262,7 @@ def test_run_security_is_rep_outermost_and_streams() -> None:
 
 
 def test_reliability_on_round_fires_per_rep() -> None:
-    from acp_bench.reliability import MCP, run_reliability
+    from stonefold_bench.reliability import MCP, run_reliability
 
     rounds: list[tuple[int, int]] = []
     trials = run_reliability(
@@ -274,8 +274,8 @@ def test_reliability_on_round_fires_per_rep() -> None:
 
 # --- the CLI writes the full structured-output contract --------------------
 def test_cli_track_r_writes_structured_outputs(tmp_path: Path) -> None:
-    from acp_bench.__main__ import main
-    from acp_bench.raw_log import write_json  # noqa: F401  (import sanity)
+    from stonefold_bench.__main__ import main
+    from stonefold_bench.raw_log import write_json  # noqa: F401  (import sanity)
 
     assert main(["--track", "r", "--smoke", "--reps", "1", "--ns", "1,10",
                  "--surfaces", "mcp,sif", "--probes", "pay-invoice",
@@ -296,7 +296,7 @@ def test_cli_track_r_writes_structured_outputs(tmp_path: Path) -> None:
 
 
 def test_cli_track_s_isolated_rung(tmp_path: Path) -> None:
-    from acp_bench.__main__ import main
+    from stonefold_bench.__main__ import main
 
     assert main(["--track", "s", "--smoke", "--reps", "1", "--rungs", "S0",
                  "--out", str(tmp_path)]) == 0
@@ -308,7 +308,7 @@ def test_cli_track_s_isolated_rung(tmp_path: Path) -> None:
 
 def test_cli_rejects_unknown_filters(tmp_path: Path) -> None:
     import pytest
-    from acp_bench.__main__ import main
+    from stonefold_bench.__main__ import main
 
     with pytest.raises(SystemExit):
         main(["--track", "r", "--smoke", "--surfaces", "nope", "--out", str(tmp_path)])
@@ -318,8 +318,8 @@ def test_cli_rejects_unknown_filters(tmp_path: Path) -> None:
 
 # --- realism extensions (docs/15 pilot record follow-up) --------------------
 def test_confusable_fillers_are_unique_and_near_duplicates() -> None:
-    from acp_bench.realism import confusable_fillers
-    from acp_bench.reliability import _ANCHORS
+    from stonefold_bench.realism import confusable_fillers
+    from stonefold_bench.reliability import _ANCHORS
 
     fillers = confusable_fillers(_ANCHORS, 40)
     assert len(fillers) == 40
@@ -333,7 +333,7 @@ def test_confusable_fillers_are_unique_and_near_duplicates() -> None:
 
 
 def test_sif_surface_carries_the_same_descriptions_as_mcp() -> None:
-    from acp_bench.reliability import MCP, PROBES, SIF, surface_for
+    from stonefold_bench.reliability import MCP, PROBES, SIF, surface_for
 
     probe = PROBES[1]
     mcp = surface_for(MCP, 50, probe, fillers="confusable")
@@ -345,8 +345,8 @@ def test_sif_surface_carries_the_same_descriptions_as_mcp() -> None:
 
 
 def test_scoring_clarify_overcall_and_wrong_args() -> None:
-    from acp_ap_demo.llm import ToolCall
-    from acp_bench.reliability import (
+    from stonefold_ap_demo.llm import ToolCall
+    from stonefold_bench.reliability import (
         CLARIFY, CORRECT, DISTRACTOR_PROBES, MCP, NO_CALL, OVERCALL, PROBES, SIF,
         WRONG_ARGS, _score, surface_for,
     )
@@ -377,7 +377,7 @@ def test_scoring_clarify_overcall_and_wrong_args() -> None:
 
 
 def test_realistic_cards_have_params_on_both_surfaces() -> None:
-    from acp_bench.reliability import MCP, PROBES, SIF, surface_for
+    from stonefold_bench.reliability import MCP, PROBES, SIF, surface_for
 
     probe = PROBES[1]
     mcp = surface_for(MCP, 10, probe, cards="realistic")
@@ -389,7 +389,7 @@ def test_realistic_cards_have_params_on_both_surfaces() -> None:
 
 
 def test_context_builder_is_bounded_and_alternating() -> None:
-    from acp_bench.realism import build_context
+    from stonefold_bench.realism import build_context
 
     assert build_context(0) == []
     msgs = build_context(2000)
@@ -401,7 +401,7 @@ def test_context_builder_is_bounded_and_alternating() -> None:
 
 
 def test_cli_realism_flags_smoke(tmp_path: Path) -> None:
-    from acp_bench.__main__ import main
+    from stonefold_bench.__main__ import main
 
     assert main(["--track", "r", "--smoke", "--reps", "1", "--ns", "10",
                  "--surfaces", "sif", "--fillers", "confusable", "--cards", "realistic",

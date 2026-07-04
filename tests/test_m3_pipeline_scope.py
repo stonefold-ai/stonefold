@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from acp_core import (
+from stonefold_core import (
     Actor,
     Connectors,
     Decision,
@@ -20,7 +20,7 @@ from acp_core import (
     load_policy,
     make_scope_resolver,
 )
-from acp_connectors import EmailConnector, HttpConnector, InMemoryConnector
+from stonefold_connectors import EmailConnector, HttpConnector, InMemoryConnector
 from tests.conftest import full_registry, load_schema
 
 CUSTOMERS = {

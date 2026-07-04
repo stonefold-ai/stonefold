@@ -22,10 +22,10 @@ pytest.importorskip("testcontainers.postgres")
 import psycopg  # noqa: E402
 from testcontainers.postgres import PostgresContainer  # noqa: E402
 
-from acp_core import Actor, Connectors, PendingState, RawCall  # noqa: E402
-from acp_connectors import InMemoryConnector  # noqa: E402
-from acp_store import DispatchWorker  # noqa: E402
-from acp_store.outbox_pg import PostgresOutboxStore, create_schema  # noqa: E402
+from stonefold_core import Actor, Connectors, PendingState, RawCall  # noqa: E402
+from stonefold_connectors import InMemoryConnector  # noqa: E402
+from stonefold_store import DispatchWorker  # noqa: E402
+from stonefold_store.outbox_pg import PostgresOutboxStore, create_schema  # noqa: E402
 from tests.conftest import full_registry  # noqa: E402
 
 pytestmark = pytest.mark.integration
@@ -177,8 +177,8 @@ def test_b4_scope_lost_inside_the_effects_transaction(container: PostgresContain
     # predicate into the effect's own UPDATE. A target reassigned to another
     # tenant between decision and dispatch ⇒ zero rows affected ⇒ FAILED
     # scope-lost, and the write commits against authorized state or not at all.
-    from acp_connectors import SqlConnector
-    from acp_core.scope import ScopeResolver, default_scope_registry
+    from stonefold_connectors import SqlConnector
+    from stonefold_core.scope import ScopeResolver, default_scope_registry
 
     conn = _connect(container)
     _truncate(conn)
@@ -241,7 +241,7 @@ def test_approval_release_over_postgres(container: PostgresContainer) -> None:
     effect_conn = InMemoryConnector()
     worker = DispatchWorker(store, Connectors({"in_memory": effect_conn}), registry=full_registry())
 
-    from acp_core import ApprovalSpec
+    from stonefold_core import ApprovalSpec
 
     held = store.stage(
         resolved=_resolve("Prescribing", "prescribe", {"drug": "X"}),

@@ -25,7 +25,7 @@ pytest.importorskip("testcontainers.postgres")
 import psycopg  # noqa: E402
 from testcontainers.postgres import PostgresContainer  # noqa: E402
 
-from acp_core import (  # noqa: E402
+from stonefold_core import (  # noqa: E402
     Actor,
     Connectors,
     PendingState,
@@ -33,10 +33,10 @@ from acp_core import (  # noqa: E402
     artifact_digest,
     load_registry,
 )
-from acp_core.digest import DIGEST_MISMATCH  # noqa: E402
-from acp_connectors import InMemoryConnector  # noqa: E402
-from acp_store import DispatchWorker  # noqa: E402
-from acp_store.outbox_pg import PostgresOutboxStore, create_schema  # noqa: E402
+from stonefold_core.digest import DIGEST_MISMATCH  # noqa: E402
+from stonefold_connectors import InMemoryConnector  # noqa: E402
+from stonefold_store import DispatchWorker  # noqa: E402
+from stonefold_store.outbox_pg import PostgresOutboxStore, create_schema  # noqa: E402
 from tests.conftest import REGISTRY_DIR, load_yaml  # noqa: E402
 
 pytestmark = pytest.mark.integration
@@ -72,7 +72,7 @@ def _truncate(conn: Any) -> None:
 
 
 def _registry_with_digests(digests: dict[str, str]) -> Any:
-    data = load_yaml(REGISTRY_DIR / "acp-registry.yaml")
+    data = load_yaml(REGISTRY_DIR / "stonefold-registry.yaml")
     data["connector_digests"] = digests
     return load_registry(data)
 

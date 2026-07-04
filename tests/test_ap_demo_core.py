@@ -1,6 +1,6 @@
 """Core pipeline behaviour for the Accounts-Payable demo (acceptance §G, B2, E1).
 
-Drives the *real* enforcement stack over the unmodified ``payments-ops.acp.yaml``
+Drives the *real* enforcement stack over the unmodified ``payments-ops.stele.yaml``
 through ``APBundle.submit`` — exactly what the agent's gated tool calls — with an
 in-memory ledger and a fixed clock. No LLM and no Docker: this isolates the
 gateway behaviour the higher layers (agent, UI, compose) rely on.
@@ -12,9 +12,9 @@ from datetime import datetime, timezone
 
 import pytest
 
-from acp_core import Decision, EvalResult, KillScope
-from acp_ap_demo.gateway import APBundle, build_inmemory_bundle
-from acp_ap_demo.principals import AP_OPERATOR, OUT_OF_TENANT_OPERATOR, PAYMENTS_MANAGER
+from stonefold_core import Decision, EvalResult, KillScope
+from stonefold_ap_demo.gateway import APBundle, build_inmemory_bundle
+from stonefold_ap_demo.principals import AP_OPERATOR, OUT_OF_TENANT_OPERATOR, PAYMENTS_MANAGER
 
 DEMO_NOW = datetime(2026, 6, 28, 12, 0, 0, tzinfo=timezone.utc)
 

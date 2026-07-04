@@ -12,7 +12,7 @@ A viewer clones the repo, supplies an API key, runs one command, and within ~5 m
 
 An **AI Accounts-Payable assistant** that reads invoices and pays vendors — the textbook high-risk case: the agent handles private financial data, ingests vendor invoices, and can move money. The bank and ledger are **faked** (no real money, no PII, all data fictional); the agent and the gateway enforcement are real.
 
-The demo's rulebook is the **unmodified** policy [`examples/payments-ops.acp.yaml`](../examples/payments-ops.acp.yaml) — there is no demo-specific policy. Editing that file and re-running changes behaviour with no code change.
+The demo's rulebook is the **unmodified** policy [`examples/payments-ops.stele.yaml`](../examples/payments-ops.stele.yaml) — there is no demo-specific policy. Editing that file and re-running changes behaviour with no code change.
 
 ## Components / infrastructure
 
@@ -51,7 +51,7 @@ demo/
 ├── docker-compose.yml         # gateway + postgres + redis + agent
 ├── .env.example               # ANTHROPIC_API_KEY=...  (copy to .env)
 ├── Makefile                   # up / seed / demo / run / down
-├── policy/                    # pointer to examples/payments-ops.acp.yaml (single source of truth)
+├── policy/                    # pointer to examples/payments-ops.stele.yaml (single source of truth)
 ├── seed/
 │   ├── ledger_seed.sql        # accounts, payees, invoices
 │   └── invoices/inbox/
@@ -64,7 +64,7 @@ demo/
 └── README.md                  # the runbook (below)
 ```
 
-The Python lives in [`../src/acp_ap_demo/`](../src/acp_ap_demo) so it is unit-tested and `mypy --strict`-clean with the rest of the project; `demo/` is the deployment + runbook.
+The Python lives in [`../src/stonefold_ap_demo/`](../src/stonefold_ap_demo) so it is unit-tested and `mypy --strict`-clean with the rest of the project; `demo/` is the deployment + runbook.
 
 ## The scenarios
 
@@ -100,5 +100,5 @@ make down
 - `make up && make seed` brings the whole demo up from a clean checkout with only Docker + an API key.
 - Through the gateway, the inbox run shows **allow / hold / deny**; the held payment can be **approved or rejected**; with the toggle **off**, the same payments execute directly — the side-by-side contrast.
 - Automated scenario tests (`tests/test_ap_demo_*.py`) cover happy / process-inbox / approval / reject / direct-rejection / gateway-off in fake-LLM mode (no key, no Docker), plus a Postgres + Redis integration test.
-- The demo uses the unmodified [`examples/payments-ops.acp.yaml`](../examples/payments-ops.acp.yaml); editing that file and re-running changes behaviour with no code change.
+- The demo uses the unmodified [`examples/payments-ops.stele.yaml`](../examples/payments-ops.stele.yaml); editing that file and re-running changes behaviour with no code change.
 - All data is fictional; no real funds, credentials, or PII anywhere.

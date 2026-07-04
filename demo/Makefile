@@ -21,10 +21,10 @@ seed:
 	@echo "ledger seeded (vendors, accounts, invoices)"
 
 demo:
-	$(COMPOSE) run --rm agent python -m acp_ap_demo --provider $${LLM_PROVIDER:-auto}
+	$(COMPOSE) run --rm agent python -m stonefold_ap_demo --provider $${LLM_PROVIDER:-auto}
 
 run:
-	$(COMPOSE) run --rm agent python -m acp_ap_demo.agent_cli --scenario inbox
+	$(COMPOSE) run --rm agent python -m stonefold_ap_demo.agent_cli --scenario inbox
 
 ui:
 	@echo "Open http://localhost:8088"

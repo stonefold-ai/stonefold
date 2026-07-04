@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-from acp_core import (
+from stonefold_core import (
     PolicyError,
     Severity,
     load_policy,

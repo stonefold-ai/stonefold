@@ -1,4 +1,4 @@
-"""acp_gates.conformance + acp_gates.stock — the registered-function kit.
+"""stonefold_gates.conformance + stonefold_gates.stock — the registered-function kit.
 
 Registered functions (precondition checks, content hooks, scope predicates)
 are hand-written, security-critical code (docs/06 §6 Bucket B). The kit is the
@@ -15,18 +15,18 @@ from typing import Any, Mapping
 
 import pytest
 
-from acp_core import Actor
-from acp_core.gating import RequestEnv
-from acp_core.scope import AttributeScope
-from acp_gates.base import GateContext
-from acp_gates.conformance import (
+from stonefold_core import Actor
+from stonefold_core.gating import RequestEnv
+from stonefold_core.scope import AttributeScope
+from stonefold_gates.base import GateContext
+from stonefold_gates.conformance import (
     ConformanceIssue,
     assert_conformant,
     check_content_hook,
     check_precondition,
     check_scope_predicate,
 )
-from acp_gates.stock import cooling_off_elapsed, data_field_present, resource_state_in
+from stonefold_gates.stock import cooling_off_elapsed, data_field_present, resource_state_in
 from tests.conftest import gate_ctx
 
 NOW = datetime(2026, 7, 1, 12, 0, tzinfo=timezone.utc)

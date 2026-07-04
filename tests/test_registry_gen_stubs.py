@@ -19,15 +19,15 @@ from typing import Any
 import pytest
 import yaml
 
-from acp_registry_gen import (
+from stonefold_registry_gen import (
     draft_from_sql,
     emit_stubs,
     plan_from_draft,
     plan_from_registry,
     validate_stub_code,
 )
-from acp_registry_gen.__main__ import main
-from acp_registry_gen.stubs import _ident
+from stonefold_registry_gen.__main__ import main
+from stonefold_registry_gen.stubs import _ident
 
 _ROOT = Path(__file__).resolve().parents[1]
 PAYMENTS_REGISTRY = _ROOT / "examples" / "payments.registry.yaml"

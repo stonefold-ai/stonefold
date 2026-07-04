@@ -2,7 +2,7 @@
 
 This guide reads one policy end to end so you can read any of them, and — importantly — it marks **what the gateway provides for you** versus **what you must implement or register** to make a policy actually run.
 
-This walkthrough uses [`ward-nurse.acp.yaml`](ward-nurse.acp.yaml). The same structure applies to every example here.
+This walkthrough uses [`ward-nurse.stele.yaml`](ward-nurse.stele.yaml). The same structure applies to every example here.
 
 ## Legend — where each referenced name comes from
 
@@ -20,7 +20,7 @@ When a policy mentions a name, it is one of these. The tags appear throughout th
 
 ### Header & defaults
 ```yaml
-apiVersion: acp/v0.1
+apiVersion: stele/v0.1
 agent: ward-nurse-assistant
 defaults: { failureMode: closed, audit: full }
 killable: true
@@ -106,7 +106,7 @@ Order.sign:
 
 ## What you must implement / register to run this policy
 
-If you deployed `ward-nurse.acp.yaml`, this is your checklist. (The gateway and all gate types are assumed already built.)
+If you deployed `ward-nurse.stele.yaml`, this is your checklist. (The gateway and all gate types are assumed already built.)
 
 **Declare in the model registry [REGISTRY]:**
 - Entities: `Patient`, `Medication`, `Observation`, `Order`, `Encounter`.
@@ -134,4 +134,4 @@ If you deployed `ward-nurse.acp.yaml`, this is your checklist. (The gateway and 
 
 ## How to read any other example
 
-Same method: skim `allow`/`deny`/`scope`/`gates`, and for every name ask "which tag is this?" — **[ENGINE]** (free), **[REGISTRY]** (declare it), **[REGISTER]** (implement it), **[IDENTITY]** (from your IdP), or **[AGENT DATA]** (the request). The money demo's bindings for [`payments-ops.acp.yaml`](payments-ops.acp.yaml) are listed the same way in [`../docs/05-demo-spec.md`](../docs/05-demo-spec.md). The full meaning of every key is in the spec, [`../docs/01-RFC-agent-control-policy.md`](../docs/01-RFC-agent-control-policy.md).
+Same method: skim `allow`/`deny`/`scope`/`gates`, and for every name ask "which tag is this?" — **[ENGINE]** (free), **[REGISTRY]** (declare it), **[REGISTER]** (implement it), **[IDENTITY]** (from your IdP), or **[AGENT DATA]** (the request). The money demo's bindings for [`payments-ops.stele.yaml`](payments-ops.stele.yaml) are listed the same way in [`../docs/05-demo-spec.md`](../docs/05-demo-spec.md). The full meaning of every key is in the spec, [`../docs/01-RFC-agent-control-policy.md`](../docs/01-RFC-agent-control-policy.md).

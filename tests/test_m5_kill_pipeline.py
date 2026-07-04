@@ -12,7 +12,7 @@ from typing import Any
 
 import pytest
 
-from acp_core import (
+from stonefold_core import (
     Actor,
     Connectors,
     Decision,
@@ -24,10 +24,10 @@ from acp_core import (
     enforce,
     load_policy,
 )
-from acp_connectors import InMemoryConnector
-from acp_gates.engine import DefaultGateEngine
-from acp_store import InMemoryOutboxStore
-from acp_store.kill_memory import InMemoryKillStore
+from stonefold_connectors import InMemoryConnector
+from stonefold_gates.engine import DefaultGateEngine
+from stonefold_store import InMemoryOutboxStore
+from stonefold_store.kill_memory import InMemoryKillStore
 from tests.conftest import full_registry, load_schema
 
 

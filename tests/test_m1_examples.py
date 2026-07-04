@@ -1,6 +1,6 @@
 """M1 — every valid example loads & validates (Acceptance A5).
 
-Each example is schema-validated against schema/acp.schema.json and passes the
+Each example is schema-validated against schema/stele.schema.json and passes the
 semantic linter with no ERROR findings (warnings are allowed).
 """
 
@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from acp_core import load_policy
+from stonefold_core import load_policy
 from tests.conftest import full_registry, load_schema, load_yaml, valid_example_paths
 
 
@@ -30,10 +30,10 @@ def test_a5_example_loads_and_validates(path: Path) -> None:
 def test_all_six_examples_present() -> None:
     names = {p.name for p in valid_example_paths()}
     assert names == {
-        "support-assistant.acp.yaml",
-        "ward-nurse.acp.yaml",
-        "track-operator.acp.yaml",
-        "payments-ops.acp.yaml",
-        "legal-matter.acp.yaml",
-        "vehicle-controller.acp.yaml",
+        "support-assistant.stele.yaml",
+        "ward-nurse.stele.yaml",
+        "track-operator.stele.yaml",
+        "payments-ops.stele.yaml",
+        "legal-matter.stele.yaml",
+        "vehicle-controller.stele.yaml",
     }

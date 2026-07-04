@@ -23,7 +23,7 @@ pytest.importorskip("testcontainers.postgres")
 import psycopg  # noqa: E402
 from testcontainers.postgres import PostgresContainer  # noqa: E402
 
-from acp_core import (  # noqa: E402
+from stonefold_core import (  # noqa: E402
     Actor,
     Connectors,
     Decision,
@@ -34,7 +34,7 @@ from acp_core import (  # noqa: E402
     load_policy,
     make_scope_resolver,
 )
-from acp_connectors import SqlConnector  # noqa: E402
+from stonefold_connectors import SqlConnector  # noqa: E402
 from tests.conftest import full_registry, load_schema  # noqa: E402
 
 pytestmark = pytest.mark.integration
@@ -102,7 +102,7 @@ def test_b1_sql_query_text_contains_scope_clause(pg_conn: Any) -> None:
     connector = SqlConnector(pg_conn, table_map={"Customer": "customer"})
     reg = full_registry()
     resolved = reg.resolve(RawCall(resource="Customer", action="read", data={"q": "all"}))
-    from acp_core import AttributeScope
+    from stonefold_core import AttributeScope
 
     scope = AttributeScope("assignedToCurrentUser", "owner_id", "id")
     cresult = connector.execute(resolved, scope, Actor(id="alice"))

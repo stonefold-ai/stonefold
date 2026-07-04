@@ -5,7 +5,7 @@ These are decided for this **concept deliverable** (proof-of-concept, not a hard
 ## Tech stack (Python)
 - **Language/runtime:** Python 3.12, full type hints, `mypy --strict` in CI.
 - **Gateway framework:** FastAPI + uvicorn — the HTTP surface for the SIF-native tool endpoint, the MCP proxy, the approvals/kill REST API, and the admin-UI backend.
-- **Policy parsing/validation:** PyYAML + pydantic v2 for the typed policy model; structural validation via `jsonschema` against `schema/acp.schema.json`; the semantic linter (RFC §13) on top.
+- **Policy parsing/validation:** PyYAML + pydantic v2 for the typed policy model; structural validation via `jsonschema` against `schema/stele.schema.json`; the semantic linter (RFC §13) on top.
 - **Durable state:** PostgreSQL (via SQLAlchemy 2.x / asyncpg) — `audit`, `pending_actions` (outbox), `approvals`, `kill_orders`.
 - **Hot state / propagation:** Redis (`redis-py`) — rate/quota/spend counters, kill-order cache invalidation (pub/sub), the kill epoch.
 - **Dispatch worker:** an async background task (or a separate process) polling `pending_actions`.
@@ -19,23 +19,23 @@ These are decided for this **concept deliverable** (proof-of-concept, not a hard
 ```
 acp/
 ├── pyproject.toml
-├── src/acp_core/        # value types (pydantic), registry, policy compiler, condition engine, pipeline — NO I/O, NO LLM
-├── src/acp_gates/       # the 14 gate implementations (depend on acp_core + store protocols)
-├── src/acp_store/       # Postgres + Redis adapters: audit, outbox, approvals, kill, counters
-├── src/acp_connectors/  # Connector protocol + in-memory, sql, http, email/stub connectors
-├── src/acp_gateway/     # FastAPI app: transports (SIF-native tool + MCP proxy), wiring, REST, dispatch worker
-├── src/acp_admin_ui/    # minimal UI: trace, approvals inbox, kill button (thin / can come late)
-├── src/acp_demo/        # the adversarial demo runner + sample agent (fake LLM client)
-├── src/acp_registry_gen/# AUTHORING-TIME registry drafting (SQL/OpenAPI/MCP -> draft registry; docs/06 §9) — never imported by the enforcement path
+├── src/stonefold_core/        # value types (pydantic), registry, policy compiler, condition engine, pipeline — NO I/O, NO LLM
+├── src/stonefold_gates/       # the 14 gate implementations (depend on stonefold_core + store protocols)
+├── src/stonefold_store/       # Postgres + Redis adapters: audit, outbox, approvals, kill, counters
+├── src/stonefold_connectors/  # Connector protocol + in-memory, sql, http, email/stub connectors
+├── src/stonefold_gateway/     # FastAPI app: transports (SIF-native tool + MCP proxy), wiring, REST, dispatch worker
+├── src/stonefold_admin_ui/    # minimal UI: trace, approvals inbox, kill button (thin / can come late)
+├── src/stonefold_demo/        # the adversarial demo runner + sample agent (fake LLM client)
+├── src/stonefold_registry_gen/# AUTHORING-TIME registry drafting (SQL/OpenAPI/MCP -> draft registry; docs/06 §9) — never imported by the enforcement path
 └── tests/
 ```
-`acp_core` MUST have **no I/O and no LLM dependency**; it is pure and unit-testable in isolation. This is the trust kernel.
+`stonefold_core` MUST have **no I/O and no LLM dependency**; it is pure and unit-testable in isolation. This is the trust kernel.
 
 ## Key decisions
-1. **Gateway is the sole path (chokepoint).** Two transports into `acp_gateway`:
+1. **Gateway is the sole path (chokepoint).** Two transports into `stonefold_gateway`:
    - **SIF-native:** one generated tool `submit_intent`; the gateway is its executor. Strong coverage (no other path).
    - **Interception (MCP proxy):** terminate the agent's MCP/tool transport, map each call to an ACP action, enforce, forward or refuse. Unmapped tool ⇒ deny. Startup **coverage check** fails if the agent has any tool endpoint that isn't the gateway.
-2. **Pipeline is pure and total** (`enforce()` in `acp_core`): resolve → authorize → scope → gates → kill → execute, always ending in an audited decision. Implements RFC §12 / design §3. No LLM call anywhere inside it.
+2. **Pipeline is pure and total** (`enforce()` in `stonefold_core`): resolve → authorize → scope → gates → kill → execute, always ending in an audited decision. Implements RFC §12 / design §3. No LLM call anywhere inside it.
 3. **Policy is compiled at load** into an indexed matcher; the linter (RFC §13) runs at load; an invalid policy prevents startup (never fall back to defaults).
 4. **Effects via outbox** (`pending_actions`) by default; dispatch worker uses `SELECT … FOR UPDATE` + idempotency key (design §8.4, §9). Approvals and kill are transitions on these rows (design §7, §8).
 5. **Scope injection below the model**: actor from the session token / transport, never from the agent payload; scope predicate realised per connector (SQL `WHERE` append; HTTP param; method/function arg). Scope-on-effect = pre-resolution authorization check (design §5).
@@ -102,7 +102,7 @@ Every place an external system can plug in, and what runs there when nothing doe
 
 ## Registry dialects & derived attributes — deferred
 
-- **Two registry dialects exist today.** `schema/registry.schema.json` + `docs/06` define the **authoring format** (`domain`/`entities`/`namedSets`/`hooks`, attributes under `attributes:`) used by `examples/*.registry.yaml`; `registry/acp-registry.yaml` is the gateway loader's **compact internal dialect** (`resources`/`sets`/`contentHooks`, attributes inline) that the code and tests consume. Both declare the same vocabulary. Unifying them (teach the loader the v1.x authoring format, or generate the compact form from it) is **deferred**; until then the authoring format is the documented one and the compact file carries a header note.
+- **Two registry dialects exist today.** `schema/registry.schema.json` + `docs/06` define the **authoring format** (`domain`/`entities`/`namedSets`/`hooks`, attributes under `attributes:`) used by `examples/*.registry.yaml`; `registry/stonefold-registry.yaml` is the gateway loader's **compact internal dialect** (`resources`/`sets`/`contentHooks`, attributes inline) that the code and tests consume. Both declare the same vocabulary. Unifying them (teach the loader the v1.x authoring format, or generate the compact form from it) is **deferred**; until then the authoring format is the documented one and the compact file carries a header note.
 - **`derived` expression grammar is deferred.** Derived attributes/properties (`operativeForce: { derived: "isHighAlert ? 'high' : 'low'" }`) are implementation-defined: pure, deterministic, no I/O (docs/06 §4). Freezing a small derivation grammar (like the §8 condition grammar) is deferred.
 - **Content-check delegation — TODO (RFC wording).** The gateway can validate structure, limits, and set membership deterministically, but it **cannot judge content** — so an implementation SHOULD (not MUST) provide hooks that delegate content checking to third-party systems (DLP, moderation, fraud scoring), executed at the chokepoint under the gateway's failure mode and audit. The reference already ships the seam (`contentCheck` → `ContentHookRegistry`; conformance contract docs/06 §6; positioning docs/13). The open item is the explicit **SHOULD** wording in `docs/01` §7.7 at the next RFC revision — today §7.7 defines the hook without stating the implementation obligation.
 

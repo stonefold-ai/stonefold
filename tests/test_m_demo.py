@@ -1,6 +1,6 @@
 """M-DEMO — the adversarial demo as acceptance tests (G1/G2/G3).
 
-These assert the *same* scenario functions the ``python -m acp_demo`` narration
+These assert the *same* scenario functions the ``python -m stonefold_demo`` narration
 runs, so what a viewer watches is exactly what's verified. The core claim: through
 the gateway, a prompt-injected agent provably cannot exfiltrate, an operator can
 halt a live run, and no crafted prompt gets an out-of-policy effect through.
@@ -8,8 +8,8 @@ halt a live run, and no crafted prompt gets an out-of-policy effect through.
 
 from __future__ import annotations
 
-from acp_core import Decision
-from acp_demo.scenarios import g1_injection_blocked, g2_live_kill, g3_invite_attack
+from stonefold_core import Decision
+from stonefold_demo.scenarios import g1_injection_blocked, g2_live_kill, g3_invite_attack
 
 
 # --- G1: injection blocked end to end -------------------------------------
@@ -90,6 +90,6 @@ def test_g3_effectful_attacks_are_all_refused() -> None:
 
 # --- the whole demo runs clean (end-to-end smoke) -------------------------
 def test_demo_main_exits_zero() -> None:
-    from acp_demo.__main__ import main
+    from stonefold_demo.__main__ import main
 
     assert main() == 0

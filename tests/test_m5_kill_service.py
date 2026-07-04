@@ -7,10 +7,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from acp_core import Decision, InMemoryAuditSink
-from acp_core.kill import KillScope
-from acp_store.kill_memory import InMemoryKillStore
-from acp_gateway.kill_service import KillService
+from stonefold_core import Decision, InMemoryAuditSink
+from stonefold_core.kill import KillScope
+from stonefold_store.kill_memory import InMemoryKillStore
+from stonefold_gateway.kill_service import KillService
 
 
 class _RecordingRuntimeCancel:

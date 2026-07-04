@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from acp_core import (
+from stonefold_core import (
     Actor,
     CompiledPolicy,
     Decision,

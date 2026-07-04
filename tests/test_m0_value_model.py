@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from acp_core import (
+from stonefold_core import (
     Actor,
     Attributes,
     Decision,

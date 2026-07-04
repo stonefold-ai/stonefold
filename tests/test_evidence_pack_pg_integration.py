@@ -1,7 +1,7 @@
 """Evidence-pack export over a **real Postgres** audit_log (plan G3, read-only path).
 
 Confirms the exporter reads records straight from the durable ``audit_log`` table the
-gateway writes (``acp_store.audit_pg``) and builds a pack from them — without touching
+gateway writes (``stonefold_store.audit_pg``) and builds a pack from them — without touching
 the log. Skipped when psycopg / testcontainers / Docker are unavailable.
 """
 
@@ -22,12 +22,12 @@ pytest.importorskip("testcontainers.postgres")
 import psycopg  # noqa: E402
 from testcontainers.postgres import PostgresContainer  # noqa: E402
 
-from acp_core.enums import Decision  # noqa: E402
-from acp_core.models import AuditRecord  # noqa: E402
-from acp_store.audit_pg import PostgresAuditSink, create_audit_schema  # noqa: E402
+from stonefold_core.enums import Decision  # noqa: E402
+from stonefold_core.models import AuditRecord  # noqa: E402
+from stonefold_store.audit_pg import PostgresAuditSink, create_audit_schema  # noqa: E402
 
-from acp_evidence import build_evidence_pack, render_markdown  # noqa: E402
-from acp_evidence.sources import records_from_postgres  # noqa: E402
+from stonefold_evidence import build_evidence_pack, render_markdown  # noqa: E402
+from stonefold_evidence.sources import records_from_postgres  # noqa: E402
 
 pytestmark = pytest.mark.integration
 

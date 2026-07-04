@@ -9,7 +9,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "acp-gateway"
+name = "stonefold-gateway"
 version = "0.1.0"
 description = "Agent Control Policy (ACP) Gateway — a deterministic enforcement point between an AI agent and the systems it can act on."
 requires-python = ">=3.11"
@@ -70,5 +70,5 @@ module = ["testcontainers.*", "jsonschema.*", "anthropic.*", "openai.*", "redis.
 ignore_missing_imports = true
 # Treat the optional external SDKs as untyped whether or not they are installed, so the
 # type-check is identical with the demo extra present (the benchmark's real-model runs)
-# or absent (dev/CI). Their neutral-dict adapters (acp_ap_demo.llm) match at runtime.
+# or absent (dev/CI). Their neutral-dict adapters (stonefold_ap_demo.llm) match at runtime.
 follow_imports = "skip"

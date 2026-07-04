@@ -26,11 +26,11 @@ pytest.importorskip("testcontainers.postgres")
 import psycopg  # noqa: E402
 from testcontainers.postgres import PostgresContainer  # noqa: E402
 
-from acp_core import Actor, Connectors, PendingState, RawCall, Session  # noqa: E402
-from acp_core.kill import KillScope, KillTarget  # noqa: E402
-from acp_connectors import InMemoryConnector  # noqa: E402
-from acp_store.outbox_pg import PostgresOutboxStore, create_schema  # noqa: E402
-from acp_store.kill_pg import PostgresKillStore, create_kill_schema  # noqa: E402
+from stonefold_core import Actor, Connectors, PendingState, RawCall, Session  # noqa: E402
+from stonefold_core.kill import KillScope, KillTarget  # noqa: E402
+from stonefold_connectors import InMemoryConnector  # noqa: E402
+from stonefold_store.outbox_pg import PostgresOutboxStore, create_schema  # noqa: E402
+from stonefold_store.kill_pg import PostgresKillStore, create_kill_schema  # noqa: E402
 from tests.conftest import full_registry  # noqa: E402
 
 pytestmark = pytest.mark.integration

@@ -1,0 +1,208 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://stonefold.io/schema/v0.1/stele.schema.json",
+  "title": "Agent Control Policy (ACP) v0.1",
+  "description": "Schema for ACP policy documents. Semantics are defined in docs/01-RFC-agent-control-policy.md. This schema enforces structure; some rules (deny-overrides, registry existence, irreversible+open) are checked by the linter, not by JSON Schema.",
+  "type": "object",
+  "required": ["agent", "allow"],
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": { "type": "string", "examples": ["stele/v0.1"] },
+    "agent": { "type": "string", "minLength": 1 },
+    "extends": { "type": "array", "items": { "type": "string" } },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "failureMode": { "enum": ["closed", "open"] },
+        "audit": { "enum": ["none", "basic", "full"] },
+        "killable": { "type": "boolean" }
+      }
+    },
+    "allow": { "$ref": "#/$defs/permissionList" },
+    "deny": { "$ref": "#/$defs/permissionList" },
+    "scope": {
+      "type": "object",
+      "description": "resource -> named scope predicate",
+      "additionalProperties": { "type": "string" }
+    },
+    "gates": {
+      "type": "object",
+      "description": "key is a named action, a kind, or '*'; value is a set of gates",
+      "additionalProperties": { "$ref": "#/$defs/gateSet" }
+    },
+    "standing": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "when", "enables"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string" },
+          "when": { "type": "string" },
+          "enables": { "$ref": "#/$defs/permissionMap" }
+        }
+      }
+    },
+    "killable": { "type": "boolean" },
+    "audit": { "enum": ["none", "basic", "full"] }
+  },
+  "$defs": {
+    "kind": { "enum": ["observe", "assess", "record", "effect", "transition"] },
+    "permissionList": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/permissionMap" }
+    },
+    "permissionMap": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "observe": { "$ref": "#/$defs/targets" },
+        "assess": { "$ref": "#/$defs/targets" },
+        "record": { "$ref": "#/$defs/targets" },
+        "effect": { "$ref": "#/$defs/targets" },
+        "transition": { "$ref": "#/$defs/targets" }
+      }
+    },
+    "targets": {
+      "description": "Either a list of resources/actions, '*', or a map Resource -> [named actions].",
+      "oneOf": [
+        { "type": "string", "const": "*" },
+        { "type": "array", "items": { "type": "string" } },
+        {
+          "type": "object",
+          "additionalProperties": { "type": "array", "items": { "type": "string" } }
+        }
+      ]
+    },
+    "gateSet": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rate": { "$ref": "#/$defs/rate" },
+        "quota": { "$ref": "#/$defs/rate" },
+        "valueLimit": { "$ref": "#/$defs/valueLimit" },
+        "spendLimit": { "$ref": "#/$defs/spend" },
+        "allowlist": { "$ref": "#/$defs/listGate" },
+        "denylist": { "$ref": "#/$defs/listGate" },
+        "precondition": { "$ref": "#/$defs/precondition" },
+        "contentCheck": { "$ref": "#/$defs/stringOrList" },
+        "requireApproval": { "$ref": "#/$defs/approval" },
+        "dualAuthorization": { "$ref": "#/$defs/approval" },
+        "window": { "$ref": "#/$defs/window" },
+        "quantityCap": { "$ref": "#/$defs/quantityCap" },
+        "disclosure": { "$ref": "#/$defs/disclosure" },
+        "emissionControl": { "$ref": "#/$defs/precondition" },
+        "requireExplanation": { "type": "boolean" }
+      }
+    },
+    "rate": {
+      "oneOf": [
+        { "type": "string", "pattern": "^[0-9]+/(second|minute|hour|day)$" },
+        {
+          "type": "object",
+          "required": ["limit"],
+          "additionalProperties": false,
+          "properties": {
+            "limit": { "type": "string", "pattern": "^[0-9]+/(second|minute|hour|day)$" },
+            "per": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "valueLimit": {
+      "type": "object",
+      "required": ["field"],
+      "additionalProperties": false,
+      "properties": {
+        "field": { "type": "string" },
+        "max": { "type": "number" },
+        "min": { "type": "number" },
+        "currency": { "type": "string" },
+        "when": { "type": "string" }
+      }
+    },
+    "spend": {
+      "oneOf": [
+        { "type": "string", "pattern": "^[0-9]+/(session|task|hour|day)$" },
+        { "type": "number" }
+      ]
+    },
+    "listGate": {
+      "type": "object",
+      "required": ["field"],
+      "additionalProperties": false,
+      "properties": {
+        "field": { "type": "string" },
+        "set": { "type": "string" },
+        "values": { "type": "array", "items": { "type": "string" } },
+        "when": { "type": "string" }
+      }
+    },
+    "precondition": {
+      "oneOf": [
+        { "type": "array", "items": { "type": "string" } },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "from": { "type": "array", "items": { "type": "string" } },
+            "checks": { "type": "array", "items": { "type": "string" } },
+            "when": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "when": { "type": "string" },
+        "approvers": { "type": "string" },
+        "quorum": { "type": "integer", "minimum": 1 },
+        "timeout": { "type": "string", "pattern": "^[0-9]+(s|m|h|d)$" },
+        "onTimeout": { "enum": ["deny", "allow"] },
+        "mode": { "enum": ["approve", "confirm"] },
+        "distinctFrom": { "type": "string" }
+      }
+    },
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "days": { "type": "array", "items": { "enum": ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"] } },
+        "hours": { "type": "string" },
+        "tz": { "type": "string" },
+        "from": { "type": "string" },
+        "to": { "type": "string" }
+      }
+    },
+    "quantityCap": {
+      "type": "object",
+      "required": ["per", "limit", "window"],
+      "additionalProperties": false,
+      "properties": {
+        "per": { "type": "string" },
+        "limit": { "type": "integer", "minimum": 1 },
+        "window": { "type": "string", "pattern": "^[0-9]+(s|m|h|d)$" },
+        "of": { "type": "string" }
+      }
+    },
+    "disclosure": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "when": { "type": "string" },
+        "allowSink": { "type": "array", "items": { "type": "string" } },
+        "maxClassification": { "type": "string" }
+      }
+    },
+    "stringOrList": {
+      "oneOf": [
+        { "type": "string" },
+        { "type": "array", "items": { "type": "string" } }
+      ]
+    }
+  }
+}

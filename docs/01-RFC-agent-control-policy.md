@@ -7,15 +7,15 @@
 **Status:** Draft v0.4 (reference specification; supersedes v0.3). **Authors:** the agent-platform team.
 **Audience:** engineers implementing or writing policies, and reviewers (security, compliance) who must read and certify them.
 
-> **Compatibility:** v0.4 promotes the two deferred timing guarantees (decision freshness, scope no-race) from *documented boundary* to *specified behaviour* — **no policy-file syntax changed**; `schema/acp.schema.json` is unchanged and existing `apiVersion: acp/v0.1` policy files remain valid as-is. CS-017 adds gateway behaviour + deployment configuration; CS-018 adds a declared connector capability (connector metadata, additive). Deltas: v0.1 → v0.2 is `docs/RFC-changeset-v0.1-to-v0.2.md`; v0.2 → v0.3 is `docs/RFC-changeset-v0.2-to-v0.3.md`; v0.3 → v0.4 is `docs/RFC-changeset-v0.3-to-v0.4.md`. A **draft** set for the next revision is accumulating in `docs/RFC-changeset-v0.4-to-v0.5.md`.
+> **Compatibility:** v0.4 promotes the two deferred timing guarantees (decision freshness, scope no-race) from *documented boundary* to *specified behaviour* — **no policy-file syntax changed**; `schema/stele.schema.json` is unchanged and existing `apiVersion: stele/v0.1` policy files remain valid as-is. CS-017 adds gateway behaviour + deployment configuration; CS-018 adds a declared connector capability (connector metadata, additive). Deltas: v0.1 → v0.2 is `docs/RFC-changeset-v0.1-to-v0.2.md`; v0.2 → v0.3 is `docs/RFC-changeset-v0.2-to-v0.3.md`; v0.3 → v0.4 is `docs/RFC-changeset-v0.3-to-v0.4.md`. A **draft** set for the next revision is accumulating in `docs/RFC-changeset-v0.4-to-v0.5.md`.
 
 ## Changelog — v0.4 → v0.5 (draft, accumulating)
 
 | ID | Type | §  | Summary |
 |----|------|----|---------|
 | CS-019 | ADDED | §1 | **Trust boundary stated.** The gateway proves *intents conform to policy*; it does not prove the executing code does what it declares. Connectors, hooks, and the gateway are the trusted computing base; their integrity is a supply-chain property. Text only; non-normative discussion in docs/13. |
-| CS-020 | ADDED | registry §5; §10 | **Connector digest pinning.** A connector declaration MAY pin its implementing artifact by `sha256` digest; when declared, the gateway MUST verify at policy load and at dispatch — mismatch is a dependency failure under §10 (fail closed, audited). Additive; existing registries unaffected. Reference implementation shipped (`acp_core.digest`). |
-| CS-021 | ADDED | arch. decision 11 | **Identity-provider seam.** The session's authenticated `actor:`/`agent:` identities come from an `IdentityProvider` protocol ahead of the pipeline; built-in default is the existing session/transport auth (no behavioural change). No credential scheme integrated or endorsed. Invariant 3 binds every provider. Reference implementation shipped (`acp_gateway.identity`). |
+| CS-020 | ADDED | registry §5; §10 | **Connector digest pinning.** A connector declaration MAY pin its implementing artifact by `sha256` digest; when declared, the gateway MUST verify at policy load and at dispatch — mismatch is a dependency failure under §10 (fail closed, audited). Additive; existing registries unaffected. Reference implementation shipped (`stonefold_core.digest`). |
+| CS-021 | ADDED | arch. decision 11 | **Identity-provider seam.** The session's authenticated `actor:`/`agent:` identities come from an `IdentityProvider` protocol ahead of the pipeline; built-in default is the existing session/transport auth (no behavioural change). No credential scheme integrated or endorsed. Invariant 3 binds every provider. Reference implementation shipped (`stonefold_gateway.identity`). |
 | CS-022 | FIXED | §9 | **Kill wording reconciled with the two axes.** The operator hard-kill is unconditional — a policy cannot opt out; `killable` is a *manner-of-stopping* declaration that guards automated halts and informs, but never blocks, the operator. Replaces §9's opening and retires its UNDER-REVIEW note. Text only; the graceful-halt wiring stays deferred (docs/03). |
 | CS-023 | ADDED | §12; SIF §5 | **Batch decision semantics.** A SIF batch is decided atomically: every operation is decided first (each with its own audit record); any DENY/HALT refuses the whole batch before anything commits or stages; a HOLD stages per §4.4 and does not refuse the batch (committed `record` ops are not rolled back by a later reject/expiry). Reference implementation pending (the reference accepts single-operation intents today). |
 | CS-024 | CLARIFIED | §7.12; registry §4 | **Classification ordering.** `disclosure.maxClassification` compares by the classification set's **declared order**; the built-in `resultSensitivity` values are ordered `public < internal < confidential < restricted`; a domain substituting its own labels MUST declare them as an ordered value set in the registry. A value missing from the declared order fails closed (§8). |
@@ -33,7 +33,7 @@
 | ID | Type | §  | Summary |
 |----|------|----|---------|
 | CS-010 | FIXED | §7.15, §14.3, §13 | `standing` cannot re-enable an explicit `deny` — deny always wins (§6.2). §14.3 wrongly listed `engage` under `deny` while a standing rule enabled it; corrected to rely on **default**-deny. New lint rule 11: an action in both `deny` and a `standing` rule's `enables` ⇒ **error** (the grant is unsatisfiable). |
-| CS-011 | FIXED | §7.13 | `emissionControl` example syntax corrected to `{ checks: [...] }` — the previous `{ precondition: [...] }` spelling did not validate against `schema/acp.schema.json` (the fixtures already used `checks`). Also clarified when the gate resolves `hold` vs `fail`. |
+| CS-011 | FIXED | §7.13 | `emissionControl` example syntax corrected to `{ checks: [...] }` — the previous `{ precondition: [...] }` spelling did not validate against `schema/stele.schema.json` (the fixtures already used `checks`). Also clarified when the gate resolves `hold` vs `fail`. |
 | CS-012 | CLARIFIED | §6.1, §13 | Bare-name grant resolution defined: a bare token under a kind matches the **resource** of that name (all of that kind's actions on it) or **any declared action of that kind with that name**, on every resource that declares it. New lint rule 12: a bare action name in `allow` that resolves on more than one resource ⇒ **warn** (use the map form). A bare-name `deny` deliberately matches them all. |
 | CS-013 | CHANGED | §8 | Grammar amendment: the right side of `in` / `not in` MAY be a function (e.g. `context.time in window("08:00-18:00")`), and string literals may be single- or double-quoted — legalising the form §7.15's example already used. No other operator/function change. |
 | CS-014 | ADDED | §13 | New lint rule 13: `dualAuthorization` with an explicit `quorum` < 2 ⇒ **error** (contradicts the gate's definition, §7.9). |
@@ -101,7 +101,7 @@ A policy document is YAML. Top-level keys:
 
 | Key | Required | Purpose | Section |
 |---|---|---|---|
-| `apiVersion` | SHOULD | Spec version, e.g. `acp/v0.1`. | — |
+| `apiVersion` | SHOULD | Spec version, e.g. `stele/v0.1`. | — |
 | `agent` | **MUST** | The agent identity this policy governs. | §2 |
 | `extends` | MAY | List of fragment policies to compose/inherit. | §3.2 |
 | `defaults` | MAY | Document-wide defaults (`failureMode`, `audit`, `killable`). | §9–§11 |
@@ -559,7 +559,7 @@ Each example exercises several kinds and gates. Together they cover all five kin
 ### 14.1 Customer support assistant (data / business)
 *All reads scoped to the user's own customers; may email within corporate domains under rate, daily-quota, and DLP limits, with a session spend ceiling on all effects; may never refund or export; anything **high-impact** needs a supervisor (approval keys on stakes — `operativeForce` — not reversibility; see §5 note).*
 ```yaml
-apiVersion: acp/v0.1
+apiVersion: stele/v0.1
 agent: support-assistant
 defaults: { failureMode: closed, audit: full }
 killable: true
@@ -598,7 +598,7 @@ gates:
 ### 14.2 Ward nurse assistant (healthcare — observe, assess, record, effect, transition)
 *Reads scoped to the nurse's ward; sealed records need break-glass; triage is an explained, confirmed assessment; administration enforces five-rights and a per-patient dose cap and is irreversible; signing an order is a gated transition; prescribing is forbidden.*
 ```yaml
-apiVersion: acp/v0.1
+apiVersion: stele/v0.1
 agent: ward-nurse-assistant
 defaults: { failureMode: closed, audit: full }
 killable: true
@@ -640,7 +640,7 @@ gates:
 ### 14.3 Air/maritime track operator (defence — observe vs emitting effect, assess, transition, gated kinetic effect)
 *Passive reads are clearance-scoped with disclosure control; an active radar sweep is an emitting `effect` needing deconfliction; combat-ID is an explained, dual-confirmed assessment; engagement is enabled only under a standing ROE state and requires positive ID, a collateral ceiling, and dual authorization — outside that state it falls to default-deny (deliberately **not** an explicit `deny`, which would beat the standing grant; §7.15, §13 rule 11).*
 ```yaml
-apiVersion: acp/v0.1
+apiVersion: stele/v0.1
 agent: track-operator-assistant
 defaults: { failureMode: closed, audit: full }
 killable: true
@@ -683,7 +683,7 @@ gates:
 ### 14.4 Payments operations agent (finance — tiered effects, dual-auth, sanctions, transition)
 *Reads tenant-scoped; small payments auto-clear, mid-size need approval, large need dual authorization and a new-payee hold; sanctioned destinations are denied; export is forbidden.*
 ```yaml
-apiVersion: acp/v0.1
+apiVersion: stele/v0.1
 agent: payments-ops-agent
 defaults: { failureMode: closed, audit: full }
 killable: true
@@ -721,7 +721,7 @@ gates:
 ### 14.5 Legal matter assistant (data / business — ties to the repo demo)
 *Reads scoped to the client; time entries and tasks are routine records; the `Engage` transition is legal only from `conflict_check` (the exact behaviour the repo already demonstrates); e-filing is allow-listed to approved courts, partner-approved, and confined to court hours; email is DLP-checked.*
 ```yaml
-apiVersion: acp/v0.1
+apiVersion: stele/v0.1
 agent: legal-matter-assistant
 defaults: { failureMode: closed, audit: full }
 killable: true
@@ -753,7 +753,7 @@ gates:
 ### 14.6 Industrial vehicle controller (cyber-physical — bounded continuous effect)
 *Setting target speed is inert; applying it is a safety-gated effect bounded by sensors and posted limits; the vehicle lifecycle is a transition; everything is killable.*
 ```yaml
-apiVersion: acp/v0.1
+apiVersion: stele/v0.1
 agent: vehicle-controller
 defaults: { failureMode: closed, audit: full }
 killable: true

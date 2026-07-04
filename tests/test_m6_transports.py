@@ -13,7 +13,7 @@ from typing import Any
 
 import pytest
 
-from acp_core import (
+from stonefold_core import (
     Actor,
     Connectors,
     Decision,
@@ -23,9 +23,9 @@ from acp_core import (
     enforce,
     load_policy,
 )
-from acp_connectors import InMemoryConnector
-from acp_gates.engine import DefaultGateEngine
-from acp_gateway.transport import (
+from stonefold_connectors import InMemoryConnector
+from stonefold_gates.engine import DefaultGateEngine
+from stonefold_gateway.transport import (
     CoverageError,
     Gateway,
     MCPProxy,
@@ -34,7 +34,7 @@ from acp_gateway.transport import (
     interception_coverage_check,
     submit_intent_schema,
 )
-from acp_store import InMemoryOutboxStore
+from stonefold_store import InMemoryOutboxStore
 from tests.conftest import full_registry, load_schema
 
 ALICE = Actor(id="alice")

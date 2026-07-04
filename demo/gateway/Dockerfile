@@ -23,4 +23,4 @@ COPY demo ./demo
 RUN pip install -e ".[demo]"
 
 EXPOSE 8088
-CMD ["uvicorn", "acp_ap_demo.app:make_app", "--factory", "--host", "0.0.0.0", "--port", "8088"]
+CMD ["uvicorn", "stonefold_ap_demo.app:make_app", "--factory", "--host", "0.0.0.0", "--port", "8088"]

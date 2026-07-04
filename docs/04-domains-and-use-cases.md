@@ -45,7 +45,7 @@ The agent emits the **same shape of intent** regardless of substrate, and **neve
 - **Connector:** device driver / control bus.
 - **Intent:** `{ "kind":"effect", "entity":"Vehicle", "action":"applySpeed", "data":{ "kph":30 } }`
 - **Key gates:** `valueLimit` (0–130 kph), `precondition: [surroundingsClear, withinPostedLimit]`, `emissionControl` for emitting sensors.
-- **Protects against:** unsafe physical commands, emitting (revealing position) without authorization. (See [`../examples/vehicle-controller.acp.yaml`](../examples/vehicle-controller.acp.yaml).)
+- **Protects against:** unsafe physical commands, emitting (revealing position) without authorization. (See [`../examples/vehicle-controller.stele.yaml`](../examples/vehicle-controller.stele.yaml).)
 
 ### 5. Cloud / DevOps infrastructure
 - **Resources/actions:** `Service.restart` / `scale` (`effect`), `Resource.delete` (`effect`), `Deployment.promote` (`transition`), metrics (`observe`).
@@ -59,7 +59,7 @@ The agent emits the **same shape of intent** regardless of substrate, and **neve
 - **Connector:** payment processor / banking API.
 - **Intent:** `{ "kind":"effect", "entity":"Payment", "action":"pay", "data":{ "amount":800 }, "resolve":{ "payee":{ "entity":"Payee", "filters":{ "name":"Acme" } } } }`
 - **Key gates:** tiered `requireApproval`/`dualAuthorization` by amount, `denylist` on sanctioned destinations, new-payee cooling-off `precondition`.
-- **Protects against:** fraudulent wires (the runnable demo — [`05-demo-spec.md`](05-demo-spec.md), [`../examples/payments-ops.acp.yaml`](../examples/payments-ops.acp.yaml)).
+- **Protects against:** fraudulent wires (the runnable demo — [`05-demo-spec.md`](05-demo-spec.md), [`../examples/payments-ops.stele.yaml`](../examples/payments-ops.stele.yaml)).
 
 ### 7. External services (data the system doesn't own)
 - **Resources/actions:** `CreditScore`, `SanctionsListEntry`, `WeatherSnapshot`, `CriminalRecord` (`observe`, or `record` to capture a snapshot).
@@ -72,7 +72,7 @@ The agent emits the **same shape of intent** regardless of substrate, and **neve
 - **Resources/actions:** reads with sensitivity (`observe`), decisions like triage or combat-ID (`assess`), clinical/operational acts (`effect`), lifecycle steps (`transition`).
 - **Connector:** EHR / mission systems.
 - **Key gates:** `disclosure` + break-glass approval on sensitive reads, `requireExplanation` + human-confirm on `assess`, `quantityCap`/`precondition` on `effect`, `dualAuthorization` on the gravest actions.
-- **Protects against:** privacy breaches, unaccountable decisions, unsafe or unauthorized actions. (See [`../examples/ward-nurse.acp.yaml`](../examples/ward-nurse.acp.yaml), [`../examples/track-operator.acp.yaml`](../examples/track-operator.acp.yaml).)
+- **Protects against:** privacy breaches, unaccountable decisions, unsafe or unauthorized actions. (See [`../examples/ward-nurse.stele.yaml`](../examples/ward-nurse.stele.yaml), [`../examples/track-operator.stele.yaml`](../examples/track-operator.stele.yaml).)
 
 ---
 

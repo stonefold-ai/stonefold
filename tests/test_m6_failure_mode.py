@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from acp_core import (
+from stonefold_core import (
     Actor,
     Connectors,
     Decision,
@@ -22,14 +22,14 @@ from acp_core import (
     enforce,
     load_policy,
 )
-from acp_core.audit import FallbackAuditSink
-from acp_core.enums import Kind, Reversibility
-from acp_core.failure import Ok, Unavailable, guard, should_fail_closed
-from acp_core.models import AuditRecord, Attributes, ResolvedAction
-from acp_core.policy import FailureMode
-from acp_connectors import InMemoryConnector
-from acp_gates.engine import DefaultGateEngine
-from acp_store import InMemoryOutboxStore
+from stonefold_core.audit import FallbackAuditSink
+from stonefold_core.enums import Kind, Reversibility
+from stonefold_core.failure import Ok, Unavailable, guard, should_fail_closed
+from stonefold_core.models import AuditRecord, Attributes, ResolvedAction
+from stonefold_core.policy import FailureMode
+from stonefold_connectors import InMemoryConnector
+from stonefold_gates.engine import DefaultGateEngine
+from stonefold_store import InMemoryOutboxStore
 from tests.conftest import full_registry, load_schema
 
 

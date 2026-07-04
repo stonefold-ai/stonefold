@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from acp_core import (
+from stonefold_core import (
     ConditionRuntimeError,
     EvalContext,
     MissingValueError,

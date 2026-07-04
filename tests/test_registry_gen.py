@@ -1,4 +1,4 @@
-"""acp_registry_gen — the authoring-time registry drafting tool.
+"""stonefold_registry_gen — the authoring-time registry drafting tool.
 
 The generator turns what an integrator already has (SQL DDL, an OpenAPI spec,
 an MCP tool list) into a DRAFT registry in the v1.x authoring format
@@ -22,14 +22,14 @@ from typing import Any
 
 import yaml
 
-from acp_registry_gen import (
+from stonefold_registry_gen import (
     draft_from_mcp_tools,
     draft_from_openapi,
     draft_from_sql,
     emit_yaml,
     validate_registry_yaml,
 )
-from acp_registry_gen.kinds import guess_kind, pascal, singular, split_words, suggest_reversibility
+from stonefold_registry_gen.kinds import guess_kind, pascal, singular, split_words, suggest_reversibility
 
 
 # --------------------------------------------------------------------------
@@ -240,7 +240,7 @@ def test_mcp_draft_emits_schema_valid_yaml() -> None:
 # CLI
 # --------------------------------------------------------------------------
 def test_cli_end_to_end(tmp_path: Path) -> None:
-    from acp_registry_gen.__main__ import main
+    from stonefold_registry_gen.__main__ import main
 
     src = tmp_path / "tools.json"
     src.write_text(json.dumps(MCP_TOOLS), encoding="utf-8")

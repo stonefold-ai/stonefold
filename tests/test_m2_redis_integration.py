@@ -24,10 +24,10 @@ pytest.importorskip("testcontainers.redis")
 import redis as redislib  # noqa: E402
 from testcontainers.redis import RedisContainer  # noqa: E402
 
-from acp_core.enums import Outcome  # noqa: E402
-from acp_core.gating import RequestEnv  # noqa: E402
-from acp_gates.gates import rate, spend_limit  # noqa: E402
-from acp_store.redis_store import RedisCounterStore  # noqa: E402
+from stonefold_core.enums import Outcome  # noqa: E402
+from stonefold_core.gating import RequestEnv  # noqa: E402
+from stonefold_gates.gates import rate, spend_limit  # noqa: E402
+from stonefold_store.redis_store import RedisCounterStore  # noqa: E402
 from tests.conftest import gate_ctx  # noqa: E402
 
 pytestmark = pytest.mark.integration

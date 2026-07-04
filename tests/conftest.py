@@ -8,19 +8,19 @@ from typing import Any
 
 import yaml
 
-from acp_core import Actor, InMemoryRegistry, RawCall, Session, load_registry
-from acp_core.gating import RequestEnv
-from acp_core.policy import FailureMode
-from acp_gates.base import GateContext, PreconditionCheck
-from acp_gates.content import ContentHookRegistry, default_hooks
-from acp_gates.engine import build_eval_context
-from acp_store import CounterStore, InMemoryCounterStore
+from stonefold_core import Actor, InMemoryRegistry, RawCall, Session, load_registry
+from stonefold_core.gating import RequestEnv
+from stonefold_core.policy import FailureMode
+from stonefold_gates.base import GateContext, PreconditionCheck
+from stonefold_gates.content import ContentHookRegistry, default_hooks
+from stonefold_gates.engine import build_eval_context
+from stonefold_store import CounterStore, InMemoryCounterStore
 
 FIXTURES = Path(__file__).parent / "fixtures"
 PROJECT_ROOT = Path(__file__).parent.parent
 EXAMPLES = PROJECT_ROOT / "examples"
 REGISTRY_DIR = PROJECT_ROOT / "registry"
-SCHEMA = PROJECT_ROOT / "schema" / "acp.schema.json"
+SCHEMA = PROJECT_ROOT / "schema" / "stele.schema.json"
 
 
 def load_yaml(path: Path) -> dict[str, Any]:
@@ -36,7 +36,7 @@ def min_registry() -> InMemoryRegistry:
 
 def full_registry() -> InMemoryRegistry:
     """The example-covering registry (M1+)."""
-    return load_registry(load_yaml(REGISTRY_DIR / "acp-registry.yaml"))
+    return load_registry(load_yaml(REGISTRY_DIR / "stonefold-registry.yaml"))
 
 
 def load_schema() -> dict[str, Any]:
@@ -48,12 +48,12 @@ def load_schema() -> dict[str, Any]:
 def valid_example_paths() -> list[Path]:
     """Every example except the INTENTIONALLY-INVALID fixture."""
     return sorted(
-        p for p in EXAMPLES.glob("*.acp.yaml") if not p.name.startswith("INVALID")
+        p for p in EXAMPLES.glob("*.stele.yaml") if not p.name.startswith("INVALID")
     )
 
 
 def invalid_example_path() -> Path:
-    return EXAMPLES / "INVALID-open-on-irreversible.acp.yaml"
+    return EXAMPLES / "INVALID-open-on-irreversible.stele.yaml"
 
 
 # --- M2 gate helpers -----------------------------------------------------

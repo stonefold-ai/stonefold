@@ -29,13 +29,13 @@ pytest.importorskip("testcontainers.postgres")
 import psycopg  # noqa: E402
 from testcontainers.postgres import PostgresContainer  # noqa: E402
 
-from acp_core import Actor, PendingState, RawCall, Session  # noqa: E402
-from acp_core.audit import build_record  # noqa: E402
-from acp_core.enums import Decision  # noqa: E402
-from acp_core.models import AuditRecord, EvalResult  # noqa: E402
-from acp_connectors import InMemoryConnector  # noqa: E402
-from acp_store.audit_pg import PostgresAuditSink, create_audit_schema  # noqa: E402
-from acp_store.outbox_pg import PostgresOutboxStore, create_schema  # noqa: E402
+from stonefold_core import Actor, PendingState, RawCall, Session  # noqa: E402
+from stonefold_core.audit import build_record  # noqa: E402
+from stonefold_core.enums import Decision  # noqa: E402
+from stonefold_core.models import AuditRecord, EvalResult  # noqa: E402
+from stonefold_connectors import InMemoryConnector  # noqa: E402
+from stonefold_store.audit_pg import PostgresAuditSink, create_audit_schema  # noqa: E402
+from stonefold_store.outbox_pg import PostgresOutboxStore, create_schema  # noqa: E402
 from tests.conftest import full_registry  # noqa: E402
 
 pytestmark = pytest.mark.integration

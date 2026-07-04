@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from acp_core import ConditionError, parse_and_validate, parse_condition
-from acp_core.condition import And, Compare, Exists, InExpr, Literal, Not, Or, Path
+from stonefold_core import ConditionError, parse_and_validate, parse_condition
+from stonefold_core.condition import And, Compare, Exists, InExpr, Literal, Not, Or, Path
 
 
 def test_simple_comparison() -> None:

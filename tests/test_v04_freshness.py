@@ -14,7 +14,7 @@ from typing import Any
 
 import pytest
 
-from acp_core import (
+from stonefold_core import (
     Actor,
     ApprovalError,
     Decision,
@@ -27,10 +27,10 @@ from acp_core import (
     enforce,
     load_policy,
 )
-from acp_core.freshness import STALE_DECISION, VOLATILE_GATES, stale_guard_reason
-from acp_connectors import InMemoryConnector
-from acp_gates.engine import DefaultGateEngine, make_dispatch_revalidator
-from acp_store import DispatchWorker, InMemoryOutboxStore
+from stonefold_core.freshness import STALE_DECISION, VOLATILE_GATES, stale_guard_reason
+from stonefold_connectors import InMemoryConnector
+from stonefold_gates.engine import DefaultGateEngine, make_dispatch_revalidator
+from stonefold_store import DispatchWorker, InMemoryOutboxStore
 from tests.conftest import full_registry, load_schema
 
 T0 = datetime(2026, 7, 2, 9, 0, tzinfo=timezone.utc)
@@ -74,7 +74,7 @@ class Harness:
         """A dispatch worker whose clock and volatile re-validation see ``now``."""
         connectors_map = {"email": self.effect_conn, "sql": self.effect_conn,
                           "in_memory": self.effect_conn}
-        from acp_core import Connectors
+        from stonefold_core import Connectors
 
         return DispatchWorker(
             self.outbox,

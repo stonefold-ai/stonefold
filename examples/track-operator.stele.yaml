@@ -1,0 +1,38 @@
+apiVersion: stele/v0.1
+agent: track-operator-assistant
+defaults: { failureMode: closed, audit: full }
+killable: true
+
+allow:
+  - observe:    [Track, IntelRecord]          # passive
+  - assess:     [combatId, collateralEstimate]
+  - record:     [TrackAnnotation]
+  - effect:     [radarSweep]                   # emits
+  - transition: { Track: [identify, designate] }
+# 'engage' is deliberately absent from allow AND deny: default-deny covers the
+# off state, and the 'weapons-free' standing rule below is its only way in.
+# (An explicit deny would beat the standing grant — RFC §7.15, §13 rule 11.)
+
+standing:
+  - name: weapons-free
+    when: "context.roeState == 'weapons_free'"
+    enables: { effect: [engage] }
+
+scope:
+  Track:       inCompartment(actor.clearance)
+  IntelRecord: inCompartment(actor.clearance)
+
+gates:
+  observe:
+    disclosure: { maxClassification: actor.clearance }
+  radarSweep:                                  # emitting effect
+    emissionControl: { checks: [emconAuthorized, deconflicted] }
+  combatId:                                    # assess
+    requireExplanation: true
+    requireApproval: { mode: confirm, approvers: role:tactical-officer }
+  Track.designate:
+    precondition: { from: [identified] }
+  engage:                                      # effect, irreversible, kinetic
+    precondition:       [positiveIdentification]
+    valueLimit:         { field: data.collateralEstimate, max: 1 }
+    dualAuthorization:  { approvers: role:weapons-release-authority }

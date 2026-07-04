@@ -16,8 +16,8 @@ pytest.importorskip("fastapi")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from acp_ap_demo.app import create_app  # noqa: E402
-from acp_ap_demo.gateway import build_inmemory_bundle  # noqa: E402
+from stonefold_ap_demo.app import create_app  # noqa: E402
+from stonefold_ap_demo.gateway import build_inmemory_bundle  # noqa: E402
 
 DEMO_NOW = datetime(2026, 6, 28, 12, 0, 0, tzinfo=timezone.utc)
 _HDRS = {"X-Actor-Id": "ap-operator", "X-Session-Id": "http-1"}

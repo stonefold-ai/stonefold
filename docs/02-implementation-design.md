@@ -300,9 +300,9 @@ This gives at-least-once dispatch with idempotency (effectively once), a cancell
 **How.** Freshness is opt-in and off by default (v0.3 behaviour is unchanged when it's not configured). Wiring it takes three pieces:
 
 ```python
-from acp_core import FreshnessConfig, enforce
-from acp_gates.engine import make_dispatch_revalidator
-from acp_store import DispatchWorker
+from stonefold_core import FreshnessConfig, enforce
+from stonefold_gates.engine import make_dispatch_revalidator
+from stonefold_store import DispatchWorker
 
 freshness = FreshnessConfig(              # deployment config, NOT policy syntax
     default_ttl=timedelta(hours=24),      # every staged row; MUST be finite
@@ -338,8 +338,8 @@ The agent sees a cancelled ticket resolve to a recoverable refusal (`stale-decis
 **How.** Opt-in like freshness: give the dispatch worker the same scope resolver the pipeline uses, and nothing else changes.
 
 ```python
-from acp_core.scope import make_scope_resolver
-from acp_connectors import SqlConnector
+from stonefold_core.scope import make_scope_resolver
+from stonefold_connectors import SqlConnector
 
 # transactional connectors register the statement each effect dispatches to;
 # {scope} is where the predicate's constraint is ANDed in.
@@ -356,7 +356,7 @@ worker = DispatchWorker(
 
 Shipped declarations: `SqlConnector` and `InMemoryConnector` are `transactional`; `HttpConnector` (`http round-trip`) and `EmailConnector` (`smtp accept`) declare their windows. A custom transactional connector implements the `TransactionalDispatch` protocol and raises `ScopeLostError` when the re-asserted predicate selects nothing; one that declares `transactional` without implementing it fails closed (`scope-unavailable`). Spec text and acceptance scenarios: `docs/RFC-changeset-v0.3-to-v0.4.md` (CS-018), scenarios B4/B5, tests in `tests/test_v04_scope_norace.py` + the Postgres B4 test in `tests/test_m4_pg_integration.py`.
 
-Both §9.1 and §9.2 are wired live in everything this repo ships: the scripted demo (`acp_demo`), the Accounts-Payable demo (`acp_ap_demo`), and the TCK reference adapter — where the TCK's `freshness` profile certifies the behaviour black-box (docs/12 §4).
+Both §9.1 and §9.2 are wired live in everything this repo ships: the scripted demo (`stonefold_demo`), the Accounts-Payable demo (`stonefold_ap_demo`), and the TCK reference adapter — where the TCK's `freshness` profile certifies the behaviour black-box (docs/12 §4).
 
 ---
 

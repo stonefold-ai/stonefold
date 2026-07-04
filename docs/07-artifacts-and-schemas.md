@@ -23,7 +23,7 @@ These three are deliberately *not* one file, because they have opposite properti
 | Schema | Validates | Static or generated? | When it runs |
 |---|---|---|---|
 | `schema/registry.schema.json` | a registry file | **static** (you author) | author time + load |
-| `schema/acp.schema.json` | a policy file | **static** (you author) | author time + load |
+| `schema/stele.schema.json` | a policy file | **static** (you author) | author time + load |
 | **SIF tool schema** | the agent's intent | **generated from the registry** | built at startup; used every request |
 | `schema/sif.schema.json` | the intent's generic shape | **static, thin (L1 only)** | every request, before the generated check |
 
@@ -67,7 +67,7 @@ Dependency order to remember: **Registry → SIF (generated) → ACP (references
 
 **(a) Author / build time**
 - Write the **registry**; validate against `registry.schema.json`.
-- Write the **policy**; validate against `acp.schema.json`, then **lint against the registry** (every referenced name exists, `deny` included — you deny things that exist; ACP §13.1).
+- Write the **policy**; validate against `stele.schema.json`, then **lint against the registry** (every referenced name exists, `deny` included — you deny things that exist; ACP §13.1).
 - Optionally **sign** the policy (+ registry bundle) so the gateway will only run approved versions.
 
 **(b) Startup / load**
@@ -92,7 +92,7 @@ Steps 1–2 are "is this *valid* SIF for this domain?" (registry + SIF). Steps 3
 ## 6. Summary
 
 - **Three artifacts:** registry (the world), policy (what's allowed), intent (what's wanted) — separated by author, cadence, and trust.
-- **Two static schemas you author:** `registry.schema.json`, `acp.schema.json`.
+- **Two static schemas you author:** `registry.schema.json`, `stele.schema.json`.
 - **One generated schema:** the SIF tool schema, built from the registry at startup (this is what makes enum-injection real).
 - **One thin static schema:** `sif.schema.json`, generic L1 shape-checking only.
 - **The rule:** registry is the source of truth; SIF is generated from it; ACP references it. Validity (registry + SIF) is checked first, then permission (ACP).

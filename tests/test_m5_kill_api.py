@@ -12,11 +12,11 @@ pytest.importorskip("fastapi")
 from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
-from acp_core import Actor, InMemoryAuditSink, RawCall, Session  # noqa: E402
-from acp_core.kill import KillTarget  # noqa: E402
-from acp_store.kill_memory import InMemoryKillStore  # noqa: E402
-from acp_gateway.kill_api import create_kill_router  # noqa: E402
-from acp_gateway.kill_service import KillService  # noqa: E402
+from stonefold_core import Actor, InMemoryAuditSink, RawCall, Session  # noqa: E402
+from stonefold_core.kill import KillTarget  # noqa: E402
+from stonefold_store.kill_memory import InMemoryKillStore  # noqa: E402
+from stonefold_gateway.kill_api import create_kill_router  # noqa: E402
+from stonefold_gateway.kill_service import KillService  # noqa: E402
 from tests.conftest import full_registry  # noqa: E402
 
 

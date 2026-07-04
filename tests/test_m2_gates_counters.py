@@ -11,10 +11,10 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from acp_core.enums import Outcome
-from acp_core.gating import RequestEnv
-from acp_store import InMemoryCounterStore
-from acp_gates.gates import quantity_cap, quota, rate, spend_limit
+from stonefold_core.enums import Outcome
+from stonefold_core.gating import RequestEnv
+from stonefold_store import InMemoryCounterStore
+from stonefold_gates.gates import quantity_cap, quota, rate, spend_limit
 from tests.conftest import gate_ctx
 
 T0 = datetime(2026, 6, 28, 12, 0, tzinfo=timezone.utc)

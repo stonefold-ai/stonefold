@@ -17,14 +17,14 @@ pytest.importorskip("fastapi")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from acp_core import Connectors, InMemoryAuditSink, load_policy  # noqa: E402
-from acp_connectors import InMemoryConnector  # noqa: E402
-from acp_gates.engine import DefaultGateEngine  # noqa: E402
-from acp_gateway.kill_service import KillService  # noqa: E402
-from acp_gateway.main import create_app  # noqa: E402
-from acp_gateway.transport import Gateway  # noqa: E402
-from acp_store import InMemoryOutboxStore  # noqa: E402
-from acp_store.kill_memory import InMemoryKillStore  # noqa: E402
+from stonefold_core import Connectors, InMemoryAuditSink, load_policy  # noqa: E402
+from stonefold_connectors import InMemoryConnector  # noqa: E402
+from stonefold_gates.engine import DefaultGateEngine  # noqa: E402
+from stonefold_gateway.kill_service import KillService  # noqa: E402
+from stonefold_gateway.main import create_app  # noqa: E402
+from stonefold_gateway.transport import Gateway  # noqa: E402
+from stonefold_store import InMemoryOutboxStore  # noqa: E402
+from stonefold_store.kill_memory import InMemoryKillStore  # noqa: E402
 from tests.conftest import full_registry, load_schema
 
 

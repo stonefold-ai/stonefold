@@ -1,6 +1,6 @@
 apiVersion: registry/v1.0
 domain: payments
-# Domain model for the payments demo. Pairs with payments-ops.acp.yaml.
+# Domain model for the payments demo. Pairs with payments-ops.stele.yaml.
 # Defines the Payment entity and the `pay` action the policy references.
 
 connectors:
@@ -51,7 +51,7 @@ entities:
     actions:
       # Reversibility is a DOMAIN decision, not intrinsic to "payment": this demo
       # domain declares no in-system refund the gateway can route to, so `pay` is
-      # `irreversible` here. The central registry/acp-registry.yaml models the same
+      # `irreversible` here. The central registry/stonefold-registry.yaml models the same
       # action `compensable` with a declared `refund` compensation — both are
       # correct for their domain (RFC §5; docs/09 §4).
       pay:

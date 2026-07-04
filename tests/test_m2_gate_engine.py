@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from acp_core import (
+from stonefold_core import (
     Actor,
     Decision,
     InMemoryAuditSink,
@@ -19,9 +19,9 @@ from acp_core import (
     enforce,
     load_policy,
 )
-from acp_core.enums import Outcome
-from acp_core.gating import RequestEnv
-from acp_gates.engine import DefaultGateEngine
+from stonefold_core.enums import Outcome
+from stonefold_core.gating import RequestEnv
+from stonefold_gates.engine import DefaultGateEngine
 from tests.conftest import full_registry, load_schema
 
 

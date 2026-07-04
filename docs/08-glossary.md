@@ -17,7 +17,7 @@ An **agent** (an LLM) proposes what it wants as a **SIF intent** (typed, in doma
 ## The schemas
 
 - **`registry.schema.json`** — validates a registry file (static; you author).
-- **`acp.schema.json`** — validates a policy file (static; you author).
+- **`stele.schema.json`** — validates a policy file (static; you author).
 - **SIF tool schema** — validates the agent's intent; **generated from the registry** at startup (not a file you write).
 - **`sif.schema.json`** — a thin static schema for generic SIF *shape* checks only. (See `07`.)
 

@@ -18,4 +18,4 @@ COPY demo ./demo
 RUN pip install -e ".[demo]"
 
 # Overridden by `make attack-safe` / `make attack-unsafe` / `make demo`.
-CMD ["python", "-m", "acp_ap_demo.agent_cli", "--help"]
+CMD ["python", "-m", "stonefold_ap_demo.agent_cli", "--help"]

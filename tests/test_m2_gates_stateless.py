@@ -9,11 +9,11 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from acp_core.enums import Outcome
-from acp_core.gating import RequestEnv
-from acp_core.policy import FailureMode
-from acp_gates.content import ContentHookRegistry, HookTimeout
-from acp_gates.gates import (
+from stonefold_core.enums import Outcome
+from stonefold_core.gating import RequestEnv
+from stonefold_core.policy import FailureMode
+from stonefold_gates.content import ContentHookRegistry, HookTimeout
+from stonefold_gates.gates import (
     _WEEKDAYS,
     allowlist,
     content_check,

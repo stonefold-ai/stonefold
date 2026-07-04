@@ -1,7 +1,7 @@
 # Accounts-Payable Demo — the ACP Gateway in the path
 
 A **real AI agent** doing accounts-payable work behind the **real ACP gateway**,
-enforcing the **unmodified** [`examples/payments-ops.acp.yaml`](../examples/payments-ops.acp.yaml).
+enforcing the **unmodified** [`examples/payments-ops.stele.yaml`](../examples/payments-ops.stele.yaml).
 The bank and ledger are faked (no real money, all data fictional); the agent and
 the enforcement are real.
 
@@ -32,7 +32,7 @@ demo/
 └── ui/                     raw transcript · approvals · live trace · kill switch (served by the gateway)
 ```
 
-The Python lives in [`../src/acp_ap_demo/`](../src/acp_ap_demo) (so it is unit-
+The Python lives in [`../src/stonefold_ap_demo/`](../src/stonefold_ap_demo) (so it is unit-
 tested and `mypy --strict`-clean with the rest of the project); this directory is
 the deployment + runbook.
 
@@ -58,8 +58,8 @@ make down                     # stop everything, remove volumes
 ```bash
 docker compose up -d --build
 docker compose exec -T postgres psql -U acp -d acp < seed/ledger_seed.sql
-docker compose run --rm agent python -m acp_ap_demo.agent_cli --scenario inbox
-docker compose run --rm agent python -m acp_ap_demo            # walkthrough
+docker compose run --rm agent python -m stonefold_ap_demo.agent_cli --scenario inbox
+docker compose run --rm agent python -m stonefold_ap_demo            # walkthrough
 docker compose down -v
 ```
 
@@ -67,7 +67,7 @@ No Docker and no key? The whole walkthrough still runs in-process with the fake 
 
 ```bash
 # from the repo root, in the project venv
-python -m acp_ap_demo --provider fake
+python -m stonefold_ap_demo --provider fake
 ```
 
 ## The scenarios
@@ -98,7 +98,7 @@ and the gateway's raw decision for each — so nothing the agent sent is hidden.
 
 ## How a payment is decided (it's just the policy)
 
-Each `pay` is checked by `payments-ops.acp.yaml`'s gates:
+Each `pay` is checked by `payments-ops.stele.yaml`'s gates:
 - `valueLimit` / `denylist` / `rate` apply to every payment;
 - `requireApproval` holds a payment when `1000 < amount <= 10000` (so the $6,000 Globex
   invoice is held for a payments-manager), while the $800 Acme invoice passes;

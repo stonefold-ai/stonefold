@@ -10,7 +10,7 @@ audited. When no digest is declared, nothing changes (the overwhelming majority 
 registries): these tests pin that "no digest ⇒ no check" regression too.
 
 The reference implementation hashes the connector module's source bytes
-(``acp_core.digest``); the RFC deliberately leaves artifact identity to the
+(``stonefold_core.digest``); the RFC deliberately leaves artifact identity to the
 implementation, so tests compute the *expected* digest from the artifact under test
 rather than hard-coding a hex value.
 """
@@ -21,7 +21,7 @@ from typing import Any
 
 import pytest
 
-from acp_core import (
+from stonefold_core import (
     Actor,
     Compensation,
     Connectors,
@@ -33,7 +33,7 @@ from acp_core import (
     load_policy,
     load_registry,
 )
-from acp_core.digest import (
+from stonefold_core.digest import (
     DIGEST_MISMATCH,
     DigestMismatch,
     DigestMismatchError,
@@ -43,11 +43,11 @@ from acp_core.digest import (
     pinned_connector_mismatch,
     verify_connector_digests,
 )
-from acp_core.outbox import PendingState
-from acp_core.policy import FailureMode
-from acp_connectors import InMemoryConnector
-from acp_gates.engine import DefaultGateEngine
-from acp_store import DispatchWorker, InMemoryOutboxStore
+from stonefold_core.outbox import PendingState
+from stonefold_core.policy import FailureMode
+from stonefold_connectors import InMemoryConnector
+from stonefold_gates.engine import DefaultGateEngine
+from stonefold_store import DispatchWorker, InMemoryOutboxStore
 from tests.conftest import REGISTRY_DIR, full_registry, load_schema, load_yaml
 
 BOGUS = "sha256:" + "0" * 64
@@ -60,7 +60,7 @@ def _connector_of(resource: str, action: str) -> str:
 
 def _registry_with_digests(digests: dict[str, str]) -> Any:
     """The shipped compact registry with connector digests injected."""
-    data = load_yaml(REGISTRY_DIR / "acp-registry.yaml")
+    data = load_yaml(REGISTRY_DIR / "stonefold-registry.yaml")
     data["connector_digests"] = digests
     return load_registry(data)
 

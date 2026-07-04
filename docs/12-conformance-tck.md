@@ -2,16 +2,16 @@
 
 *How a gateway — in **any language** — proves it conforms to the ACP RFC.*
 
-The TCK (`src/acp_tck/`) is an implementation-independent, black-box test suite. You do not port the reference gateway's tests; you implement ONE small adapter — the **driver** — and the kit runs every acceptance scenario against your gateway, then reports which **conformance profiles** you certify. The Python reference implementation is certified by the same kit (`tests/test_tck_reference.py`), both in-process and through the wire binding.
+The TCK (`src/stonefold_tck/`) is an implementation-independent, black-box test suite. You do not port the reference gateway's tests; you implement ONE small adapter — the **driver** — and the kit runs every acceptance scenario against your gateway, then reports which **conformance profiles** you certify. The Python reference implementation is certified by the same kit (`tests/test_tck_reference.py`), both in-process and through the wire binding.
 
 ---
 
 ## 1. How to certify a new gateway (the short version)
 
-**If your gateway is Python:** implement the `acp_tck.driver.ConformanceDriver` protocol (≈200 lines of test-only glue — `acp_tck/adapters/reference.py` is the worked example) and run:
+**If your gateway is Python:** implement the `stonefold_tck.driver.ConformanceDriver` protocol (≈200 lines of test-only glue — `stonefold_tck/adapters/reference.py` is the worked example) and run:
 
 ```python
-from acp_tck import run_conformance
+from stonefold_tck import run_conformance
 from my_gateway.tck_adapter import MyDriver
 
 report = run_conformance(MyDriver(), implementation="my-gateway 0.1")
@@ -21,8 +21,8 @@ print(report.render())
 **If your gateway is Java / Go / Rust / anything else:** expose the **TCK harness API** (§6) in a *test build* of your gateway — fourteen small JSON endpoints — start it, and run:
 
 ```python
-from acp_tck import run_conformance
-from acp_tck.http_driver import HttpDriver
+from stonefold_tck import run_conformance
+from stonefold_tck.http_driver import HttpDriver
 
 driver = HttpDriver("http://localhost:9099")
 report = run_conformance(driver, implementation=driver.implementation_name())
@@ -49,7 +49,7 @@ A profile is **certified** only when every one of its checks passed. A check ski
 
 The driver is a **test-only adapter** over your gateway: it loads a registry+policy, seeds rows into the store behind the connectors, submits intents *as an authenticated actor*, steps the dispatch worker, and exposes what happened (effects that left, audit records written). It is the *test harness's* hands — it is **not** part of your gateway, and the harness API must never exist in a production build (it can reset state and seed data by design).
 
-Driver obligations (the contract is `acp_tck/driver.py`, one docstring per method):
+Driver obligations (the contract is `stonefold_tck/driver.py`, one docstring per method):
 
 | Method | Obligation |
 |---|---|
@@ -72,7 +72,7 @@ Determinism is the design principle: `dispatch_once` steps the worker instead of
 
 ## 3. Required registered-function semantics
 
-The fixture pack (`acp_tck/fixtures.py`) references five registered names. Your driver must register implementations with **exactly** these semantics for the TCK run (they are deliberately trivial — the kit tests your *gateway*, not your DLP vendor):
+The fixture pack (`stonefold_tck/fixtures.py`) references five registered names. Your driver must register implementations with **exactly** these semantics for the TCK run (they are deliberately trivial — the kit tests your *gateway*, not your DLP vendor):
 
 | Name | Kind | Required behaviour |
 |---|---|---|
@@ -109,7 +109,7 @@ A certification claim therefore reads "certifies TCK profiles X, Y, Z" — never
 
 ## 6. The wire binding (multi-language)
 
-The harness API is the driver contract as fourteen JSON endpoints — the full table with request/response shapes is in `acp_tck/http_driver.py`'s module docstring, and `acp_tck/adapters/http_harness.py` is the golden FastAPI example serving the reference. A non-Python gateway implements the same endpoints in its test build; `HttpDriver` does the rest. The whole suite runs through this path in CI (`test_wire_binding_certifies_end_to_end`), so the wire protocol itself is conformance-tested.
+The harness API is the driver contract as fourteen JSON endpoints — the full table with request/response shapes is in `stonefold_tck/http_driver.py`'s module docstring, and `stonefold_tck/adapters/http_harness.py` is the golden FastAPI example serving the reference. A non-Python gateway implements the same endpoints in its test build; `HttpDriver` does the rest. The whole suite runs through this path in CI (`test_wire_binding_certifies_end_to_end`), so the wire protocol itself is conformance-tested.
 
 Rules: the harness is **test builds only**; every endpoint returns 200 with a JSON body; timestamps are ISO-8601; a capability you don't advertise may leave its endpoint unimplemented.
 

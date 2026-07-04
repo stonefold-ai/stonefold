@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from acp_core import Kind, RawCall, Reversibility, UnknownActionError
+from stonefold_core import Kind, RawCall, Reversibility, UnknownActionError
 from tests.conftest import min_registry
 
 

@@ -12,13 +12,13 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from acp_core.enums import Decision, Outcome
-from acp_core.models import AuditRecord, GateResult
+from stonefold_core.enums import Decision, Outcome
+from stonefold_core.models import AuditRecord, GateResult
 
-from acp_evidence import build_evidence_pack, render_markdown
-from acp_evidence.__main__ import main
-from acp_evidence.controls import CONTROLS
-from acp_evidence.sources import records_from_jsonl, write_jsonl
+from stonefold_evidence import build_evidence_pack, render_markdown
+from stonefold_evidence.__main__ import main
+from stonefold_evidence.controls import CONTROLS
+from stonefold_evidence.sources import records_from_jsonl, write_jsonl
 
 _T0 = datetime(2026, 7, 2, 9, 0, 0, tzinfo=timezone.utc)
 _GEN = datetime(2026, 7, 2, 12, 0, 0, tzinfo=timezone.utc)
@@ -49,7 +49,7 @@ def _mixed() -> list[AuditRecord]:
 
 # --- aggregation ----------------------------------------------------------
 def test_pack_aggregates_decisions_and_window() -> None:
-    pack = build_evidence_pack(_mixed(), policy_ref="examples/payments-ops.acp.yaml",
+    pack = build_evidence_pack(_mixed(), policy_ref="examples/payments-ops.stele.yaml",
                                generated_at=_GEN)
     assert pack.total_records == 4
     assert pack.decision_counts == {"allow": 1, "hold": 1, "deny": 1, "halt": 1}
@@ -78,9 +78,9 @@ def test_oversight_present_only_with_events() -> None:
 
 
 def test_deployer_names_the_policy() -> None:
-    pack = build_evidence_pack(_mixed(), policy_ref="payments-ops.acp.yaml", generated_at=_GEN)
+    pack = build_evidence_pack(_mixed(), policy_ref="payments-ops.stele.yaml", generated_at=_GEN)
     facts = " ".join(next(c.facts for c in pack.controls if c.control.id == "art-26"))
-    assert "payments-ops.acp.yaml" in facts and "[VERIFY 26(6)]" in facts
+    assert "payments-ops.stele.yaml" in facts and "[VERIFY 26(6)]" in facts
 
 
 # --- the [VERIFY] markers are preserved -----------------------------------
@@ -110,7 +110,7 @@ def test_jsonl_roundtrip(tmp_path: Path) -> None:
 def test_cli_writes_markdown(tmp_path: Path) -> None:
     jsonl = write_jsonl(tmp_path / "audit.jsonl", _mixed())
     out = tmp_path / "pack.md"
-    rc = main(["--jsonl", str(jsonl), "--policy", "examples/payments-ops.acp.yaml", "-o", str(out)])
+    rc = main(["--jsonl", str(jsonl), "--policy", "examples/payments-ops.stele.yaml", "-o", str(out)])
     assert rc == 0 and out.exists()
     md = out.read_text(encoding="utf-8")
     assert "[VERIFY]" in md and "Audit evidence pack" in md
@@ -118,7 +118,7 @@ def test_cli_writes_markdown(tmp_path: Path) -> None:
 
 # --- end to end over real audit records -----------------------------------
 def test_pack_over_real_bundle_records() -> None:
-    from acp_ap_demo.gateway import build_inmemory_bundle
+    from stonefold_ap_demo.gateway import build_inmemory_bundle
 
     now = datetime(2026, 7, 2, 12, 0, 0, tzinfo=timezone.utc)
     bundle = build_inmemory_bundle(clock=lambda: now)

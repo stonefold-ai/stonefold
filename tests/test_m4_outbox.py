@@ -11,7 +11,7 @@ from typing import Any
 
 import pytest
 
-from acp_core import (
+from stonefold_core import (
     Actor,
     ConnectorResult,
     Connectors,
@@ -26,9 +26,9 @@ from acp_core import (
     enforce,
     load_policy,
 )
-from acp_connectors import InMemoryConnector
-from acp_gates.engine import DefaultGateEngine
-from acp_store import DispatchWorker, InMemoryOutboxStore
+from stonefold_connectors import InMemoryConnector
+from stonefold_gates.engine import DefaultGateEngine
+from stonefold_store import DispatchWorker, InMemoryOutboxStore
 from tests.conftest import full_registry, load_schema
 
 

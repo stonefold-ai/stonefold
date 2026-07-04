@@ -17,7 +17,7 @@ from typing import Any
 
 import pytest
 
-from acp_core import (
+from stonefold_core import (
     Actor,
     Connectors,
     Decision,
@@ -28,17 +28,17 @@ from acp_core import (
     enforce,
     load_policy,
 )
-from acp_core.connector import (
+from stonefold_core.connector import (
     SCOPE_LOST,
     ConnectorResult,
     ScopeCapability,
     ScopeReassertion,
     scope_capability_of,
 )
-from acp_core.models import ResolvedAction
-from acp_core.scope import ScopePredicate, make_scope_resolver
-from acp_connectors import InMemoryConnector
-from acp_store import DispatchWorker, InMemoryOutboxStore
+from stonefold_core.models import ResolvedAction
+from stonefold_core.scope import ScopePredicate, make_scope_resolver
+from stonefold_connectors import InMemoryConnector
+from stonefold_store import DispatchWorker, InMemoryOutboxStore
 from tests.conftest import full_registry, load_schema
 
 ACTOR = Actor(id="alice", claims={"tenant": "T1"})
@@ -277,7 +277,7 @@ def test_undeclared_connector_is_priced_as_an_undeclared_window() -> None:
 
 
 def test_shipped_connectors_declare_their_capability() -> None:
-    from acp_connectors import EmailConnector, HttpConnector, SqlConnector
+    from stonefold_connectors import EmailConnector, HttpConnector, SqlConnector
 
     assert SqlConnector(conn=None).scope_capability.reassertion is ScopeReassertion.TRANSACTIONAL
     assert InMemoryConnector().scope_capability.reassertion is ScopeReassertion.TRANSACTIONAL

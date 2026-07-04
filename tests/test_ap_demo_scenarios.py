@@ -1,8 +1,8 @@
 """End-to-end demo scenarios, driven by the fake-LLM agent (no key, no Docker).
 
 These run the *real* agent tool-loop and the *real* gateway over the unmodified
-``payments-ops.acp.yaml``; only the LLM is the scripted fake. The same scenarios
-run against Claude/OpenAI by swapping the provider — see ``acp_ap_demo.__main__``.
+``payments-ops.stele.yaml``; only the LLM is the scripted fake. The same scenarios
+run against Claude/OpenAI by swapping the provider — see ``stonefold_ap_demo.__main__``.
 """
 
 from __future__ import annotations
@@ -11,10 +11,10 @@ from datetime import datetime, timezone
 
 import pytest
 
-from acp_ap_demo.fake_llm import FakeProvider
-from acp_ap_demo.gateway import APBundle, build_inmemory_bundle
-from acp_ap_demo.llm import LLMProvider
-from acp_ap_demo.scenarios import (
+from stonefold_ap_demo.fake_llm import FakeProvider
+from stonefold_ap_demo.gateway import APBundle, build_inmemory_bundle
+from stonefold_ap_demo.llm import LLMProvider
+from stonefold_ap_demo.scenarios import (
     approve_and_settle,
     scenario_approval,
     scenario_blocked,

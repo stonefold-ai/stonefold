@@ -16,10 +16,10 @@ through real Postgres ``SELECT … FOR UPDATE`` with two threads and a barrier.
 
 from __future__ import annotations
 
-from acp_core import Actor, Connectors, PendingState, RawCall
-from acp_core.outbox import PendingAction
-from acp_connectors import InMemoryConnector
-from acp_store import DispatchWorker, InMemoryOutboxStore
+from stonefold_core import Actor, Connectors, PendingState, RawCall
+from stonefold_core.outbox import PendingAction
+from stonefold_connectors import InMemoryConnector
+from stonefold_store import DispatchWorker, InMemoryOutboxStore
 from tests.conftest import full_registry
 
 

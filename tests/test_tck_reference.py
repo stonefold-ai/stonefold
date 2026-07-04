@@ -10,10 +10,10 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from acp_tck import ALL_PROFILES, run_conformance
-from acp_tck.adapters.http_harness import create_tck_harness
-from acp_tck.adapters.reference import ReferenceDriver
-from acp_tck.http_driver import HttpDriver
+from stonefold_tck import ALL_PROFILES, run_conformance
+from stonefold_tck.adapters.http_harness import create_tck_harness
+from stonefold_tck.adapters.reference import ReferenceDriver
+from stonefold_tck.http_driver import HttpDriver
 
 
 def test_reference_certifies_every_profile() -> None:

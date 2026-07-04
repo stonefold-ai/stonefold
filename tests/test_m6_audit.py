@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from acp_core import (
+from stonefold_core import (
     Actor,
     Connectors,
     Decision,
@@ -21,11 +21,11 @@ from acp_core import (
     enforce,
     load_policy,
 )
-from acp_connectors import InMemoryConnector
-from acp_core.models import AuditRecord
-from acp_gates.engine import DefaultGateEngine
-from acp_store import InMemoryOutboxStore
-from acp_store.kill_memory import InMemoryKillStore
+from stonefold_connectors import InMemoryConnector
+from stonefold_core.models import AuditRecord
+from stonefold_gates.engine import DefaultGateEngine
+from stonefold_store import InMemoryOutboxStore
+from stonefold_store.kill_memory import InMemoryKillStore
 from tests.conftest import full_registry, load_schema
 
 # The RFC §11 "required at full" columns. ``approval`` is excluded: the RFC marks

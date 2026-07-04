@@ -10,12 +10,12 @@ The **ACP Gateway**: a deterministic enforcement point between an AI agent and t
 2. `docs/01-RFC-agent-control-policy.md` — ACP policy semantics (*what's allowed*), **v0.4** (changelogs at top); references SIF for the kinds. Deltas for older builds: `docs/RFC-changeset-v0.1-to-v0.2.md`, then `docs/RFC-changeset-v0.2-to-v0.3.md`, then `docs/RFC-changeset-v0.3-to-v0.4.md`; a **draft** set for the next revision accumulates in `docs/RFC-changeset-v0.4-to-v0.5.md`. A Change Set wins on any conflict with older wording.
 3. `docs/02-implementation-design.md` — mechanism (*how*). Code snippets there are illustrative pseudocode; realise them in the pinned Python stack.
 4. `docs/03-architecture-decisions.md` — pinned stack & layout (Python: FastAPI + pydantic + Postgres + Redis).
-5. `schema/sif.schema.json`, `schema/acp.schema.json`, `schema/registry.schema.json` — the JSON Schemas for intents, policies, and registries. Every `examples/*` must validate against the matching schema.
-6. `registry/acp-registry.yaml` (+ `examples/*.registry.yaml`) — the declared vocabulary (resources, actions with their kind/attributes, states, scope predicates, named sets) a policy resolves against.
-7. `examples/*.acp.yaml` — the RFC's worked policies, used as fixtures.
+5. `schema/sif.schema.json`, `schema/stele.schema.json`, `schema/registry.schema.json` — the JSON Schemas for intents, policies, and registries. Every `examples/*` must validate against the matching schema.
+6. `registry/stonefold-registry.yaml` (+ `examples/*.registry.yaml`) — the declared vocabulary (resources, actions with their kind/attributes, states, scope predicates, named sets) a policy resolves against.
+7. `examples/*.stele.yaml` — the RFC's worked policies, used as fixtures.
 8. `docs/05-demo-spec.md` — the runnable Accounts-Payable demo spec (matches the shipped `demo/`: minimal scripted walkthrough plus the tested attack-refusal, invite-attack, and kill paths).
 9. `tests/acceptance-scenarios.md` — the acceptance bar.
-10. `docs/12-conformance-tck.md` + `src/acp_tck/` — the conformance test kit: how ANY gateway (any language) certifies against the RFC. The kit core imports nothing from the reference; the reference is certified by it (`tests/test_tck_reference.py`), in-process and over the wire binding.
+10. `docs/12-conformance-tck.md` + `src/stonefold_tck/` — the conformance test kit: how ANY gateway (any language) certifies against the RFC. The kit core imports nothing from the reference; the reference is certified by it (`tests/test_tck_reference.py`), in-process and over the wire binding.
 
 Supporting docs (context, not normative): `docs/04-domains-and-use-cases.md`, `docs/06-registry-domain-model.md`, `docs/07-artifacts-and-schemas.md`, `docs/08-glossary.md`, `docs/09-mental-models.md`, `docs/10-positioning-policy-engines.md`, `docs/11-delegation-multi-agent.md` (exploration), `docs/13-who-is-this-for.md` (industries & buyers), `docs/14-eu-ai-act-mapping.md` (DRAFT — citations unverified), `docs/15-benchmark-design.md` (design only; no results exist), `docs/16-incremental-adoption.md`, `docs/17-interception-mapping.md` (how ACP interprets ordinary MCP/tool calls via the declared mapping), `docs/renaming.md` (rename decided, not yet executed).
 
@@ -32,22 +32,22 @@ Supporting docs (context, not normative): `docs/04-domains-and-use-cases.md`, `d
 ## Definition of done (every task)
 - Tests written first (from `tests/acceptance-scenarios.md` + the cited RFC section) and passing.
 - Full suite green, including integration tests against real Postgres + Redis (`testcontainers-python`).
-- All `examples/*.acp.yaml` and `examples/*.registry.yaml` still load and validate against their schemas (`schema/acp.schema.json` / `schema/registry.schema.json`).
+- All `examples/*.stele.yaml` and `examples/*.registry.yaml` still load and validate against their schemas (`schema/stele.schema.json` / `schema/registry.schema.json`).
 - `mypy --strict` clean; no invariant above violated; any unavoidable ambiguity marked `# ACP-AMBIGUITY:` with the RFC reference.
 - Public types/functions typed and docstring'd; a short note on which RFC sections the change implements.
 
 ## Build & run (pinned stack in docs/03)
 - `uv sync` (or `pip install -e ".[dev]"`) — set up the environment.
 - `docker compose up -d` — Postgres + Redis for local runs.
-- `uvicorn acp_gateway.main:app --reload` — start the gateway.
+- `uvicorn stonefold_gateway.main:app --reload` — start the gateway.
 - `pytest` — unit + integration (testcontainers spins up Postgres + Redis).
 - `mypy --strict src` — type check.
-- `make demo` — run the scripted adversarial demo (`acp_demo`) end to end. The real-LLM Accounts-Payable demo lives in `demo/` (`cd demo && make up && make seed`; see `docs/05`).
+- `make demo` — run the scripted adversarial demo (`stonefold_demo`) end to end. The real-LLM Accounts-Payable demo lives in `demo/` (`cd demo && make up && make seed`; see `docs/05`).
 
 ## Coding conventions
 - Python 3.12, type hints everywhere; `pydantic` models for value types; `Enum` for `Kind` / `Decision` / `Outcome`.
 - Use `typing.Protocol` for the `Gate`, `Connector`, and store interfaces (structural typing, easy fakes in tests).
-- One module per pipeline stage; each stage's output type is the next stage's only input type (trust boundaries are explicit). Keep `acp_core` pure: no I/O, no LLM, no framework imports.
+- One module per pipeline stage; each stage's output type is the next stage's only input type (trust boundaries are explicit). Keep `stonefold_core` pure: no I/O, no LLM, no framework imports.
 - Gates implement a single `Gate` protocol returning `GateResult` (PASS/FAIL/HOLD) — **never raise to signal a policy decision**; a raised exception means a *dependency failure* and triggers `failureMode`.
 - Condition engine: a parser + tree-walk evaluator over the frozen grammar. **No `eval`/`exec`/`compile` of policy expressions** — ever.
 - Connectors implement one `Connector` protocol; the in-memory / sql / http / email connectors are separate modules.
