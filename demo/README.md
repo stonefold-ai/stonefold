@@ -39,7 +39,10 @@ the deployment + runbook.
 ## Run it (Docker + an API key)
 
 ```bash
-cd demo
+git clone --recurse-submodules https://github.com/stonefold-ai/stonefold.git
+                              # the spec/ submodule carries the policy + schemas the
+                              # images copy in; if spec/ is empty: git submodule update --init
+cd stonefold/demo
 cp .env.example .env          # paste your ANTHROPIC_API_KEY (or set LLM_PROVIDER=openai / fake)
 
 make up                       # build & start gateway + postgres + redis

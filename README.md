@@ -128,6 +128,20 @@ Back with the gateway on, a **held** payment waits for a person — the agent ca
 
 Run it yourself with Docker and an API key — see [`demo/README.md`](demo/README.md).
 
+### Getting the code
+
+The specs (schemas, worked policies, the registry) live in a **git submodule** at `spec/` — the `spec @ <commit>` entry above. A plain clone leaves that folder empty and nothing will build, so clone with:
+
+```bash
+git clone --recurse-submodules https://github.com/stonefold-ai/stonefold.git
+```
+
+Already cloned without it, or `spec/` is empty after a pull? One command fixes it:
+
+```bash
+git submodule update --init
+```
+
 ## How this relates to existing policy tools
 
 Stonefold is not a new access-control theory, and it does not replace the policy engines you may already use. The decision layer — "is this request allowed?" — is deliberately in the same family as AWS Cedar and Open Policy Agent (OPA/Rego), which themselves build on decades of authorization work (XACML, ABAC/RBAC). Default-deny, explicit-deny-wins, a typed schema of entities and actions, attribute-based conditions — those are shared, well-established ideas Stonefold inherits from that lineage.
