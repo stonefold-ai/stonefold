@@ -96,6 +96,8 @@ The set of legal names is **not** open. Entity, action, transition, field, and e
 
 Adding a capability means **adding a declared action to the registry**, which flows through the same validated path — not adding a new SIF construct.
 
+> **Authoring the vocabulary (non-normative).** The registry this section presupposes does not have to be written by hand. Drafting it is now largely automatable: an LLM-assisted generator can propose the entities, actions with suggested kinds, and typed attributes from artefacts the integrator already has (an MCP `tools/list`, SQL DDL, an OpenAPI spec), leaving the human the part that was always the real content — reviewing the judgment calls (which kind, what is irreversible, which field is the money, which column is the tenant key). An LLM can assist that review too, by explaining what each declaration will permit, gate, or expose, so the reviewer decides correctly rather than rubber-stamps. The boundary is fixed, however: all such assistance is **authoring-time only** — nothing model-drafted becomes effective without human review and sign-off, and no model ever runs in the enforcement path (ACP invariant: deterministic enforcement). See the registry doc (docs/06 §9) for the shipped generator and its safety rules, and docs/17 §5 for why this dissolves the historical authoring-cost objection to declared vocabularies.
+
 ---
 
 ## 5. Batching and atomicity

@@ -94,7 +94,9 @@ afternoon-sized expectation, and the differentiated guarantees are bought entity
 entity where an auditor actually demands them — never as a leap of faith.
 
 *See also:* [`00-RFC-sif-intent-format.md`](00-RFC-sif-intent-format.md) §7 (the two
-bindings, normative), [`06-registry-domain-model.md`](06-registry-domain-model.md)
+bindings, normative), [`17-interception-mapping.md`](17-interception-mapping.md) (how the
+Stage 1 mapping actually interprets a tool call, and why mapping wins),
+[`06-registry-domain-model.md`](06-registry-domain-model.md)
 (registry + generator), [`13-who-is-this-for.md`](13-who-is-this-for.md) (risk ranking
 per industry), [`10-positioning-policy-engines.md`](10-positioning-policy-engines.md)
 (what each stage does/doesn't defend, attack by attack).
