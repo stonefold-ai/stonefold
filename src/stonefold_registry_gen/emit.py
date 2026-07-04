@@ -31,7 +31,7 @@ _HEADER = """\
 #   3. declare from/to states for every transition;
 #   4. add connectors/dataSource, scopePredicates, preconditionChecks, hooks,
 #      sinks, and namedSets as the policies need them (docs/06 sec. 2, 5);
-#   5. validate against schema/registry.schema.json and run the ACP linter.
+#   5. validate against schema/registry.schema.json and run the Stonefold linter.
 # ---------------------------------------------------------------------------
 """
 

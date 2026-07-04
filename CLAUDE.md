@@ -1,13 +1,13 @@
-# CLAUDE.md — ACP Gateway (concept deliverable)
+# CLAUDE.md — Stonefold Gateway (concept deliverable)
 
 Project conventions and guardrails for any AI agent working in this repository. Start with the sources of truth below (the `docs/` specs), then the code in `src/`. This is a **proof-of-concept**: prioritise a readable codebase and a working demo over throughput/HA — but never relax the invariants below.
 
 ## What this project is
-The **ACP Gateway**: a deterministic enforcement point between an AI agent and the systems it can act on. It validates each attempted action against a declarative policy, injects identity/scope, runs deterministic gates, executes via connectors, records an audit entry, and supports human approval and a kill-switch. **No language model runs in the enforcement path.**
+The **Stonefold Gateway**: a deterministic enforcement point between an AI agent and the systems it can act on. It validates each attempted action against a declarative policy, injects identity/scope, runs deterministic gates, executes via connectors, records an audit entry, and supports human approval and a kill-switch. **No language model runs in the enforcement path.**
 
 ## Sources of truth (priority order)
 1. `docs/00-RFC-sif-intent-format.md` — the SIF intent format (the five kinds + the shape the agent emits), **v1.0**. The lower layer; canonical home for the kinds.
-2. `docs/01-RFC-agent-control-policy.md` — ACP policy semantics (*what's allowed*), **v0.4** (changelogs at top); references SIF for the kinds. Deltas for older builds: `docs/RFC-changeset-v0.1-to-v0.2.md`, then `docs/RFC-changeset-v0.2-to-v0.3.md`, then `docs/RFC-changeset-v0.3-to-v0.4.md`; a **draft** set for the next revision accumulates in `docs/RFC-changeset-v0.4-to-v0.5.md`. A Change Set wins on any conflict with older wording.
+2. `docs/01-RFC-agent-control-policy.md` — Stele policy semantics (*what's allowed*), **v0.4** (changelogs at top); references SIF for the kinds. Deltas for older builds: `docs/RFC-changeset-v0.1-to-v0.2.md`, then `docs/RFC-changeset-v0.2-to-v0.3.md`, then `docs/RFC-changeset-v0.3-to-v0.4.md`; a **draft** set for the next revision accumulates in `docs/RFC-changeset-v0.4-to-v0.5.md`. A Change Set wins on any conflict with older wording.
 3. `docs/02-implementation-design.md` — mechanism (*how*). Code snippets there are illustrative pseudocode; realise them in the pinned Python stack.
 4. `docs/03-architecture-decisions.md` — pinned stack & layout (Python: FastAPI + pydantic + Postgres + Redis).
 5. `schema/sif.schema.json`, `schema/stele.schema.json`, `schema/registry.schema.json` — the JSON Schemas for intents, policies, and registries. Every `examples/*` must validate against the matching schema.
@@ -17,7 +17,7 @@ The **ACP Gateway**: a deterministic enforcement point between an AI agent and t
 9. `tests/acceptance-scenarios.md` — the acceptance bar.
 10. `docs/12-conformance-tck.md` + `src/stonefold_tck/` — the conformance test kit: how ANY gateway (any language) certifies against the RFC. The kit core imports nothing from the reference; the reference is certified by it (`tests/test_tck_reference.py`), in-process and over the wire binding.
 
-Supporting docs (context, not normative): `docs/04-domains-and-use-cases.md`, `docs/06-registry-domain-model.md`, `docs/07-artifacts-and-schemas.md`, `docs/08-glossary.md`, `docs/09-mental-models.md`, `docs/10-positioning-policy-engines.md`, `docs/11-delegation-multi-agent.md` (exploration), `docs/13-who-is-this-for.md` (industries & buyers), `docs/14-eu-ai-act-mapping.md` (DRAFT — citations unverified), `docs/15-benchmark-design.md` (design only; no results exist), `docs/16-incremental-adoption.md`, `docs/17-interception-mapping.md` (how ACP interprets ordinary MCP/tool calls via the declared mapping), `docs/renaming.md` (rename decided, not yet executed).
+Supporting docs (context, not normative): `docs/04-domains-and-use-cases.md`, `docs/06-registry-domain-model.md`, `docs/07-artifacts-and-schemas.md`, `docs/08-glossary.md`, `docs/09-mental-models.md`, `docs/10-positioning-policy-engines.md`, `docs/11-delegation-multi-agent.md` (exploration), `docs/13-who-is-this-for.md` (industries & buyers), `docs/14-eu-ai-act-mapping.md` (DRAFT — citations unverified), `docs/15-benchmark-design.md` (design only; no results exist), `docs/16-incremental-adoption.md`, `docs/17-interception-mapping.md` (how Stonefold interprets ordinary MCP/tool calls via the declared mapping), `docs/renaming.md` (rename decided, not yet executed).
 
 ## Non-negotiable invariants (treat a violation as a P0 bug)
 1. **Deterministic enforcement.** No LLM / nondeterminism inside `enforce()`.
@@ -33,7 +33,7 @@ Supporting docs (context, not normative): `docs/04-domains-and-use-cases.md`, `d
 - Tests written first (from `tests/acceptance-scenarios.md` + the cited RFC section) and passing.
 - Full suite green, including integration tests against real Postgres + Redis (`testcontainers-python`).
 - All `examples/*.stele.yaml` and `examples/*.registry.yaml` still load and validate against their schemas (`schema/stele.schema.json` / `schema/registry.schema.json`).
-- `mypy --strict` clean; no invariant above violated; any unavoidable ambiguity marked `# ACP-AMBIGUITY:` with the RFC reference.
+- `mypy --strict` clean; no invariant above violated; any unavoidable ambiguity marked `# STONEFOLD-AMBIGUITY:` with the RFC reference.
 - Public types/functions typed and docstring'd; a short note on which RFC sections the change implements.
 
 ## Build & run (pinned stack in docs/03)

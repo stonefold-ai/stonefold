@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://stonefold.io/schema/v0.1/stele.schema.json",
-  "title": "Agent Control Policy (ACP) v0.1",
-  "description": "Schema for ACP policy documents. Semantics are defined in docs/01-RFC-agent-control-policy.md. This schema enforces structure; some rules (deny-overrides, registry existence, irreversible+open) are checked by the linter, not by JSON Schema.",
+  "$id": "https://stonefold.ai/schema/v0.1/stele.schema.json",
+  "title": "Stele v0.1",
+  "description": "Schema for Stele policy documents. Semantics are defined in docs/01-RFC-agent-control-policy.md. This schema enforces structure; some rules (deny-overrides, registry existence, irreversible+open) are checked by the linter, not by JSON Schema.",
   "type": "object",
   "required": ["agent", "allow"],
   "additionalProperties": false,

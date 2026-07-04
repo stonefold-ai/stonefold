@@ -32,12 +32,12 @@ from stonefold_ap_demo.llm import AssistantTurn, LLMProvider, ToolCall, ToolDef
 from stonefold_ap_demo.principals import AP_OPERATOR
 from stonefold_ap_demo.seed import INBOX
 
-# The agent proposes; the ACP gateway disposes. The agent reads its invoice inbox
+# The agent proposes; the Stonefold gateway disposes. The agent reads its invoice inbox
 # and submits a payment intent for each invoice through the gateway, which allows,
 # holds, or refuses each one. The agent reports the gateway's decisions.
 SYSTEM_PROMPT = (
     "You are Acme Corp's accounts-payable assistant. You process the company's invoice "
-    "inbox by submitting a payment for each invoice through the ACP gateway, from the "
+    "inbox by submitting a payment for each invoice through the Stonefold gateway, from the "
     "operating account 'ACME-OPS'.\n\n"
     "Tools:\n"
     "- read_inbox(): returns the pending invoices.\n"
@@ -62,7 +62,7 @@ READ_INBOX_TOOL = ToolDef(
 SUBMIT_INTENT_TOOL = ToolDef(
     name="submit_intent",
     description=(
-        "Submit one intended action to the ACP gateway for enforcement. The gateway "
+        "Submit one intended action to the Stonefold gateway for enforcement. The gateway "
         "validates it against policy, injects scope, runs the gates, and either "
         "executes, stages, holds, or refuses it."
     ),

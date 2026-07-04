@@ -1,10 +1,10 @@
 # 13 — Who is this for: industries, buyers, adoption paths
 
-*Which industries benefit most from an ACP gateway, what each one's risk actually is, and which parts of the spec answer it.*
+*Which industries benefit most from a Stonefold gateway, what each one's risk actually is, and which parts of the spec answer it.*
 
-**Supporting doc — context, not normative.** `docs/04` answers "which technical substrates does the recipe apply to" (SQL, email, devices, …); this document answers "who should deploy it, and why them first". The ranking principle is simple: ACP's guarantees are priced for settings where an agent's action can **move money, touch a regulated record, or cause an irreversible physical or legal effect** — and where someone must later *prove* what the agent did and who allowed it. The further a deployment sits from those three, the less of the gateway it needs.
+**Supporting doc — context, not normative.** `docs/04` answers "which technical substrates does the recipe apply to" (SQL, email, devices, …); this document answers "who should deploy it, and why them first". The ranking principle is simple: Stonefold's guarantees are priced for settings where an agent's action can **move money, touch a regulated record, or cause an irreversible physical or legal effect** — and where someone must later *prove* what the agent did and who allowed it. The further a deployment sits from those three, the less of the gateway it needs.
 
-Each section names the agent work being deployed, the risk that blocks deployment today, the ACP mechanisms that answer it, the worked example already in the spec, and who signs the purchase.
+Each section names the agent work being deployed, the risk that blocks deployment today, the Stonefold mechanisms that answer it, the worked example already in the spec, and who signs the purchase.
 
 ---
 
@@ -119,11 +119,11 @@ Three things keep this boundary from being a defeat:
 
 Deliberately out of scope: attestation infrastructure (artifact signing chains, provenance frameworks, SLSA levels) is an existing product category the gateway composes with, not one it contains. And trust bottoms out somewhere — a compromised system of record or a rooted gateway host is beneath every declaration scheme. The claim that remains is the strongest an enforcement architecture can make: **the trusted base is small, named, pinned by digest, and everything outside it — including the intelligent part — can be arbitrarily malicious without consequence.**
 
-## Where ACP is the wrong tool (honesty section)
+## Where Stonefold is the wrong tool (honesty section)
 
 - **Read-only, low-stakes agents** (internal search, summarization, analytics over non-sensitive data): default-deny scoping is cheap insurance but the full gateway is overkill; a thin allowlist proxy may do.
 - **Creative/content workflows** with a human already reviewing every output: the human *is* the gateway.
-- **Agent orchestration, planning, memory, multi-step workflow engines:** explicitly out of scope (RFC non-goals) — ACP governs the actions, not the agent's reasoning loop.
+- **Agent orchestration, planning, memory, multi-step workflow engines:** explicitly out of scope (RFC non-goals) — Stonefold governs the actions, not the agent's reasoning loop.
 
 ## Recommended beachhead
 

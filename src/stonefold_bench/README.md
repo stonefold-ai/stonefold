@@ -26,10 +26,10 @@ names, **malformed** calls, **no-call**, retrieval misses, and token cost. Capab
 parity holds — all three surfaces expose the same N capabilities; only the shape
 differs (docs/15 §4.1).
 
-**Track S — security ablation (the second purpose, from docs/15).** Whether SIF+ACP
+**Track S — security ablation (the second purpose, from docs/15).** Whether SIF+Stele
 stops injection/hallucination from becoming **executed** unauthorized effects where
 commodity defenses do not: the ladder S0 (naked tools) → S1 (gateway allowlist) → S2
-(parameter-level policy) → S3 (SIF+ACP full), scored as ASR-executed / ASR-attempted
+(parameter-level policy) → S3 (SIF+Stele full), scored as ASR-executed / ASR-attempted
 per attack class (A1–A7), with benign task success (BTS) reported alongside.
 
 ## Run it (console)

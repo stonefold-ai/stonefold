@@ -6,7 +6,7 @@
 
 ## 1. The pressure
 
-Agent systems are becoming trees: an orchestrator spawns researchers, a coding agent spawns reviewers, an agent calls another team's agent. ACP v0.x governs **one agent at one gateway**; the moment agents spawn agents, three questions appear:
+Agent systems are becoming trees: an orchestrator spawns researchers, a coding agent spawns reviewers, an agent calls another team's agent. Stonefold today governs **one agent at one gateway**; the moment agents spawn agents, three questions appear:
 
 1. **Authority** — what may the spawned agent do? (Surely never *more* than its spawner.)
 2. **Accounting** — whose limits does it consume? (A swarm must not multiply rate limits by spawning.)
@@ -24,7 +24,7 @@ effective(child) = meet( effective(parent), declared(child) )
 - gates take the **more restrictive** value at each level (lower limit, narrower allowlist, stricter window);
 - scope predicates **intersect**: the child sees only rows visible to *both* predicates.
 
-The key observation: **ACP already has this operation.** `extends` composition (RFC §3.2) merges fragments with exactly these rules — union, deny wins, more-restrictive-gate wins, "composition MUST NOT widen a permission a fragment denied." Delegation is the same merge run in the other direction: `extends` composes *sideways* at authoring time; delegation composes *downward* at spawn time. One semantics, one implementation, two uses.
+The key observation: **Stele already has this operation.** `extends` composition (RFC §3.2) merges fragments with exactly these rules — union, deny wins, more-restrictive-gate wins, "composition MUST NOT widen a permission a fragment denied." Delegation is the same merge run in the other direction: `extends` composes *sideways* at authoring time; delegation composes *downward* at spawn time. One semantics, one implementation, two uses.
 
 ## 3. Sketch of the mechanics (unspecified)
 
@@ -38,7 +38,7 @@ The key observation: **ACP already has this operation.** `extends` composition (
 
 ## 4. What stays out
 
-- **Orchestration/workflow** — who spawns what, in which order, with what retries — remains out of scope (RFC non-goals). ACP governs each edge of the tree; it does not schedule the tree.
+- **Orchestration/workflow** — who spawns what, in which order, with what retries — remains out of scope (RFC non-goals). Stonefold governs each edge of the tree; it does not schedule the tree.
 - **Foreign agents** (another organisation's agent, A2A protocols): not delegates. A remote agent is an **external system** — reach it through a connector, gate it like any effect. Attenuation applies only inside one trust domain.
 - **Trust negotiation / capability marketplaces** — far out.
 

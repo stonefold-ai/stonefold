@@ -1,4 +1,4 @@
-# 17 — The interception mapping: how ACP interprets ordinary tool calls
+# 17 — The interception mapping: how Stonefold interprets ordinary tool calls
 
 *Non-normative companion. The normative basis is one sentence in the SIF RFC §7
 ("existing tool/MCP calls are mapped to SIF operations by the gateway; an unmapped call
@@ -9,17 +9,17 @@ lines compress — because it is the single most common misunderstanding of the 
 
 ## 1. The question this answers
 
-**"Can ACP enforce its policies when the agent uses ordinary MCP tools — no `submit_intent`,
+**"Can Stonefold enforce its policies when the agent uses ordinary MCP tools — no `submit_intent`,
 no SIF emitted by the agent?"**
 
 Yes. But the *how* has a crux worth stating precisely, because both naive readings are wrong:
 
-- **Wrong reading 1:** "ACP understands tool calls." It does not. A raw call like
+- **Wrong reading 1:** "Stonefold understands tool calls." It does not. A raw call like
   `create_payment(vendor="X", amount=4200)` carries no governance semantics — nothing in
   it says what resource it touches, whether it is an `effect` or a `read`, whether it is
   irreversible, or which argument is the money. MCP tool schemas describe *syntax*
   (argument names and types), not meaning. There is nothing for a policy to evaluate.
-- **Wrong reading 2:** "So ACP needs the agent to speak SIF." It does not. The gateway
+- **Wrong reading 2:** "So Stonefold needs the agent to speak SIF." It does not. The gateway
   synthesizes the SIF operation *on the agent's behalf*, from the tool call — and can do
   so deterministically, because a human declared the interpretation ahead of time.
 

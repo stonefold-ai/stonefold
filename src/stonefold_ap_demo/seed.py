@@ -97,7 +97,7 @@ def payee_by_id(payee_id: str) -> dict[str, Any] | None:
 
 # --- SQL seed generation (for the docker-compose Postgres ledger) ------------
 LEDGER_DDL = """
--- Fictional ledger for the ACP Accounts-Payable demo. Separate from the gateway's
+-- Fictional ledger for the Stonefold Accounts-Payable demo. Separate from the gateway's
 -- own pending_actions / audit_log / kill_orders tables (created by stonefold_store).
 CREATE TABLE IF NOT EXISTS account (
     id         text PRIMARY KEY,

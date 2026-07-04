@@ -1,6 +1,6 @@
 # Domains & Use Cases — beyond the database
 
-The most common misconception about this design is that it's "a safe way to let an AI use a database." It isn't. A database is **one connector**. The same five SIF kinds and the same ACP gates govern email, files, devices, cloud infrastructure, payments, external services — anything an agent can act on or about.
+The most common misconception about this design is that it's "a safe way to let an AI use a database." It isn't. A database is **one connector**. The same five SIF kinds and the same Stele gates govern email, files, devices, cloud infrastructure, payments, external services — anything an agent can act on or about.
 
 This companion shows that range. It is illustrative, not normative — the format is in [`00-RFC-sif-intent-format.md`](00-RFC-sif-intent-format.md), the policy language in [`01-RFC-agent-control-policy.md`](01-RFC-agent-control-policy.md).
 

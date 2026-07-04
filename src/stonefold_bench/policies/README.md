@@ -9,7 +9,7 @@ strength varies:
 | **S0** naked tools | *(none — the gateway is bypassed)* | built in (`DirectBackend`) |
 | **S1** allowlist only | `s1-allowlist.stele.yaml` | **the author** |
 | **S2** allowlist + parameter policy | `s2-parameter.stele.yaml` | **the author** |
-| **S3** SIF + ACP full | `examples/payments-ops.stele.yaml` | shipped |
+| **S3** SIF + Stele full | `examples/payments-ops.stele.yaml` | shipped |
 
 ## Why S1/S2 are not shipped
 

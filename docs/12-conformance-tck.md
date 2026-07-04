@@ -1,6 +1,6 @@
-# 12 — The ACP Conformance Test Kit (TCK)
+# 12 — The Stonefold Conformance Test Kit (TCK)
 
-*How a gateway — in **any language** — proves it conforms to the ACP RFC.*
+*How a gateway — in **any language** — proves it conforms to the Stele RFC.*
 
 The TCK (`src/stonefold_tck/`) is an implementation-independent, black-box test suite. You do not port the reference gateway's tests; you implement ONE small adapter — the **driver** — and the kit runs every acceptance scenario against your gateway, then reports which **conformance profiles** you certify. The Python reference implementation is certified by the same kit (`tests/test_tck_reference.py`), both in-process and through the wire binding.
 
@@ -32,7 +32,7 @@ print(report.render())
 Either way the output is the same report:
 
 ```
-ACP TCK conformance report -- implementation: my-gateway 0.1
+Stonefold TCK conformance report -- implementation: my-gateway 0.1
 [core]    CERTIFIED -- 12 pass, 0 fail, 0 skip
 [lint]    CERTIFIED -- 6 pass, 0 fail, 0 skip
 ...
@@ -41,7 +41,7 @@ Certified profiles: core, lint, scope, staging, kill, audit, freshness
 
 A profile is **certified** only when every one of its checks passed. A check skipped for a missing capability leaves the profile *incomplete* — a skip is never a pass, so a certification claim is always exactly as strong as what actually ran.
 
-**The conformance claim format:** *"`<implementation>` certifies ACP TCK profiles `<list>` at RFC `<version>`, kit version `<git ref>`."* Publish the rendered report alongside.
+**The conformance claim format:** *"`<implementation>` certifies Stonefold TCK profiles `<list>` at RFC `<version>`, kit version `<git ref>`."* Publish the rendered report alongside.
 
 ---
 

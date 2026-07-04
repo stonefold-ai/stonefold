@@ -1,4 +1,4 @@
-"""stonefold_core — the pure trust kernel of the ACP Gateway.
+"""stonefold_core — the pure trust kernel of the Stonefold Gateway.
 
 No I/O, no LLM, no framework imports (CLAUDE.md coding conventions; ADR docs/03).
 Re-exports the value model, registry, audit seam, and the enforcement pipeline.

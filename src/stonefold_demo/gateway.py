@@ -1,4 +1,4 @@
-"""Assemble the full ACP enforcement stack over an example policy (M-DEMO).
+"""Assemble the full Stonefold enforcement stack over an example policy (M-DEMO).
 
 This is the same wiring a real deployment uses: registry → compiled policy →
 gate engine → scope resolver → connectors → outbox (+ optional kill store), all

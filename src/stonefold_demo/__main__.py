@@ -1,7 +1,7 @@
 """The adversarial demo (M-DEMO). Run with ``python -m stonefold_demo`` (or ``make demo``).
 
 Makes the product's core claim visible and attackable: the *same* prompt-injected
-agent run, once with no gateway (the data leaves) and once through the ACP gateway
+agent run, once with no gateway (the data leaves) and once through the Stonefold gateway
 (the exfiltration is refused and the audit proves it); then an operator kills a
 live run; then an open invitation to make the gated agent leak - which it can't.
 
@@ -46,7 +46,7 @@ def act1(r: G1Result) -> bool:
     print(f"{_NO}emailed the data to: {', '.join(r.unprotected.external_emails)}")
     print(f"{_NO}bulk export ran ({r.unprotected.exports} dump). DATA LEFT THE BUILDING.\n")
 
-    print("RUN B - through the ACP gateway (same intents):")
+    print("RUN B - through the Stonefold gateway (same intents):")
     print(f"{_OK}read was scoped below the model: {r.scoped_read_rows} rows (only alice's own)")
     for step in r.gated.steps:
         mark = _OK if step.decision in (Decision.DENY, Decision.HALT) or not step.intent.malicious else _NO
@@ -90,7 +90,7 @@ def act3(r: G3Result) -> bool:
 
 
 def main() -> int:
-    print("\n  ACP GATEWAY - adversarial demo")
+    print("\n  Stonefold GATEWAY - adversarial demo")
     print("  The same compromised agent, with and without the gateway in front.")
 
     ok = act1(g1_injection_blocked())

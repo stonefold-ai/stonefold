@@ -109,7 +109,7 @@ def _run_draft(source: str, input_path: Path, domain: str, out: Path | None,
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="stonefold_registry_gen",
-        description="Draft an ACP registry + handler stubs (authoring format, docs/06) "
+        description="Draft a Stonefold registry + handler stubs (authoring format, docs/06) "
                     "from existing artefacts.",
     )
     parser.add_argument("source", choices=("sql", "openapi", "mcp", "stubs"),

@@ -1,7 +1,7 @@
-"""stonefold_tck — the ACP conformance test kit (docs/12).
+"""stonefold_tck — the Stonefold conformance test kit (docs/12).
 
 An implementation-independent, black-box test suite any gateway runs to prove
-conformance to the ACP RFC (docs/01). The implementer writes ONE adapter — a
+conformance to the Stele RFC (docs/01). The implementer writes ONE adapter — a
 ``ConformanceDriver`` — and runs ``run_conformance`` over it; the report states
 which conformance profiles (core, lint, scope, staging, kill, audit) the
 implementation certifies.

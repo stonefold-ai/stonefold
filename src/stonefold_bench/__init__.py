@@ -8,7 +8,7 @@ tools, and as one SIF ``submit_intent`` whose registry declares them all? Measur
 condition × N: correct / wrong-tool / hallucinated / malformed / no-call rates and
 token cost (``reliability``, ``tracks``).
 
-**Track S — security ablation (the docs/15 headline claim).** Does the SIF+ACP surface
+**Track S — security ablation (the docs/15 headline claim).** Does the SIF+Stele surface
 stop injection/hallucination from becoming *executed* unauthorized effects where
 commodity gateway defenses (S0 naked → S1 allowlist → S2 parameter policy → S3 full)
 do not? Measured as ASR-executed / ASR-attempted per attack class × rung, with benign

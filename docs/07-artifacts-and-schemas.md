@@ -11,7 +11,7 @@ The system has three distinct artifacts. The reason there is more than one comes
 | Artifact | Authored by | Changes | Trust | Defines |
 |---|---|---|---|---|
 | **Registry** (domain model) — [`06`](06-registry-domain-model.md) | the **integrator / engineer** | rarely (stable) | trusted, reviewed | *the world:* entities, actions (kind + attributes), states, mappings |
-| **ACP policy** ([`01`](01-RFC-agent-control-policy.md)) | the **security / policy officer** | often; **signed** | trusted, signed | *what's allowed:* allow/deny/scope/gates |
+| **Stele policy** ([`01`](01-RFC-agent-control-policy.md)) | the **security / policy officer** | often; **signed** | trusted, signed | *what's allowed:* allow/deny/scope/gates |
 | **SIF intent** ([`00`](00-RFC-sif-intent-format.md)) | the **agent (LLM), at runtime** | every request | **untrusted** | *what's wanted:* one batch of typed operations |
 
 These three are deliberately *not* one file, because they have opposite properties: the registry is stable and engineering-owned; the policy changes constantly and is security-owned (and signed); the intent is produced fresh every turn by the least-trusted component in the system. Collapsing them would force the most-trusted and least-trusted things to share a lifecycle and an owner — the opposite of what you want.
@@ -27,7 +27,7 @@ These three are deliberately *not* one file, because they have opposite properti
 | **SIF tool schema** | the agent's intent | **generated from the registry** | built at startup; used every request |
 | `schema/sif.schema.json` | the intent's generic shape | **static, thin (L1 only)** | every request, before the generated check |
 
-So: **two schemas you hand-maintain** (registry, ACP). **SIF's real validating schema is generated** — it is *not* a file you write, because it must contain *this domain's* names (`Patient`, `pay`, …) as enums, and those live in the registry. The static `sif.schema.json` checks only the generic shape (an `operations` array; each op has a valid `kind` and the right fields) — it cannot and does not know domain names.
+So: **two schemas you hand-maintain** (registry, Stele). **SIF's real validating schema is generated** — it is *not* a file you write, because it must contain *this domain's* names (`Patient`, `pay`, …) as enums, and those live in the registry. The static `sif.schema.json` checks only the generic shape (an `operations` array; each op has a valid `kind` and the right fields) — it cannot and does not know domain names.
 
 ---
 
@@ -46,7 +46,7 @@ The **registry is the source of truth**; the other two derive from it.
 ```mermaid
 flowchart TD
     R["Registry (domain model)<br/>entities · actions(kind+attrs) · states · mappings"]
-    P["ACP policy<br/>allow/deny/scope/gates"]
+    P["Stele policy<br/>allow/deny/scope/gates"]
     G["Generated SIF tool schema<br/>(enum-injected names)"]
     I["SIF intent<br/>(emitted by the agent)"]
 
@@ -59,7 +59,7 @@ flowchart TD
 
 In words: the **policy references** registry names (the linter rejects a policy that names something the registry doesn't declare). The **SIF tool schema is generated** from the registry. The **agent's intent** is shaped by the generated schema, checked for *names* against the registry (L2), and then *authorized* by the policy.
 
-Dependency order to remember: **Registry → SIF (generated) → ACP (references).**
+Dependency order to remember: **Registry → SIF (generated) → Stele (references).**
 
 ---
 
@@ -67,7 +67,7 @@ Dependency order to remember: **Registry → SIF (generated) → ACP (references
 
 **(a) Author / build time**
 - Write the **registry**; validate against `registry.schema.json`.
-- Write the **policy**; validate against `stele.schema.json`, then **lint against the registry** (every referenced name exists, `deny` included — you deny things that exist; ACP §13.1).
+- Write the **policy**; validate against `stele.schema.json`, then **lint against the registry** (every referenced name exists, `deny` included — you deny things that exist; Stele §13.1).
 - Optionally **sign** the policy (+ registry bundle) so the gateway will only run approved versions.
 
 **(b) Startup / load**
@@ -78,12 +78,12 @@ Dependency order to remember: **Registry → SIF (generated) → ACP (references
 **(c) Per request** — for each intent the agent emits, in order:
 1. **L1 — shape.** Validate against the generic `sif.schema.json` (well-formed operations).
 2. **L2 — names/values.** Validate against the **registry** (entities/actions/fields/enums exist). *(The generated tool schema already prevents most violations; L2 is the authoritative re-check below the model.)*
-3. **Authorize.** ACP `allow`/`deny` decision.
+3. **Authorize.** Stele `allow`/`deny` decision.
 4. **Scope.** Inject the actor's scope (below the model).
-5. **Gates.** Run ACP gates (limits, approvals, etc.).
+5. **Gates.** Run Stele gates (limits, approvals, etc.).
 6. **Kill check → execute → record.** (Pipeline per the implementation design.)
 
-Steps 1–2 are "is this *valid* SIF for this domain?" (registry + SIF). Steps 3–5 are "is it *allowed*?" (ACP). That clean split — **valid vs. allowed** — is exactly why the schemas are separate.
+Steps 1–2 are "is this *valid* SIF for this domain?" (registry + SIF). Steps 3–5 are "is it *allowed*?" (Stele). That clean split — **valid vs. allowed** — is exactly why the schemas are separate.
 
 **Policy signing (status: seam, deferred — this paragraph is its single home).** Where signing is enabled, the gateway verifies a signature over the **bundle** — the policy, the registry, and the registered-function set (docs/06 §6.3) — at load; a verification failure means the policy does not load (fail closed, like any load-time validation failure). Key management, signature format, and the approval workflow are deployment tooling, deliberately unspecified in this draft. Until a mechanism is specified, "signed" elsewhere in these docs means "went through your organisation's review-and-approve process, pinned in version control."
 
@@ -95,4 +95,4 @@ Steps 1–2 are "is this *valid* SIF for this domain?" (registry + SIF). Steps 3
 - **Two static schemas you author:** `registry.schema.json`, `stele.schema.json`.
 - **One generated schema:** the SIF tool schema, built from the registry at startup (this is what makes enum-injection real).
 - **One thin static schema:** `sif.schema.json`, generic L1 shape-checking only.
-- **The rule:** registry is the source of truth; SIF is generated from it; ACP references it. Validity (registry + SIF) is checked first, then permission (ACP).
+- **The rule:** registry is the source of truth; SIF is generated from it; Stele references it. Validity (registry + SIF) is checked first, then permission (Stele).

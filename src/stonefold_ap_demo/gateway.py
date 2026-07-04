@@ -1,4 +1,4 @@
-"""Assemble the full ACP enforcement stack over ``examples/payments-ops.stele.yaml``.
+"""Assemble the full Stonefold enforcement stack over ``examples/payments-ops.stele.yaml``.
 
 This is the *real product* wiring — registry → compiled policy → gate engine →
 scope resolver → ledger connector → outbox → kill store — behind the ``Gateway``
@@ -161,7 +161,7 @@ class APBundle:
         the policy's new-payee cooling-off gate (``when: "exists data.newPayee"``).
         This derives the fact from the gateway's own payee list — not from the
         agent — so the cooling-off hold cannot be evaded by however the agent
-        happens to name the recipient. ACP-AMBIGUITY (RFC §7): the policy keys on
+        happens to name the recipient. STONEFOLD-AMBIGUITY (RFC §7): the policy keys on
         ``data.newPayee``; a real deployment resolves new-payee status from the
         vendor master here.
         """
@@ -345,7 +345,7 @@ def _build_common(
         # Per-request env: the live wall clock (time-based gates) + the resolved
         # ``resource`` attributes a gate references. The ``rate`` gate keys on
         # ``resource.payeeId``; populate it so the gate has a partition key (an
-        # absent key would fail the gate closed). ACP-AMBIGUITY (RFC §7): the
+        # absent key would fail the gate closed). STONEFOLD-AMBIGUITY (RFC §7): the
         # authoritative payee should come from the ledger; for the demo the
         # partition key falls back to the intended payee in the call.
         data = call.data

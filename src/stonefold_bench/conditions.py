@@ -7,7 +7,7 @@ enforcement strength varies — the first fairness constraint a hostile reviewer
 * **S0** naked tools, no gateway — the agent's tools hit the ledger directly.
 * **S1** gateway allowlist only (the commodity MCP-gateway baseline).
 * **S2** S1 + parameter-level policy (value bounds, recipient lists).
-* **S3** SIF + ACP full — the shipped payments policy (scope injection, resolved
+* **S3** SIF + Stele full — the shipped payments policy (scope injection, resolved
   state, stateful gates, staged effects).
 
 **S1 and S2 are author-owned.** docs/15 §4.4 makes configuring the gateway baselines
@@ -43,7 +43,7 @@ class Rung(str, Enum):
     S0 = "S0"  # naked tools, no gateway
     S1 = "S1"  # gateway allowlist only
     S2 = "S2"  # allowlist + parameter-level policy
-    S3 = "S3"  # SIF + ACP full
+    S3 = "S3"  # SIF + Stele full
 
 
 @dataclass(frozen=True)
@@ -60,7 +60,7 @@ CONDITIONS: tuple[Condition, ...] = (
     Condition(Rung.S0, "naked tools (no gateway)", None),
     Condition(Rung.S1, "gateway allowlist", _POLICIES / "s1-allowlist.stele.yaml"),
     Condition(Rung.S2, "allowlist + parameter policy", _POLICIES / "s2-parameter.stele.yaml"),
-    Condition(Rung.S3, "SIF + ACP full", PAYMENTS_POLICY),
+    Condition(Rung.S3, "SIF + Stele full", PAYMENTS_POLICY),
 )
 
 

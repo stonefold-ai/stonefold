@@ -57,7 +57,7 @@ class Standing(BaseModel):
 
 
 class Policy(BaseModel):
-    """A parsed ACP policy document (RFC §6)."""
+    """A parsed Stele policy document (RFC §6)."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 

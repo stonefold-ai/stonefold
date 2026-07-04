@@ -52,13 +52,13 @@ def _decisions(result: object) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="ACP Accounts-Payable demo walkthrough")
+    parser = argparse.ArgumentParser(description="Stonefold Accounts-Payable demo walkthrough")
     parser.add_argument("--provider", default="fake",
                         help="fake | auto | anthropic | openai (default: fake)")
     args = parser.parse_args(argv)
     provider = select_provider(args.provider)
 
-    print("ACP Accounts-Payable Gateway - guided walkthrough")
+    print("Stonefold Accounts-Payable Gateway - guided walkthrough")
     print("  policy : examples/payments-ops.stele.yaml (unmodified)")
     print(f"  agent  : {provider.label}")
     print("  ledger : in-memory fake bank (no real money; all data fictional)")

@@ -51,7 +51,7 @@ class AttributeScope:
     """The POC scope predicate: a single attribute of the row/target must equal a
     value derived from the actor (its id or a named claim).
 
-    ACP-AMBIGUITY (RFC §6.3): the registry declares predicate *names* only; their
+    STONEFOLD-AMBIGUITY (RFC §6.3): the registry declares predicate *names* only; their
     column/claim binding is a gateway concern. These bindings are the gateway's
     registered implementations — a real deployment plugs richer predicates (an
     OPA/IAM seam) behind the same ``ScopePredicate`` protocol.

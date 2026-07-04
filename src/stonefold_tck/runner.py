@@ -49,7 +49,7 @@ class ConformanceReport:
         return tuple(r for r in self.results if r.status == FAIL)
 
     def render(self) -> str:
-        lines = [f"ACP TCK conformance report -- implementation: {self.implementation}"]
+        lines = [f"Stonefold TCK conformance report -- implementation: {self.implementation}"]
         for profile in ALL_PROFILES:
             results = self.by_profile(profile)
             if not results:

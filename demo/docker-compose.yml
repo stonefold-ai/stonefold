@@ -1,5 +1,5 @@
 # The Accounts-Payable demo stack (docs/05-demo-spec.md).
-#   gateway  - the real ACP product (FastAPI) + the demo UI, served at :8088
+#   gateway  - the real Stonefold product (FastAPI) + the demo UI, served at :8088
 #   postgres - the fake ledger AND the gateway's audit / outbox / kill tables
 #              (Postgres specifically: the kill no-race demo needs SELECT ... FOR UPDATE)
 #   redis    - rate/spend counters + kill propagation

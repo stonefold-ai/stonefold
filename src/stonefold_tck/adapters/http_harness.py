@@ -18,7 +18,7 @@ from stonefold_tck.driver import ConformanceDriver, Operation, TckActor
 
 
 def create_tck_harness(driver: ConformanceDriver, *, implementation: str) -> FastAPI:
-    app = FastAPI(title="ACP TCK harness (test builds only)", docs_url=None, redoc_url=None)
+    app = FastAPI(title="Stonefold TCK harness (test builds only)", docs_url=None, redoc_url=None)
 
     @app.get("/tck/capabilities")
     def capabilities() -> dict[str, Any]:

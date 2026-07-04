@@ -44,7 +44,7 @@ critics**. Mixing them is how the result gets dismissed.
   | **S0** | naked tools — no defense (context only; beating this proves nothing) |
   | **S1** | tools behind a gateway **allowlist** (the commodity MCP-gateway baseline) |
   | **S2** | S1 + **parameter-level policy** (value bounds, recipient lists — the best current gateways) |
-  | **S3** | **SIF + ACP full**: enum-injected surface, scope injection, resolved state, stateful gates, staged effects |
+  | **S3** | **SIF + Stele full**: enum-injected surface, scope injection, resolved state, stateful gates, staged effects |
 
 - **The entire argument lives in the S2→S3 gap.** If S2 ≈ S3 across all attack classes,
   the claim is falsified.

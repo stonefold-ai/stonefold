@@ -19,7 +19,7 @@ _PROMPTS = {"happy": HAPPY_PROMPT, "inbox": INBOX_PROMPT, "approval": GLOBEX_PRO
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="ACP AP agent (live-stack runner)")
+    parser = argparse.ArgumentParser(description="Stonefold AP agent (live-stack runner)")
     parser.add_argument("--gateway", default=os.environ.get("GATEWAY_URL", "http://localhost:8088"))
     parser.add_argument("--scenario", default="inbox", choices=sorted(_PROMPTS))
     parser.add_argument("--prompt", default=None, help="free-text prompt (overrides --scenario)")

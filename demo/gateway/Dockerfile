@@ -1,4 +1,4 @@
-# The ACP gateway service for the Accounts-Payable demo.
+# The Stonefold gateway service for the Accounts-Payable demo.
 # Build context is the REPO ROOT (see docker-compose.yml) so the policy, registry,
 # schema and source are all available to the image.
 FROM python:3.11-slim

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://stonefold.io/schema/v1.0/sif.schema.json",
+  "$id": "https://stonefold.ai/schema/v1.0/sif.schema.json",
   "title": "SIF Intent — L1 structural schema v1.0",
   "description": "Generic, domain-INDEPENDENT structural (L1) validation of a SIF intent batch: shape and fields per kind only. The VALIDATING, domain-specific schema is GENERATED from the registry at runtime (enum-injected entity/action/field names); this static file does not know domain names. See docs/07-artifacts-and-schemas.md.",
   "type": "object",

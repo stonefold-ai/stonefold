@@ -1,6 +1,6 @@
-# ACP Implementation Design — Engineering Companion to the RFC
+# Stonefold Implementation Design — Engineering Companion to the RFC
 
-*The Agent Control Policy RFC says **what** a policy means. This paper says **how** the gateway actually executes it — data structures, control flow, where state lives, how each gate is computed, and (worked in full) how the kill-switch operates. It is written so an engineer can build from it and a reviewer can tell whether a given claim in the RFC is mechanically real. Throughout, **Design notes** flag specific decisions, trade-offs, and failure modes to engineer against.*
+*The Stele RFC says **what** a policy means. This paper says **how** the gateway actually executes it — data structures, control flow, where state lives, how each gate is computed, and (worked in full) how the kill-switch operates. It is written so an engineer can build from it and a reviewer can tell whether a given claim in the RFC is mechanically real. Throughout, **Design notes** flag specific decisions, trade-offs, and failure modes to engineer against.*
 
 Reference stack (pinned in `docs/03`): a **Python** gateway (FastAPI + pydantic), PostgreSQL for durable state (audit, outbox, approvals, kill orders), and Redis for hot counters and kill propagation. None of it is load-bearing — swap equivalents freely. **The code snippets below are illustrative pseudocode** (written in a record/`switch` style for clarity); realise them in the pinned Python stack — records → `pydantic`/`dataclass` models, sealed interfaces → `typing.Protocol` + `enum`, the `switch` in §10 → a tree-walk over the AST. The *mechanism* is what matters, not the syntax.
 
@@ -32,10 +32,10 @@ The agent keeps its existing tools/MCP servers, but its tool traffic is routed *
 
 ```
 LLM --tool_call--> [Gateway proxy] --(if allowed)--> real MCP server / tool --> system
-                         |  intercepts, maps the call to an ACP action,
+                         |  intercepts, maps the call to a declared action,
                          |  enforces, forwards or refuses, logs
 ```
-Technically the gateway is a reverse proxy for the tool transport: for HTTP/SSE-based MCP it terminates the agent's connection and holds upstream connections to the real servers; for stdio MCP it sits as a middleware process. Each intercepted tool call is **mapped to an ACP action** via a per-tool mapping (`tool name + args  →  kind/resource/action/data`).
+Technically the gateway is a reverse proxy for the tool transport: for HTTP/SSE-based MCP it terminates the agent's connection and holds upstream connections to the real servers; for stdio MCP it sits as a middleware process. Each intercepted tool call is **mapped to a declared action** via a per-tool mapping (`tool name + args  →  kind/resource/action/data`).
 
 > **Design note.** Interception's coverage is only as good as the mapping and the routing. Two failure modes to engineer against: (1) a tool the gateway doesn't know about (unmapped) — policy: **unmapped ⇒ deny** by default, never pass-through; (2) network paths that bypass the proxy — must be closed at deployment (egress policy / the agent runtime only has the gateway endpoint). There should be a "coverage check" that fails startup if the agent has any configured tool endpoint that isn't the gateway.
 

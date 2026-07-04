@@ -1,4 +1,4 @@
-# ACP model registry — the declared catalogue the gateway knows about (RFC §2,
+# Stonefold model registry — the declared catalogue the gateway knows about (RFC §2,
 # design §2). Every resource/action/scope-predicate/hook/check/set/sink that any
 # example policy references is declared here, so the linter's §13.1 existence
 # check passes. Governance attributes (RFC §5) are listed only when they differ

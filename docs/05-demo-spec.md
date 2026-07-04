@@ -20,7 +20,7 @@ Everything comes up via `docker compose` from a clean checkout, given an API key
 
 | Component | What it is | Notes |
 |---|---|---|
-| **ACP Gateway** | the real product (FastAPI) + the demo UI | the agent reaches it only through the SIF-native `submit_intent` tool |
+| **Stonefold Gateway** | the real product (FastAPI) + the demo UI | the agent reaches it only through the SIF-native `submit_intent` tool |
 | **Agent runner** | a tool-use loop calling a **real LLM** (Claude default; OpenAI supported) | needs `ANTHROPIC_API_KEY`; cheap model (e.g. Haiku). The UI also runs it in-process; a scripted **fake-LLM** mode needs no key. |
 | **Postgres** | the fake **ledger** (accounts, payees, invoices, payments) **and** the gateway's `audit_log`, `pending_actions` (outbox), `kill_orders` | Postgres specifically — the durable outbox uses real `SELECT … FOR UPDATE` |
 | **Redis** | rate counters | |
@@ -58,7 +58,7 @@ demo/
 │       ├── acme_800.eml       # routine     — allowed
 │       ├── globex_6000.eml    # mid-size    — held for approval
 │       └── initech_500.eml    # sanctioned  — refused (denylist)
-├── gateway/Dockerfile         # the ACP gateway service + UI
+├── gateway/Dockerfile         # the Stonefold gateway service + UI
 ├── agent/Dockerfile           # the real-LLM agent runner
 ├── ui/                        # transcript · live trace · approvals
 └── README.md                  # the runbook (below)

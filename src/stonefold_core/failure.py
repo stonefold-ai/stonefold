@@ -12,7 +12,7 @@ not be assumed absent).
 
 This module is pure (no I/O, no framework) — part of the trust kernel.
 
-ACP-AMBIGUITY (RFC §10): the RFC permits ``failureMode`` to be overridden *per
+STONEFOLD-AMBIGUITY (RFC §10): the RFC permits ``failureMode`` to be overridden *per
 kind/action*; the pinned policy schema (``schema/stele.schema.json``) only carries
 ``defaults.failureMode``, so this POC resolves the mode at the defaults
 granularity. Per-action override is a schema extension deferred past the concept

@@ -1,6 +1,6 @@
-# ACP Gateway — project metadata and tooling.
+# Stonefold Gateway — project metadata and tooling.
 #
-# ACP-AMBIGUITY (docs/03 §Tech stack): the ADR pins Python 3.12, but the build
+# STONEFOLD-AMBIGUITY (docs/03 §Tech stack): the ADR pins Python 3.12, but the build
 # environment only has CPython 3.11.3 available. All code here is written to be
 # valid on 3.11+ (no PEP 695 `type` statements, no 3.12-only syntax) so it runs
 # unchanged on the pinned 3.12. requires-python is set to ">=3.11" accordingly.
@@ -11,7 +11,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "stonefold-gateway"
 version = "0.1.0"
-description = "Agent Control Policy (ACP) Gateway — a deterministic enforcement point between an AI agent and the systems it can act on."
+description = "Stonefold Gateway — a deterministic enforcement point between an AI agent and the systems it can act on."
 requires-python = ">=3.11"
 dependencies = [
     "pydantic>=2.6",

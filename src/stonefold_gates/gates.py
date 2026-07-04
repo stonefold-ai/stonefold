@@ -88,7 +88,7 @@ def check_from_states(from_states: Any, gctx: GateContext) -> GateResult:
 
 
 def _run_named_check(name: str, gctx: GateContext) -> bool:
-    """Run a registered precondition check. POC convention (ACP-AMBIGUITY,
+    """Run a registered precondition check. POC convention (STONEFOLD-AMBIGUITY,
     RFC §7.6): with no registered implementation the check passes iff the call
     carries a boolean flag of the same name set ``true`` — deterministic and
     test-drivable; a real deployment registers code here."""

@@ -344,7 +344,7 @@ def _check_open_on_irreversible(
 ) -> None:
     """§13.5 — failureMode: open on an irreversible action ⇒ ERROR.
 
-    ACP-AMBIGUITY: the RFC allows "explicit acknowledgement" to downgrade this;
+    STONEFOLD-AMBIGUITY: the RFC allows "explicit acknowledgement" to downgrade this;
     the schema has no ack field, so we always ERROR (the safer reading)."""
     if policy.defaults.failureMode is not FailureMode.OPEN:
         return

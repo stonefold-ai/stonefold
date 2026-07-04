@@ -1,8 +1,8 @@
-# Agent Control Policy (ACP) — Specification v0.4
+# Stele — Specification v0.4
 
 *The policy language for the SIF gateway: the declarative file that decides, deterministically, what an AI agent is permitted to do, and what is recorded when it tries.*
 
-> **Layering.** ACP is the upper layer. The lower layer — **what the agent can express** (the five action kinds and the intent shape) — is defined in the **SIF RFC** ([`00-RFC-sif-intent-format.md`](00-RFC-sif-intent-format.md)). ACP references SIF for the kinds and the operation shape; it does not redefine them. SIF = *what can be said*; ACP = *what is allowed*.
+> **Layering.** Stele is the upper layer. The lower layer — **what the agent can express** (the five action kinds and the intent shape) — is defined in the **SIF RFC** ([`00-RFC-sif-intent-format.md`](00-RFC-sif-intent-format.md)). Stele references SIF for the kinds and the operation shape; it does not redefine them. SIF = *what can be said*; Stele = *what is allowed*.
 
 **Status:** Draft v0.4 (reference specification; supersedes v0.3). **Authors:** the agent-platform team.
 **Audience:** engineers implementing or writing policies, and reviewers (security, compliance) who must read and certify them.
@@ -58,13 +58,13 @@
 
 ### Conventions
 
-The key words **MUST**, **MUST NOT**, **SHOULD**, **SHOULD NOT**, and **MAY** are used as in RFC 2119. A *gateway* is the deterministic enforcement point; a *policy* is one ACP document governing one agent (or a reusable fragment). The *model registry* is the declared catalogue of resources and actions the gateway knows about; the policy references names from it.
+The key words **MUST**, **MUST NOT**, **SHOULD**, **SHOULD NOT**, and **MAY** are used as in RFC 2119. A *gateway* is the deterministic enforcement point; a *policy* is one Stele document governing one agent (or a reusable fragment). The *model registry* is the declared catalogue of resources and actions the gateway knows about; the policy references names from it.
 
 ---
 
 ## 1. Overview and design principles
 
-An ACP document binds an **agent identity** to a set of **permissions** (what it may attempt) and **gates** (deterministic conditions every attempt must satisfy). The gateway evaluates the policy on every action; **no language model runs inside the evaluation**.
+A Stele document binds an **agent identity** to a set of **permissions** (what it may attempt) and **gates** (deterministic conditions every attempt must satisfy). The gateway evaluates the policy on every action; **no language model runs inside the evaluation**.
 
 Five principles constrain the whole format. They are the reason the language stays small and certifiable.
 
@@ -507,7 +507,7 @@ Levels: `none` | `basic` (decisions only) | `full` (decisions + parameters + gat
 
 **Remediation is downstream (boundary note).** The gateway's role in undoing a wrong-but-allowed effect is to make it *findable and actionable* — a complete, attributable record carrying `resultRefs` (CS-009) — **not** to perform the reversal. The compensating action is executed by the system of record, or as a gated operator action (§9), never reconstructed inside the gateway.
 
-**Scope boundary — the gateway governs agent→world, not world→world.** The unit of enforcement is **one resolved action**; a compound/batch intent is decomposed into N actions, each independently authorized, audited, killed, and carrying its own `resultRefs` (bulk-as-one-effect is out of scope). The gateway records the *direct* effects of an agent action; it does **not** see or govern the **cascade** those effects trigger in downstream systems (a posted payment that fires a webhook → a journal entry → a covenant alert). Therefore an action's `reversibility`, `compensation`, `resultRefs`, and the kill guarantee all describe the **direct** effect only — never the world's reactions to it. Cascade reconciliation is the downstream systems' responsibility, joined back via `resultRefs`/`correlationId`; multi-step transactional consistency across several agent intents (sagas) is out of scope (the audit trail makes them reconstructable and externally unwindable, but ACP guarantees no atomicity across intents). Design analysis: `docs/03` → "Multi-effect & cascade".
+**Scope boundary — the gateway governs agent→world, not world→world.** The unit of enforcement is **one resolved action**; a compound/batch intent is decomposed into N actions, each independently authorized, audited, killed, and carrying its own `resultRefs` (bulk-as-one-effect is out of scope). The gateway records the *direct* effects of an agent action; it does **not** see or govern the **cascade** those effects trigger in downstream systems (a posted payment that fires a webhook → a journal entry → a covenant alert). Therefore an action's `reversibility`, `compensation`, `resultRefs`, and the kill guarantee all describe the **direct** effect only — never the world's reactions to it. Cascade reconciliation is the downstream systems' responsibility, joined back via `resultRefs`/`correlationId`; multi-step transactional consistency across several agent intents (sagas) is out of scope (the audit trail makes them reconstructable and externally unwindable, but Stele guarantees no atomicity across intents). Design analysis: `docs/03` → "Multi-effect & cascade".
 
 ---
 

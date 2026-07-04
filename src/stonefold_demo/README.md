@@ -1,4 +1,4 @@
-# ACP Gateway — the adversarial demo
+# Stonefold Gateway — the adversarial demo
 
 > Make the product's core claim **visible and attackable**: the same
 > prompt-injected agent run, once without the gateway (the data leaves) and once

@@ -1,4 +1,4 @@
-# 09 — Mental models: a developer's guide to the ACP safety model
+# 09 — Mental models: a developer's guide to the Stonefold safety model
 
 *Non-normative companion.* This doc **teaches the mental model**; it does not define
 anything. Every rule lives in the RFC ([`01-RFC-agent-control-policy.md`](01-RFC-agent-control-policy.md))
@@ -151,7 +151,7 @@ inside other systems. The gateway never sees that cascade. So an action's
 `reversibility`, `compensation`, `resultRefs`, and even the kill switch describe the
 **direct** effect only — never the downstream reactions.
 
-That's deliberate scope, not a missing feature: chasing the cascade would make ACP a
+That's deliberate scope, not a missing feature: chasing the cascade would make Stonefold a
 distributed-transaction coordinator (out of scope). The seam back is `resultRefs` +
 `correlationId` — the keys a downstream reconciler uses to trace and remediate the
 chain. (RFC §9, §11; [`03`](03-architecture-decisions.md) → "Multi-effect & cascade".)

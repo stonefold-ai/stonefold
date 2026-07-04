@@ -11,7 +11,7 @@ Two transports sit in front of it (RFC §3):
   whose schema is generated from the registry (resource/action enums injected).
   Coverage is structural — there is no other tool, so there is no other path.
 * **Interception / MCP proxy** (design §1.2): the agent keeps its tools, but each
-  call is mapped to an ACP action and enforced. The mapping is the coverage
+  call is mapped to a declared action and enforced. The mapping is the coverage
   boundary, so: an **unmapped tool denies** (never pass-through, review note),
   and a **free-form-string pass-through requires explicit acknowledgement**
   (review note). ``interception_coverage_check`` fails startup if any configured
@@ -218,7 +218,7 @@ class CoverageError(RuntimeError):
 
 @dataclass(frozen=True)
 class ToolMapping:
-    """Maps an intercepted tool call to an ACP action (design §1.2).
+    """Maps an intercepted tool call to a declared action (design §1.2).
 
     ``arg_map`` renames tool argument keys to the action's ``data`` keys (identity
     when empty). ``free_form`` flags a tool whose arguments are an opaque string

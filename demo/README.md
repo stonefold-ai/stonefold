@@ -1,6 +1,6 @@
-# Accounts-Payable Demo — the ACP Gateway in the path
+# Accounts-Payable Demo — the Stonefold Gateway in the path
 
-A **real AI agent** doing accounts-payable work behind the **real ACP gateway**,
+A **real AI agent** doing accounts-payable work behind the **real Stonefold gateway**,
 enforcing the **unmodified** [`examples/payments-ops.stele.yaml`](../examples/payments-ops.stele.yaml).
 The bank and ledger are faked (no real money, all data fictional); the agent and
 the enforcement are real.
@@ -23,7 +23,7 @@ demo/
 ├── docker-compose.yml      gateway + postgres + redis + agent
 ├── .env.example            ANTHROPIC_API_KEY=...  (copy to .env)
 ├── Makefile                up / seed / demo / run / down
-├── gateway/Dockerfile      the ACP gateway service (FastAPI) + UI
+├── gateway/Dockerfile      the Stonefold gateway service (FastAPI) + UI
 ├── agent/Dockerfile        the real-LLM agent runner
 ├── policy/                 pointer to the real policy (no copy — single source of truth)
 ├── seed/

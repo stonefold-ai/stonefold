@@ -51,7 +51,7 @@ def create_app(
     outbox: OutboxStore | None = None,
     identity: IdentityProvider | None = None,
 ) -> FastAPI:
-    app = FastAPI(title="ACP Gateway", version="0.1")
+    app = FastAPI(title="Stonefold Gateway", version="0.1")
     sif = SifNativeTransport(gateway)
     # CS-021: identity enters through the seam ahead of the pipeline. The default
     # is the standalone built-in (transport-authenticated ids verbatim) — so an
@@ -112,7 +112,7 @@ def create_app(
 # and a global kill button — enough to show intent → decision → effect, approve a
 # held action, and halt a session (M6 DoD). Not a product UI.
 _ADMIN_HTML = """<!doctype html>
-<html><head><meta charset="utf-8"><title>ACP Gateway — console</title>
+<html><head><meta charset="utf-8"><title>Stonefold Gateway — console</title>
 <style>
  body{font:14px system-ui,sans-serif;margin:2rem;max-width:60rem}
  h1{font-size:1.2rem} section{border:1px solid #ddd;border-radius:8px;padding:1rem;margin:1rem 0}
@@ -120,7 +120,7 @@ _ADMIN_HTML = """<!doctype html>
  pre{background:#f6f6f6;padding:.6rem;border-radius:6px;overflow:auto}
  .kill{background:#b00020;color:#fff;border:0;border-radius:6px}
 </style></head><body>
-<h1>ACP Gateway — operator console</h1>
+<h1>Stonefold Gateway — operator console</h1>
 
 <section><h2>Trace (intent → decision → effect)</h2>
  <input id="cid" placeholder="correlationId"/>

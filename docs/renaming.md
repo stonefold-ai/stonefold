@@ -8,11 +8,14 @@ the history is visibly not hidden.
 
 > **Supersedes the earlier "Interlock" proposal.** A prior revision of this page recorded
 > *Interlock* (product) / *Interlock Policy Language* (spec) as the decided names, gated on
-> the author's due diligence. That due diligence has now run: the domains **stonefold.ai**
-> and **stonefold.io** are reserved, and a collision check settled the language name. The
-> decision below — **Stonefold** (product) / **Stele** (policy language) — replaces it.
-> Interlock is recorded here only so the trail is honest; it was never executed, so the
-> sweep goes ACP → Stonefold/Stele directly.
+> the author's due diligence. That due diligence **disqualified Interlock: "Interlock" is
+> the name of an active ransomware group** — a fatal association for a security product,
+> and exactly the kind of collision the gate existed to catch. The name was dropped. The
+> domains **stonefold.ai** (primary) and **stonefold.io** (held defensively) are now
+> reserved, and a collision check settled the language name. The decision below —
+> **Stonefold** (product) / **Stele** (policy language) — replaces it. Interlock is recorded
+> here only so the trail is honest; it was **never applied to the repo** (the code was still
+> ACP), so the sweep goes ACP → Stonefold/Stele directly.
 
 ## What changes
 

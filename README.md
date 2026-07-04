@@ -1,6 +1,6 @@
-# Agent Control Protocol
+# Stonefold
 
-> **Status:** working proof-of-concept. The full specification (ACP v0.4) lives in [`docs/`](docs/); this repo also carries a Python reference implementation (`src/`, tested against real Postgres/Redis), a runnable real-LLM demo ([`demo/`](demo/)), and a [conformance kit](docs/12-conformance-tck.md) for certifying gateways in any language. Not production-hardened.
+> **Status:** working proof-of-concept. The full specification (Stele v0.4) lives in [`docs/`](docs/); this repo also carries a Python reference implementation (`src/`, tested against real Postgres/Redis), a runnable real-LLM demo ([`demo/`](demo/)), and a [conformance kit](docs/12-conformance-tck.md) for certifying gateways in any language. Not production-hardened.
 
 ## What it is
 
@@ -8,7 +8,7 @@ It's a **safety checkpoint that sits between an AI agent and the real systems it
 
 The slogan: **the AI proposes; a machine you control disposes.**
 
-Three names, once, so the rest of this page and the docs line up: the protocol is what this repo specifies — the contract between an agent and the systems it acts on. The checkpoint component that enforces it is the **gateway**; the rulebook language is **ACP** (Agent Control Policy); the request-slip format the agent emits is **SIF** (Structured Intent Format). That's the whole vocabulary.
+Three names, once, so the rest of this page and the docs line up: **Stonefold** is the product this repo specifies — the deterministic checkpoint between an agent and the systems it acts on. The component that enforces the rules is the **gateway**; the rulebook language you write is **Stele**; the request-slip format the agent emits is **SIF** (Structured Intent Format). That's the whole vocabulary.
 
 If you're coming from the MCP world: **SIF runs on MCP** — the SIF-native binding *is* an MCP server, exposing exactly one registry-typed tool (`submit_intent`, SIF RFC §7). It replaces the tool sprawl, not the transport: instead of an agent facing dozens of tools it can be tricked into misusing, the agent faces one provable surface whose vocabulary is generated from your domain model. An existing MCP tool estate doesn't have to migrate first — interception mode governs it as-is (unmapped calls are denied), and the [registry generator](docs/06-registry-domain-model.md) drafts a governance model straight from your `tools/list`.
 
@@ -18,7 +18,7 @@ Think of the AI as a brilliant but gullible new employee who works incredibly fa
 
 ## How it actually works — one example
 
-Say you deploy a **customer-support AI**. Its job: answer customers and email them their invoices. You've written a simple rulebook — a short, readable file; in ACP terms, the *policy* — that says, in effect:
+Say you deploy a **customer-support AI**. Its job: answer customers and email them their invoices. You've written a simple rulebook — a short, readable file; in Stele terms, the *policy* — that says, in effect:
 
 - It may **read** customer and order records — *but only for the customer it's currently helping.*
 - It may **send email** — *but only to company-approved addresses, no more than 20 an hour, and the content gets scanned for sensitive data.*
@@ -69,7 +69,7 @@ And the judgment call: when the AI proposes identifying a track as hostile, that
 
 ## Why it matters
 
-Companies are stuck: AI agents are capable enough to do real work, but most firms **can't safely deploy them on anything that matters** because they can't control or prove what the AI does. Industry data backs this up — Gartner expects [over 40% of agentic-AI projects to be cancelled by 2027](https://www.gartner.com/en/newsroom/press-releases/2025-06-25-gartner-predicts-over-40-percent-of-agentic-ai-projects-will-be-canceled-by-end-of-2027), mainly over cost, unclear value, and **inadequate controls**, and MIT found [95% of corporate AI pilots deliver no return](https://fortune.com/2025/08/18/mit-report-95-percent-generative-ai-pilots-at-companies-failing-cfo/). The blocker isn't smarter AI — it's trust and control. This is the layer that provides them. It works **on top of** any AI model (ACP doesn't build or train the model), so it rides the whole industry's progress instead of competing with it, and it's aimed at the regulated, high-stakes settings where being unable to control the agent is a dealbreaker — finance, healthcare, critical operations.
+Companies are stuck: AI agents are capable enough to do real work, but most firms **can't safely deploy them on anything that matters** because they can't control or prove what the AI does. Industry data backs this up — Gartner expects [over 40% of agentic-AI projects to be cancelled by 2027](https://www.gartner.com/en/newsroom/press-releases/2025-06-25-gartner-predicts-over-40-percent-of-agentic-ai-projects-will-be-canceled-by-end-of-2027), mainly over cost, unclear value, and **inadequate controls**, and MIT found [95% of corporate AI pilots deliver no return](https://fortune.com/2025/08/18/mit-report-95-percent-generative-ai-pilots-at-companies-failing-cfo/). The blocker isn't smarter AI — it's trust and control. This is the layer that provides them. It works **on top of** any AI model (Stonefold doesn't build or train the model), so it rides the whole industry's progress instead of competing with it, and it's aimed at the regulated, high-stakes settings where being unable to control the agent is a dealbreaker — finance, healthcare, critical operations.
 
 For EU deployers there is a harder-edged version of "why it matters": the AI Act's high-risk obligations — automatic logging of what the system did, and human oversight including the ability to interrupt it — are *mechanical* requirements, and they describe this gateway's feature list almost line by line (transactional audit, approval holds, the stop button with its no-race guarantee). The mapping, obligation by obligation, is [`docs/14-eu-ai-act-mapping.md`](docs/14-eu-ai-act-mapping.md).
 
@@ -77,7 +77,7 @@ One honest caveat worth stating plainly: this **bounds what the AI is able to do
 
 ## Who is this for
 
-The short rule: ACP earns its keep wherever an agent's action can **move money, touch a regulated record, or cause an irreversible effect** — and where someone must later prove what the agent did and who allowed it. Concretely, in rough order of fit:
+The short rule: Stonefold earns its keep wherever an agent's action can **move money, touch a regulated record, or cause an irreversible effect** — and where someone must later prove what the agent did and who allowed it. Concretely, in rough order of fit:
 
 | Industry | The agent work | What the gateway contributes |
 |---|---|---|
@@ -90,9 +90,9 @@ The short rule: ACP earns its keep wherever an agent's action can **move money, 
 
 There's a second customer orthogonal to all of these: **platform and vertical-SaaS vendors who embed a gateway** in their own product — for them the spec, the registry generator, and the conformance TCK (certify your own implementation, any language) are the deliverables.
 
-And where it's the *wrong* tool, honestly: read-only low-stakes agents, creative workflows a human already reviews, and anything that's really an orchestration problem — ACP governs actions, not the agent's reasoning loop. One boundary worth knowing up front: the gateway never judges *content* itself (it's deterministic on purpose) — instead it hosts the hooks where your DLP, moderation, or fraud checks plug in, at a point the agent can't bypass, with their verdicts on the audit record.
+And where it's the *wrong* tool, honestly: read-only low-stakes agents, creative workflows a human already reviews, and anything that's really an orchestration problem — Stonefold governs actions, not the agent's reasoning loop. One boundary worth knowing up front: the gateway never judges *content* itself (it's deterministic on purpose) — instead it hosts the hooks where your DLP, moderation, or fraud checks plug in, at a point the agent can't bypass, with their verdicts on the audit record.
 
-The full analysis — each industry's blocking risk, the exact ACP mechanisms and worked policy examples that answer it, who the buyer is, what the gateway does *not* judge and where other systems plug in, and the recommended beachhead — is [`docs/13-who-is-this-for.md`](docs/13-who-is-this-for.md).
+The full analysis — each industry's blocking risk, the exact Stonefold mechanisms and worked policy examples that answer it, who the buyer is, what the gateway does *not* judge and where other systems plug in, and the recommended beachhead — is [`docs/13-who-is-this-for.md`](docs/13-who-is-this-for.md).
 
 ## See it run
 
@@ -130,30 +130,30 @@ Run it yourself with Docker and an API key — see [`demo/README.md`](demo/READM
 
 ## How this relates to existing policy tools
 
-ACP is not a new access-control theory, and it does not replace the policy engines you may already use. The decision layer — "is this request allowed?" — is deliberately in the same family as AWS Cedar and Open Policy Agent (OPA/Rego), which themselves build on decades of authorization work (XACML, ABAC/RBAC). Default-deny, explicit-deny-wins, a typed schema of entities and actions, attribute-based conditions — those are shared, well-established ideas ACP inherits from that lineage.
+Stonefold is not a new access-control theory, and it does not replace the policy engines you may already use. The decision layer — "is this request allowed?" — is deliberately in the same family as AWS Cedar and Open Policy Agent (OPA/Rego), which themselves build on decades of authorization work (XACML, ABAC/RBAC). Default-deny, explicit-deny-wins, a typed schema of entities and actions, attribute-based conditions — those are shared, well-established ideas Stonefold inherits from that lineage.
 
-What ACP adds is the agent layer around that decision:
+What Stonefold adds is the agent layer around that decision:
 
 - it constrains what an LLM can even ask for — a typed intent surface generated from the domain model, so the agent can't form a request for something that wasn't declared. A policy engine judges requests that already exist; it doesn't address how a non-deterministic, promptable LLM forms them in the first place.
 - runtime controls a pure decision engine doesn't do — rate and spend limits, human approval and dual-authorization, a kill-switch, result-disclosure.
 - staged execution with an action-level audit trail.
 
-Put simply: Cedar/OPA decide whether a request is allowed; ACP also controls what an AI agent can request, and runs the gated, staged, recorded execution around it. Think of Cedar/OPA as the decision engine and ACP as the agent runtime that can sit on top of one — not as competitors.
+Put simply: Cedar/OPA decide whether a request is allowed; Stonefold also controls what an AI agent can request, and runs the gated, staged, recorded execution around it. Think of Cedar/OPA as the decision engine and Stonefold as the agent runtime that can sit on top of one — not as competitors.
 
-The closest existing system is **AWS Bedrock AgentCore**, which already runs Cedar inside an agent runtime — intercepting tool calls through an MCP gateway, evaluating each before access (Cedar can inspect the argument values too), and adding human approval through a separate orchestration layer. Two things still differ. **How the action surface is modelled:** AgentCore also constrains the agent — it can only call registered tools, and MCP tools carry typed argument schemas — so this is a difference of abstraction, not capability. ACP generates the agent's whole intent vocabulary from one domain model, and its five action *kinds* plus governance attributes (reversibility, emission, operative force) let a policy reason about the *nature* of an action uniformly, where AgentCore reasons per-tool-name and per-argument. **Its shape:** in AgentCore, approval, orchestration, and audit are assembled from separate AWS services and coupled to AWS; in ACP, staging, approval, kill, and audit are first-class parts of one model, portable across any stack.
+The closest existing system is **AWS Bedrock AgentCore**, which already runs Cedar inside an agent runtime — intercepting tool calls through an MCP gateway, evaluating each before access (Cedar can inspect the argument values too), and adding human approval through a separate orchestration layer. Two things still differ. **How the action surface is modelled:** AgentCore also constrains the agent — it can only call registered tools, and MCP tools carry typed argument schemas — so this is a difference of abstraction, not capability. Stonefold generates the agent's whole intent vocabulary from one domain model, and its five action *kinds* plus governance attributes (reversibility, emission, operative force) let a policy reason about the *nature* of an action uniformly, where AgentCore reasons per-tool-name and per-argument. **Its shape:** in AgentCore, approval, orchestration, and audit are assembled from separate AWS services and coupled to AWS; in Stonefold, staging, approval, kill, and audit are first-class parts of one model, portable across any stack.
 
 The full version of this argument — the PDP/PEP category error, the four-verdict comparison table, how IAM/OPA/Cedar compose with the gateway through the authorization seam, and what those engines honestly do better — is [`docs/10-positioning-policy-engines.md`](docs/10-positioning-policy-engines.md).
 
 ## Learn more
 
 - **[SIF — the intent format](docs/00-RFC-sif-intent-format.md)** — the five action kinds and the shape the agent emits; the layer everything else builds on.
-- **[Specification](docs/01-RFC-agent-control-policy.md)** — the rulebook language, with worked examples across five domains.
+- **[Stele — the policy language](docs/01-RFC-agent-control-policy.md)** — the rulebook language, with worked examples across five domains.
 - **[Implementation design](docs/02-implementation-design.md)** — how the gateway executes it, including the stop button in full.
 - **[Architecture decisions](docs/03-architecture-decisions.md)** — the chosen stack and structure.
 - **[Registry & domain model](docs/06-registry-domain-model.md)** — how to declare your resources/actions, and the generator that drafts a registry from SQL DDL, OpenAPI, or an MCP tool list.
 - **[Positioning vs OPA / Cedar / IAM / AgentCore / agent passports](docs/10-positioning-policy-engines.md)** — why a decision engine alone can't govern an agent, the same gap attack-by-attack, and how they all compose with the gateway.
 - **[Conformance TCK](docs/12-conformance-tck.md)** — certify a gateway in any language against the RFC: one small driver adapter (Python protocol or fourteen JSON endpoints), one report, named profiles.
-- **[Who is this for](docs/13-who-is-this-for.md)** — the industries ranked by fit, each one's blocking risk mapped to the mechanisms that answer it, who buys, and where ACP is the wrong tool.
+- **[Who is this for](docs/13-who-is-this-for.md)** — the industries ranked by fit, each one's blocking risk mapped to the mechanisms that answer it, who buys, and where Stonefold is the wrong tool.
 - **[EU AI Act mapping](docs/14-eu-ai-act-mapping.md)** — the high-risk logging and human-oversight obligations, mechanism by mechanism (draft; citations pending verification).
 - **[Incremental adoption](docs/16-incremental-adoption.md)** — the ramp from an existing MCP tool estate to structural containment: draft → intercept → migrate entity-by-entity → SIF-native, with the honest coverage guarantee at each stage.
 - **[Benchmark: SIF vs tool surface](docs/15-benchmark-design.md)** — the experiment design and the **[pilot run records](docs/15-benchmark-design.md#realism-battery--2026-07-02-same-day-track-r-supersedes-the-count-pilot-as-headline)** on real models. The first pilot showed tool *count* alone doesn't break selection on current models (three Claude tiers, N up to 100); the **realism battery** then added what production actually has — look-alike capabilities, vague wording, 2k tokens of prior context — and the surfaces separated: with confusable capabilities Haiku picks correctly **95/80%** under SIF vs **75/55%** under MCP tools (N=10/50), stays at **95/90%** under SIF with 2k context while MCP drops to 75/60%, and production-length tool cards fix MCP's selection (90%) *but at 5.4× the tokens per call* — an honest trade reported both ways, next to two clean ties (nobody over-calls; realistic-card selection favours MCP). **The test data and harness for verifying the method are in the repo**: every model call's raw log in [`bench_results/`](bench_results/), the scoring/surface code pointers in its README, one command to re-run any cell with your own key. Pilot only — one model, small sample, labelled as such.

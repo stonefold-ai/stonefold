@@ -29,7 +29,7 @@ def _merge_chain(docs: list[dict[str, Any]]) -> dict[str, Any]:
     """Union allow/deny/gates/scope/standing across a fragment chain
     (RFC §3.2). Later docs (the governed document) are applied last; deny is
     unioned so a fragment's deny can never be widened (deny wins at authorize
-    time). ACP-AMBIGUITY: RFC §3.2 says "more-restrictive gate wins"; for this
+    time). STONEFOLD-AMBIGUITY: RFC §3.2 says "more-restrictive gate wins"; for this
     PoC a later doc's gate config overrides an earlier one on the same gate."""
     out: dict[str, Any] = {}
     allow: list[Any] = []

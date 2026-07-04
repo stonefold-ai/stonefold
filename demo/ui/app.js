@@ -1,5 +1,5 @@
 "use strict";
-// Thin client for the ACP Accounts-Payable demo: live trace over WebSocket, the
+// Thin client for the Stonefold Accounts-Payable demo: live trace over WebSocket, the
 // approvals inbox, the KILL switch, the audit log, and the agent runner buttons.
 // Everything is same-origin against the gateway that serves this page.
 

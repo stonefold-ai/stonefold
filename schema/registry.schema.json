@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://stonefold.io/schema/v1.0/registry.schema.json",
+  "$id": "https://stonefold.ai/schema/v1.0/registry.schema.json",
   "title": "Registry (Domain Model) v1.0",
   "description": "Schema for a registry/domain-model document. Semantics in docs/06-registry-domain-model.md. Structural checks only; cross-reference checks are performed by the linter.",
   "type": "object",
@@ -77,7 +77,7 @@
         "data": { "type": "object", "additionalProperties": { "$ref": "#/$defs/property" } },
         "resolve": { "type": "object", "additionalProperties": { "type": "object", "required": ["entity"], "additionalProperties": true, "properties": { "entity": { "type": "string" } } } },
         "compensation": {
-          "description": "Declared in-system undo action (ACP RFC section 13 rule 10 / CS-008). Required when reversibility is 'compensable'; the linter checks the target exists.",
+          "description": "Declared in-system undo action (Stele RFC section 13 rule 10 / CS-008). Required when reversibility is 'compensable'; the linter checks the target exists.",
           "type": "object",
           "required": ["resource", "action"],
           "additionalProperties": false,

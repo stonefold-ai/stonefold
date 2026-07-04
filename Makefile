@@ -1,4 +1,4 @@
-# ACP Gateway — developer tasks. See docs/03 for the pinned stack.
+# Stonefold Gateway — developer tasks. See docs/03 for the pinned stack.
 #
 # `make demo` is the M-DEMO milestone: the adversarial demo end to end.
 # On Windows without `make`, run the same thing with:  python -m stonefold_demo

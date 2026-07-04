@@ -1,4 +1,4 @@
-"""The demo gateway HTTP/WebSocket service (docs/05 components: ACP Gateway + UI).
+"""The demo gateway HTTP/WebSocket service (docs/05 components: Stonefold Gateway + UI).
 
 Wraps an ``APBundle`` in FastAPI: the SIF-native ``submit_intent`` tool (identity
 from headers, never the body — invariant 3), a live trace WebSocket for the UI,
@@ -77,7 +77,7 @@ def create_app(bundle: APBundle, *, default_provider: str = "auto") -> FastAPI:
         finally:
             bundle.stop_worker()
 
-    app = FastAPI(title="ACP Accounts-Payable Demo", version="0.1", lifespan=lifespan)
+    app = FastAPI(title="Stonefold Accounts-Payable Demo", version="0.1", lifespan=lifespan)
     sif = SifNativeTransport(bundle.gateway)
 
     @app.get("/tool-schema")
