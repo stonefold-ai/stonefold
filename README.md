@@ -116,6 +116,16 @@ A runnable proof-of-concept lives in [`demo/`](demo/): a **real LLM agent** (Cla
 
 *The agent's recap of the ungoverned run: all three "Approved (Bypassed)", **$7,300 sent** — the two the gateway would have stopped, gone. That gap is the product.*
 
+The third position is **HALT** — the operator kill switch:
+
+![Gateway halted — the kill switch stops every action](docs/img/demo-gateway-halt.png)
+
+*Gateway **HALTED**: the agent keeps running and keeps submitting intents, but every one of them — including the $800 payment that ON would allow — becomes an audited `halt` against the kill order's rule. Nothing staged dispatches until an operator lifts the kill.*
+
+![The halted run's summary](docs/img/demo-gateway-halt-detail.png)
+
+*The raw verdicts of the halted run (`decision: "halt"`, `rule: kill:<order-id>`) and the agent's recap. A halted invoice is deliberately not marked handled — the kill is transient, so the work is retried once the gateway is back on.*
+
 Back with the gateway on, a **held** payment waits for a person — the agent can't release its own money:
 
 ![Approvals inbox — a held payment awaiting a human](docs/img/demo-approvals-held.png)
