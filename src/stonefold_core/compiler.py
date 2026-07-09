@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from enum import IntEnum
 from typing import TYPE_CHECKING, Any
 
-from stonefold_core.enums import Kind
+from stonefold_core.enums import FeedbackLevel, Kind
 from stonefold_core.models import ResolvedAction
 from stonefold_core.policy import Policy, Targets
 
@@ -155,6 +155,17 @@ class CompiledPolicy:
                 # restrictive / more specific governs).
                 merged.setdefault(gate_name, cfg)
         return merged
+
+    def feedback_for(self, a: ResolvedAction) -> FeedbackLevel:
+        """The agent-feedback visibility level for ``a`` (RFC §11, CS-030): the
+        most-specific gate set's ``feedback:`` key, else the ``code+fields``
+        default."""
+        from stonefold_core.feedback import DEFAULT_FEEDBACK, parse_feedback
+
+        raw = self.gates_for(a).get("feedback")
+        if raw is None:
+            return DEFAULT_FEEDBACK
+        return parse_feedback(raw)
 
     def scope_for(self, resource: str) -> str | None:
         return self.policy.scope.get(resource)

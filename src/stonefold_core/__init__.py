@@ -19,12 +19,14 @@ from stonefold_core.enums import (
     Decision,
     Emission,
     Explainability,
+    FeedbackLevel,
     Kind,
     OperativeForce,
     Outcome,
     RetryClass,
     Reversibility,
 )
+from stonefold_core.feedback import agent_view, agent_view_batch
 from stonefold_core.models import (
     Actor,
     Attributes,
@@ -138,6 +140,9 @@ __all__ = [
     "Decision",
     "Outcome",
     "RetryClass",
+    "FeedbackLevel",
+    "agent_view",
+    "agent_view_batch",
     "Reversibility",
     "Emission",
     "OperativeForce",

@@ -20,6 +20,7 @@ from typing import Any, Protocol
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from stonefold_core.enums import Decision
 from stonefold_core.models import AuditRecord
 from stonefold_core.outbox import (
     ApprovalError,
@@ -31,10 +32,41 @@ from stonefold_core.outbox import (
 
 
 class ReplayableAudit(Protocol):
-    """An audit sink that can replay a run (``InMemoryAuditSink`` /
-    ``PostgresAuditSink`` both satisfy this)."""
+    """An audit sink that can replay a run and enumerate its records
+    (``InMemoryAuditSink`` / ``PostgresAuditSink`` both satisfy this)."""
 
     def by_correlation(self, correlation_id: str) -> list[AuditRecord]: ...
+
+    def all_records(self) -> list[AuditRecord]: ...
+
+
+def reason_code_stats(records: list[AuditRecord]) -> list[dict[str, Any]]:
+    """Deny-rate + reason-code distribution per (agent, principal) — the
+    CS-030 probing-detection surface. Reason codes are an oracle even at the
+    tightest visibility (each probe maps one policy wall); the countermeasure
+    is not blunting the codes (that kills the convergence loop) but watching
+    this distribution: a converging loop and a mapping loop look different."""
+    stats: dict[tuple[str, str], dict[str, Any]] = {}
+    for r in records:
+        entry = stats.setdefault(
+            (r.agent, r.actor),
+            {
+                "agent": r.agent, "actor": r.actor,
+                "total": 0, "denied": 0, "held": 0, "codes": {},
+            },
+        )
+        entry["total"] += 1
+        if r.decision is Decision.DENY:
+            entry["denied"] += 1
+        elif r.decision is Decision.HOLD:
+            entry["held"] += 1
+        if r.reasonCode:
+            entry["codes"][r.reasonCode] = entry["codes"].get(r.reasonCode, 0) + 1
+    out = []
+    for entry in sorted(stats.values(), key=lambda e: (e["agent"], e["actor"])):
+        entry["denyRate"] = round(entry["denied"] / entry["total"], 4)
+        out.append(entry)
+    return out
 
 
 class ApproverBody(BaseModel):
@@ -55,6 +87,10 @@ def create_admin_router(*, audit: ReplayableAudit, outbox: OutboxStore) -> APIRo
     def approvals() -> list[dict[str, Any]]:
         held = outbox.list_by_state(PendingState.PENDING_APPROVAL)
         return [a.model_dump(mode="json") for a in held]
+
+    @router.get("/reason-codes")
+    def reason_codes() -> list[dict[str, Any]]:
+        return reason_code_stats(audit.all_records())
 
     @router.post("/approvals/{action_id}/approve")
     def approve(action_id: str, body: ApproverBody) -> dict[str, Any]:

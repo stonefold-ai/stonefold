@@ -42,6 +42,10 @@ class InMemoryAuditSink:
         """Replay one agent run as an ordered query (RFC §11)."""
         return [r for r in self.records if r.correlationId == correlation_id]
 
+    def all_records(self) -> list[AuditRecord]:
+        """Every record, in write order (the CS-030 stats surface reads this)."""
+        return list(self.records)
+
 
 class FallbackAuditSink:
     """Best-effort durability for the audit write (design §11 review note, F3).

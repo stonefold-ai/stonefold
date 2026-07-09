@@ -53,6 +53,15 @@ class RetryClass(str, Enum):
     ESCALATE = "escalate"  # stop and surface to a human on the AGENT's side
 
 
+class FeedbackLevel(str, Enum):
+    """What the AGENT receives on a deny/hold (RFC §11, v0.6 CS-030). The audit
+    record always carries everything — redact on return, never on write."""
+
+    CODE = "code"  # reason code + retry class only
+    CODE_FIELDS = "code+fields"  # + which intent fields failed; never record-side values
+    CODE_EVIDENCE = "code+evidence"  # the full comparison; trusted internal loops only
+
+
 class Reversibility(str, Enum):
     """How recoverable an action is (RFC §5). Drives approval/gate strength."""
 

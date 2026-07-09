@@ -32,7 +32,7 @@ from stonefold_core.audit import AuditSink, build_record
 from stonefold_core.compiler import CompiledPolicy
 from stonefold_core.connector import ConnectorRegistry
 from stonefold_core.digest import DIGEST_MISMATCH, pinned_connector_mismatch
-from stonefold_core.enums import Decision, Kind, Outcome
+from stonefold_core.enums import Decision, FeedbackLevel, Kind, Outcome
 from stonefold_core.failure import Unavailable, guard, should_fail_closed
 from stonefold_core.freshness import FreshnessConfig
 from stonefold_core.gating import ApprovalSpec, GateEngine, ReleaseContract, RequestEnv
@@ -79,6 +79,9 @@ class _Decided:
     releases: tuple[ReleaseContract, ...] = ()
     scope_pred: ScopePredicate | None = None
     scope_applied: tuple[str, ...] = ()
+    # v0.6 (CS-030): the policy-declared agent-feedback level, stamped on the
+    # EvalResult so the transport can redact the return path.
+    feedback: FeedbackLevel = FeedbackLevel.CODE_FIELDS
 
 
 def enforce(
@@ -116,11 +119,12 @@ def enforce(
         env=env, scopes=scopes, connectors=connectors, kill=kill,
         agent_name=agent_name, failure_mode=failure_mode,
     )
-    return _commit(
+    result = _commit(
         decided, actor, session, audit=audit, connectors=connectors,
         outbox=outbox, freshness=freshness, env=env, agent_name=agent_name,
         failure_mode=failure_mode,
     )
+    return _stamp_feedback(result, decided)
 
 
 def enforce_batch(
@@ -205,7 +209,9 @@ def enforce_batch(
         return BatchResult(
             decision=decided[failing].decision,
             failing_index=failing,
-            results=tuple(results),
+            results=tuple(
+                _stamp_feedback(r, d) for r, d in zip(results, decided, strict=True)
+            ),
         )
 
     # Phase 2b — commit: stage every hold/effect, execute every read/write, in
@@ -218,10 +224,13 @@ def enforce_batch(
     # earlier operations committed) is governed per-operation by §10 and is not
     # rolled back here.
     results = [
-        _commit(
-            d, actor, session, audit=audit, connectors=connectors, outbox=outbox,
-            freshness=freshness, env=env_of(i), agent_name=agent_name,
-            failure_mode=failure_mode,
+        _stamp_feedback(
+            _commit(
+                d, actor, session, audit=audit, connectors=connectors, outbox=outbox,
+                freshness=freshness, env=env_of(i), agent_name=agent_name,
+                failure_mode=failure_mode,
+            ),
+            d,
         )
         for i, d in enumerate(decided)
     ]
@@ -290,10 +299,14 @@ def _decide(
     if policy is None:
         return _Decided(call, resolved, Decision.DENY, "default-deny")
 
+    # CS-030: the agent-feedback level this action's policy declares — stamped
+    # on every decision from here down so the transport can redact the return.
+    fb = policy.feedback_for(resolved)
+
     # 2. AUTHORIZE — RFC §6.2: deny-wins → default-deny → allow.
     authz = policy.authorize(resolved)
     if not authz.allowed:
-        return _Decided(call, resolved, Decision.DENY, authz.rule)
+        return _Decided(call, resolved, Decision.DENY, authz.rule, feedback=fb)
 
     # 3. SCOPE — derive the predicate from the actor (never the payload). For an
     # effect this is a pre-resolution authorization check (design §5): the target
@@ -317,12 +330,12 @@ def _decide(
                     if should_fail_closed(resolved, failure_mode):
                         return _Decided(
                             call, resolved, Decision.DENY, "scope-unavailable",
-                            scope_applied=scope_applied,
+                            scope_applied=scope_applied, feedback=fb,
                         )
                 elif probe.value is None:
                     return _Decided(
                         call, resolved, Decision.DENY, "scope-denied",
-                        scope_applied=scope_applied,
+                        scope_applied=scope_applied, feedback=fb,
                     )
 
     # 4. GATES — evaluate the matching gates (RFC §7/§12 step 4). Any FAIL ⇒
@@ -335,14 +348,14 @@ def _decide(
             return _Decided(
                 call, resolved, Decision.DENY, outcome.reason or "gate-fail",
                 gate_results=outcome.results, scope_pred=scope_pred,
-                scope_applied=scope_applied,
+                scope_applied=scope_applied, feedback=fb,
             )
         if outcome.outcome is Outcome.HOLD:
             return _Decided(
                 call, resolved, Decision.HOLD, outcome.reason or "gate-hold",
                 gate_results=outcome.results, approval=outcome.approval,
                 releases=outcome.releases,
-                scope_pred=scope_pred, scope_applied=scope_applied,
+                scope_pred=scope_pred, scope_applied=scope_applied, feedback=fb,
             )
         gate_trace = outcome.results
 
@@ -364,7 +377,7 @@ def _decide(
                 return _Decided(
                     call, resolved, Decision.HALT, "kill-unavailable",
                     outcome="halted", gate_results=gate_trace,
-                    scope_pred=scope_pred, scope_applied=scope_applied,
+                    scope_pred=scope_pred, scope_applied=scope_applied, feedback=fb,
                 )
             order = None
         else:
@@ -373,12 +386,12 @@ def _decide(
             return _Decided(
                 call, resolved, Decision.HALT, f"kill:{order.id}",
                 outcome="halted", gate_results=gate_trace,
-                scope_pred=scope_pred, scope_applied=scope_applied,
+                scope_pred=scope_pred, scope_applied=scope_applied, feedback=fb,
             )
 
     return _Decided(
         call, resolved, Decision.ALLOW, authz.rule, gate_results=gate_trace,
-        scope_pred=scope_pred, scope_applied=scope_applied,
+        scope_pred=scope_pred, scope_applied=scope_applied, feedback=fb,
     )
 
 
@@ -545,6 +558,15 @@ def _commit(
         Decision.ALLOW, decided.rule, call, resolved, actor, session, audit,
         agent_name, gate_results=gate_trace, scope_applied=decided.scope_applied,
     )
+
+
+def _stamp_feedback(result: EvalResult, decided: _Decided) -> EvalResult:
+    """Stamp the policy-declared feedback level (CS-030) on the result AFTER the
+    audit was written from it — the transport redacts by this stamp; the audit
+    never sees a redacted record."""
+    if result.feedback is decided.feedback:
+        return result
+    return result.model_copy(update={"feedback": decided.feedback})
 
 
 def _staging_expiry(

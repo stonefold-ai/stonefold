@@ -16,6 +16,7 @@ from stonefold_core.enums import (
     Decision,
     Emission,
     Explainability,
+    FeedbackLevel,
     Kind,
     OperativeForce,
     Outcome,
@@ -146,6 +147,10 @@ class GateResult(BaseModel):
     # gate's built-in default assigned by the engine). ``None`` on PASS and on
     # approval-shaped holds (the agent's move there is to wait).
     retry_class: RetryClass | None = None
+    # v0.6 CS-030: which INTENT field(s) the comparison judged (e.g.
+    # ``data.amount``) — what ``code+fields`` visibility may reveal. Never
+    # carries record-side values; those live only in ``reason``/``evidence``.
+    fields: tuple[str, ...] = ()
 
 
 class EvalResult(BaseModel):
@@ -160,6 +165,10 @@ class EvalResult(BaseModel):
     # deny/hold — the agent's convergence signal. Empty/None on ALLOW.
     reason_code: str = ""
     retry_class: RetryClass | None = None
+    # v0.6 CS-030: the visibility level the deciding action's policy declares
+    # (stamped by the pipeline; the TRANSPORT applies it via ``agent_view`` —
+    # the pipeline's own result, and hence the audit, is always full).
+    feedback: FeedbackLevel = FeedbackLevel.CODE_FIELDS
     # Populated on HOLD/accepted-effect with the staged ``pending_actions`` id.
     ticket: str | None = None
     # The connector result on an executed ALLOW (rows for an observe, a receipt

@@ -43,6 +43,7 @@ from stonefold_core import (
     enforce,
     enforce_batch,
 )
+from stonefold_core.feedback import agent_view, agent_view_batch
 from stonefold_core.freshness import FreshnessConfig
 from stonefold_core.scope import ScopeResolver
 
@@ -108,10 +109,15 @@ class Gateway:
         actor: Actor,
         session: Session,
     ) -> EvalResult:
-        """The single enforcement entry point shared by both transports."""
+        """The single enforcement entry point shared by both transports.
+
+        The returned result is the AGENT's view (CS-030): redacted to the
+        policy-declared feedback level. The audit record was written from the
+        full result inside ``enforce`` — redact on return, never on write.
+        """
         raw = RawCall(resource=resource, action=action, data=dict(data or {}))
         env = self._env_factory(raw) if self._env_factory is not None else self._env
-        return enforce(
+        result = enforce(
             raw,
             actor,
             session,
@@ -127,6 +133,7 @@ class Gateway:
             freshness=self._freshness,
             agent=self._agent,
         )
+        return agent_view(result)
 
     def submit_batch(
         self,
@@ -156,21 +163,23 @@ class Gateway:
             envs = [self._env] * len(raws)
         else:
             envs = None
-        return enforce_batch(
-            raws,
-            actor,
-            session,
-            registry=self._registry,
-            audit=self._audit,
-            policy=self._policy,
-            gates=self._gates,
-            envs=envs,
-            scopes=self._scopes,
-            connectors=self._connectors,
-            outbox=self._outbox,
-            kill=self._kill,
-            freshness=self._freshness,
-            agent=self._agent,
+        return agent_view_batch(
+            enforce_batch(
+                raws,
+                actor,
+                session,
+                registry=self._registry,
+                audit=self._audit,
+                policy=self._policy,
+                gates=self._gates,
+                envs=envs,
+                scopes=self._scopes,
+                connectors=self._connectors,
+                outbox=self._outbox,
+                kill=self._kill,
+                freshness=self._freshness,
+                agent=self._agent,
+            )
         )
 
     def refuse(

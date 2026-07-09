@@ -95,10 +95,11 @@ def failed(
     code: str = "",
     source: str = "",
     retry_class: "RetryClass | None" = None,
+    fields: tuple[str, ...] = (),
 ) -> GateResult:
     return GateResult(
         gate=gate, outcome=Outcome.FAIL, reason=reason, code=code, source=source,
-        retry_class=retry_class,
+        retry_class=retry_class, fields=fields,
     )
 
 

@@ -39,15 +39,16 @@ _WEEKDAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 # --- 3. valueLimit -------------------------------------------------------
 def value_limit(cfg: Any, gctx: GateContext) -> GateResult:
     field = cfg.get("field") if isinstance(cfg, dict) else None
+    fields = (str(field),) if field else ()  # CS-030: what code+fields may reveal
     try:
         num = to_number(resolve_field(field, gctx))
     except (MissingValueError, ConditionRuntimeError) as exc:
-        return failed("valueLimit", f"fail-closed: {exc}")
+        return failed("valueLimit", f"fail-closed: {exc}", fields=fields)
     mx, mn = cfg.get("max"), cfg.get("min")
     if mx is not None and num > float(mx):
-        return failed("valueLimit", f"{field}={num} exceeds max {mx}")
+        return failed("valueLimit", f"{field}={num} exceeds max {mx}", fields=fields)
     if mn is not None and num < float(mn):
-        return failed("valueLimit", f"{field}={num} below min {mn}")
+        return failed("valueLimit", f"{field}={num} below min {mn}", fields=fields)
     return passed("valueLimit")
 
 
@@ -57,18 +58,23 @@ def _membership(cfg: Any, gctx: GateContext, *, deny: bool) -> GateResult:
     if not isinstance(cfg, dict):
         return failed(name, "fail-closed: gate needs {field, set}")
     field, set_name = cfg.get("field"), cfg.get("set")
+    fields = (str(field),) if field else ()  # CS-030: what code+fields may reveal
     try:
         value = str(resolve_field(field, gctx))
     except (MissingValueError, ConditionRuntimeError) as exc:
-        return failed(name, f"fail-closed: {exc}")
+        return failed(name, f"fail-closed: {exc}", fields=fields)
     if set_name is not None:
         members = set(gctx.registry.named_set(set_name))
     else:
         members = {str(v) for v in cfg.get("values", [])}
     in_set = value in members
     if deny:
-        return failed(name, f"{field}={value!r} is denylisted") if in_set else passed(name)
-    return passed(name) if in_set else failed(name, f"{field}={value!r} not in {set_name!r}")
+        if in_set:
+            return failed(name, f"{field}={value!r} is denylisted", fields=fields)
+        return passed(name)
+    if in_set:
+        return passed(name)
+    return failed(name, f"{field}={value!r} not in {set_name!r}", fields=fields)
 
 
 def allowlist(cfg: Any, gctx: GateContext) -> GateResult:
