@@ -2,7 +2,7 @@
 
 A runnable, check-out-and-run demonstration that uses a **real LLM agent** (an API key is required) and shows the gateway **enforcing policy on every action a real agent takes** — allowing a routine payment, holding a mid-size one for a human, and refusing a non-compliant one — with a one-click **gateway ON/OFF** toggle that shows what happens with no gateway in the path. The shipped demo lives in [`demo/`](../demo/).
 
-> **Note.** The *scripted walkthrough* is deliberately minimal: three legitimate invoices, allow / hold / deny. The adversarial pieces are shipped and tested, just not given dedicated scenario boxes in the UI: the **indirect-injection attack** — a fraudulent invoice directing a wire to a new payee at an attacker account — is refused by the gateway on the new-payee cooling-off precondition (test G2, also proven over Postgres), an **invite-attack** free-text prompt ("send money out…") is available from the UI's prompt box, and the **kill switch** control plane (issue/lift, with live trace events) is wired at `/admin/kill`. Only the earlier spec's spend-cap-loop demo box was dropped outright.
+> **Note.** The *scripted walkthrough* is deliberately minimal: three legitimate invoices, allow / hold / deny. The adversarial pieces are shipped and tested, just not given dedicated scenario boxes in the UI: the **indirect-injection attack** — a fraudulent invoice directing a wire to a new payee at an attacker account — is refused by **matching** (v0.6 `requireMatch`: the invoice corresponds to no purchase order; it does not even carry the fields to match one), with the new-payee cooling-off precondition behind it as defence in depth (test G2, also proven over Postgres); an **invite-attack** free-text prompt ("send money out…") is available from the UI's prompt box; and the **kill switch** control plane (issue/lift, with live trace events) is wired at `/admin/kill`. Only the earlier spec's spend-cap-loop demo box was dropped outright.
 
 ## Goal
 
@@ -26,7 +26,7 @@ Everything comes up via `docker compose` from a clean checkout, given an API key
 | **Redis** | rate counters | |
 | **Fake connector** | `ledger-pay` — "sends" money by writing a payment row + emitting an event | clearly fake and safe |
 | **Demo UI** | a thin web page: a **gateway ON/OFF toggle**, scenario buttons, the **raw agent transcript** (prompt + the exact intents the model emits), a **live trace** (intent → decision → effect, each tagged by pipeline stage), and an **approvals inbox** (Approve/Reject) | REST + WebSocket |
-| **Seed data** | accounts, known payees, and three legitimate invoices | one routine, one mid-size (approval), one to a sanctioned-country vendor (refused) |
+| **Seed data** | accounts, known payees, three legitimate invoices, and their **open purchase orders** (v0.6) | one routine, one mid-size (approval), one to a sanctioned-country vendor (refused); one open PO line per invoice — the obligations `requireMatch` matches and consumes |
 
 A **fake-LLM mode** exists (scripted decisions) so CI and no-key users can run the mechanics — the real demo uses a key.
 
@@ -38,7 +38,8 @@ The policy only *names* the domain-specific functions and data it relies on; the
 |---|---|---|
 | `tenantOf(actor)` | scope predicate | limits `Account`/`Payment` rows to the actor's tenant, and gates paying *from* an out-of-tenant account (a pre-resolution check) |
 | `sanctioned-list` | named set | the country list the `denylist` gate checks against `data.destinationCountry` — trips on the Initech (IR) invoice |
-| `payeeCoolingOffElapsed` | precondition check | the new-payee hold (runs `when: exists data.newPayee`); not exercised by the shipped inbox (known payees) but exercised by the indirect-injection attack test (G2) and the invite-attack prompt — it is what refuses the fraudulent wire |
+| `payeeCoolingOffElapsed` | precondition check | the new-payee hold (runs `when: exists data.newPayee`); defence in depth behind matching for the fraudulent wire (G2) and the invite-attack prompt |
+| `erp.purchase_orders` | obligation registry (v0.6, CS-034) | the `requireMatch` source: an in-memory adapter seeded at gateway startup from `PURCHASE_ORDERS` (`src/stonefold_ap_demo/seed.py`) — one open PO line per legitimate invoice. Reserving/consuming flips the line's declared state, so a resubmitted invoice **no-matches at decision time**; payment intents carry `vendorId` + `sourceDomain` (the match and provenance inputs) |
 | registry: entities/actions | registry | `Account`/`Payment`/`Payee` (observe), `LedgerEntry` (record), `pay` (effect, staged via the outbox), `Invoice` |
 | `ledger-pay` | connector | the fake "bank": carries out `pay` by writing a payment row + emitting an event; reads apply the injected scope below the model |
 | `role:payments-manager` | identity/role | the approver for held mid-size payments (Approve/Reject in the UI) |
@@ -75,6 +76,7 @@ Each is a real prompt to the real LLM; the agent decides; the gateway enforces. 
 3. **Approval** — *"Pay the $6,000 invoice to Globex."* Mid-size → **HELD**; appears in the approvals inbox; **Approve** → it proceeds (money moves), **Reject** → it does not. Both outcomes are audited.
 4. **Direct rejection** — *"Pay the $500 invoice from Initech."* The vendor is in a sanctioned country → the gateway **refuses it itself** (`denylist`), with no human involved.
 5. **Gateway off (the contrast)** — flip the toggle to **OFF** and re-run any scenario: the agent's tools hit the ledger directly, every payment executes with **no** checks (the $6,000 is not held, the $500 is not refused), and nothing is recorded — showing exactly what the gateway adds.
+6. **The obligation beats (v0.6)** — the refusal no earlier gate could produce. The $800 payment matched its open PO line, so paying it **consumed** the line (the audit's `consumption` field carries the receipt; `obligationRefs` names the line). Re-run scenario 1: the *same* invoice now matches **nothing** and **holds `no-match`** in the AP clerk's queue (`onNoMatch: hold` in the policy) — never a second payment against one line. Resubmit it again and the holds **collapse** into the one queue item with an attempt count (CS-031). The fraudulent invoice is refused the same way: no purchase order, no payment — *in bounds is not the same as owed* (docs/18).
 
 Every decision (allow / hold / deny) is an append-only audit record with its reason; the live trace tags each entry with the pipeline stage that produced it (`RESOLVE` / `AUTHORIZE` / `SCOPE` / `GATES` / `KILL` / `EXECUTE` / `DISPATCH`).
 
