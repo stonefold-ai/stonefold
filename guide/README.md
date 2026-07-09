@@ -8,7 +8,8 @@ directory is a complete program, executed by the test suite on every commit
 (`tests/test_guide_examples.py`) — so what you read here is what actually
 runs, and it cannot silently rot.
 
-![How the pieces fit](architecture.svg)
+<img src="architecture.svg" alt="How the pieces fit: the agent's only path is a typed submit_intent into the deterministic gateway (resolve, authorize, scope, gates, kill, stage, audit); gates call your registered checks/hooks/predicates; allowed effects stage in the outbox and a dispatch worker sends them through your connectors, with the operator holding approvals and the kill switch; v0.6 adds the obligation registry the gateway queries, reserves, consumes and releases; everything lands in the append-only audit log" width="900">
+
 
 The one-sentence model, before any code: **the agent's only power is to
 submit a typed intent; a deterministic gateway decides allow / hold / deny /
