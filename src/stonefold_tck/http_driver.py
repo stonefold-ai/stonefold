@@ -44,7 +44,7 @@ Omit an endpoint (404/501) only if its capability is not advertised.
 (v0.5 CS-020); ``/tck/resolve`` + ``/tck/sweep-holds`` back
 ``hold-precondition``, ``reasonCode``/``retryClass``/``agentView`` back
 ``feedback``, and ``/tck/seed-obligations`` + ``/tck/obligation-outage`` back
-``obligation`` (v0.6, OPEN change set).)
+``obligation`` (v0.6).)
 """
 
 from __future__ import annotations

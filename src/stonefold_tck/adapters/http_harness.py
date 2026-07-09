@@ -168,7 +168,7 @@ def create_tck_harness(driver: ConformanceDriver, *, implementation: str) -> Fas
         driver.update_named_set(str(body["name"]), [str(v) for v in body["values"]])
         return {}
 
-    # --- v0.6 (OPEN change set): hold-precondition / obligation --------------
+    # --- v0.6: hold-precondition / obligation ---------------------------------
     @app.post("/tck/resolve")
     def resolve(body: dict[str, Any]) -> dict[str, Any]:
         return {

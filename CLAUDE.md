@@ -15,7 +15,7 @@ The **Stonefold Gateway**: a deterministic enforcement point between an AI agent
 > here. The runnable TCK code is the reverse case: it lives **here**
 > (`src/stonefold_tck/`); the spec repo carries only its specification (spec/docs/12).
 1. `spec/docs/00-RFC-sif-intent-format.md` — the SIF intent format (the five kinds + the shape the agent emits), **v1.0**. The lower layer; canonical home for the kinds.
-2. `spec/docs/01-RFC-agent-control-policy.md` — Stele policy semantics (*what's allowed*), **v0.5** (changelogs at top); references SIF for the kinds. Deltas for older builds: `spec/docs/RFC-changeset-v0.1-to-v0.2.md` through `spec/docs/RFC-changeset-v0.4-to-v0.5.md`, in order. A Change Set wins on any conflict with older wording.
+2. `spec/docs/01-RFC-agent-control-policy.md` — Stele policy semantics (*what's allowed*), **v0.6** (changelogs at top); references SIF for the kinds. Deltas for older builds: `spec/docs/RFC-changeset-v0.1-to-v0.2.md` through `spec/docs/RFC-changeset-v0.5-to-v0.6.md`, in order. A Change Set wins on any conflict with older wording.
 3. `docs/02-implementation-design.md` — mechanism (*how*). Code snippets there are illustrative pseudocode; realise them in the pinned Python stack.
 4. `docs/03-architecture-decisions.md` — pinned stack & layout (Python: FastAPI + pydantic + Postgres + Redis).
 5. `spec/schema/sif.schema.json`, `spec/schema/stele.schema.json`, `spec/schema/registry.schema.json` — the JSON Schemas for intents, policies, and registries. Every `spec/examples/*` must validate against the matching schema.
