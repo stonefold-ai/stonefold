@@ -27,6 +27,7 @@ from stonefold_core.freshness import VOLATILE_GATES, DispatchRevalidator
 from stonefold_core.reasons import gate_class
 from stonefold_core.gating import ApprovalSpec, GateOutcome, ReleaseContract, RequestEnv
 from stonefold_core.models import Actor, GateResult, ResolvedAction, Session
+from stonefold_core.obligation import ObligationRegistry
 from stonefold_core.outbox import PendingAction
 from stonefold_store import CounterStore, InMemoryCounterStore
 from stonefold_gates import gates as g
@@ -52,6 +53,7 @@ _GATES: dict[str, tuple[int, GateFn]] = {
     "denylist": (15, g.denylist),
     "precondition": (20, g.precondition),
     "emissionControl": (20, g.emission_control),
+    "requireMatch": (20, g.require_match),  # v0.6 CS-032 (volatile band)
     "disclosure": (20, g.disclosure),
     "rate": (30, g.rate),
     "quota": (30, g.quota),
@@ -108,12 +110,17 @@ class DefaultGateEngine:
         counters: CounterStore | None = None,
         hooks: ContentHookRegistry | None = None,
         preconditions: Mapping[str, PreconditionCheck] | None = None,
+        obligations: Mapping[str, ObligationRegistry] | None = None,
         default_resolver_role: str | None = None,
     ) -> None:
         self.registry = registry
         self.counters: CounterStore = counters or InMemoryCounterStore()
         self.hooks: ContentHookRegistry = hooks or default_hooks()
         self.preconditions: dict[str, PreconditionCheck] = dict(preconditions or {})
+        # v0.6 (CS-034): obligation-registry adapters, keyed by declared
+        # registry name. A ``requireMatch`` whose registry has no adapter here
+        # is a dependency failure at evaluation time (RFC §10).
+        self.obligations: dict[str, ObligationRegistry] = dict(obligations or {})
         # CS-027: the deployment's default resolver role for non-approval holds
         # whose gate declares no ``resolvers:``. ``None`` + no ``resolvers:`` on a
         # check-driven hold ⇒ the intent is refused fail-closed
@@ -140,6 +147,7 @@ class DefaultGateEngine:
             preconditions=self.preconditions,
             failure_mode=policy.policy.defaults.failureMode,
             agent=policy.agent,
+            obligations=self.obligations,
         )
 
     def evaluate(

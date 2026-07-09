@@ -93,12 +93,13 @@ class PostgresOutboxStore:
         releases: tuple[ReleaseContract, ...] = (),
         compensation: Compensation | None = None,
         expires_at: datetime | None = None,
+        staged_at: datetime | None = None,
     ) -> PendingAction:
         row = build_pending(
             resolved=resolved, actor=actor, session_id=session_id, agent=agent,
             state=state, correlation_id=correlation_id, gates=gates,
             approval=approval, releases=releases, compensation=compensation,
-            expires_at=expires_at,
+            expires_at=expires_at, staged_at=staged_at,
         )
         with self._conn.transaction(), self._conn.cursor() as cur:
             cur.execute(

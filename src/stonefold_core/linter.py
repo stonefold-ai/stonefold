@@ -1,9 +1,10 @@
-"""The semantic linter (RFC §13) — the rule-1..13 validation checks (v0.3).
+"""The semantic linter (RFC §13) — the rule-1..18 validation checks.
 
 A policy that produces any ERROR-severity finding MUST NOT load: the gateway
 refuses to start rather than fall back to a permissive default (design §4 review
 note — a silently-degraded control plane is how a gateway fails open by
-accident). WARN findings are reported but do not block loading.
+accident). WARN findings are reported but do not block loading; INFO findings
+(v0.6, rule 15's deployment-check pointer) are purely advisory.
 """
 
 from __future__ import annotations
@@ -12,17 +13,22 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-from stonefold_core.condition import parse_and_validate
+from stonefold_core.condition import Path, parse, parse_and_validate
 from stonefold_core.enums import Kind, Reversibility
 from stonefold_core.policy import FailureMode, Policy, Targets
 from stonefold_core.registry import ActionDef, InMemoryRegistry
 
 _SENSITIVE_FLOOR = frozenset({"public", "internal"})
 
+# The extra read-only namespace legal ONLY inside requireMatch match/provenance
+# clauses (RFC §8 note, v0.6 CS-036).
+_OBLIGATION_NS = frozenset({"obligation"})
+
 
 class Severity(str, Enum):
     ERROR = "error"
     WARN = "warn"
+    INFO = "info"
 
 
 @dataclass(frozen=True)
@@ -46,6 +52,10 @@ class LintReport:
     @property
     def warnings(self) -> list[LintFinding]:
         return [f for f in self.findings if f.severity is Severity.WARN]
+
+    @property
+    def infos(self) -> list[LintFinding]:
+        return [f for f in self.findings if f.severity is Severity.INFO]
 
     @property
     def has_errors(self) -> bool:
@@ -154,6 +164,9 @@ def lint(policy: Policy, registry: InMemoryRegistry) -> LintReport:
     _check_ambiguous_bare_allow(policy, registry, report)
     _check_dual_auth_quorum(policy, report)
     _check_hold_capable_resolvers(policy, registry, report)
+    _check_require_match(policy, registry, report)
+    _check_creation_execution_separation(policy, registry, report)
+    _check_consume_none_irreversible(policy, registry, report)
     return report
 
 
@@ -187,6 +200,206 @@ def _check_hold_capable_resolvers(
                         "resolvers: — its holds fall to the deployment default resolver "
                         "role, and are refused hold-unresolvable if none is configured",
                     )
+
+
+def _clause_obligation_paths(clause: str) -> list[str]:
+    """The record-relative ``obligation.*`` paths a parsed clause references
+    (empty for an unparsable clause — rule 14's parse check reports that)."""
+    try:
+        expr = parse(clause)
+    except Exception:
+        return []
+    out: list[str] = []
+    stack: list[Any] = [expr]
+    while stack:
+        node = stack.pop()
+        if isinstance(node, Path):
+            if len(node.parts) > 1 and node.parts[0] == "obligation":
+                out.append(".".join(node.parts[1:]))
+        elif hasattr(node, "left") and hasattr(node, "right"):  # And/Or/Compare/In
+            stack.append(node.left)
+            stack.append(node.right)
+        elif hasattr(node, "args"):  # Func
+            stack.extend(node.args)
+        elif hasattr(node, "expr"):  # Not
+            stack.append(node.expr)
+        elif hasattr(node, "path"):  # Exists
+            stack.append(node.path)
+    return out
+
+
+def _check_require_match(
+    policy: Policy, registry: InMemoryRegistry, report: LintReport
+) -> None:
+    """§13.14 + §13.17 (v0.6, CS-038) — ``requireMatch`` typing: the registry
+    is declared; every ``obligation.*`` path in ``match``/``provenance``/
+    ``consume`` exists in its declared schema; a tolerance clause applies to a
+    numeric/money field; clause strings parse under the ``obligation``
+    namespace; ``onAmbiguous: allow`` is illegal."""
+    for key, gateset in policy.gates.items():
+        cfg = gateset.get("requireMatch")
+        if cfg is None:
+            continue
+        where = f"gates[{key}].requireMatch"
+        if not isinstance(cfg, dict):
+            report.add("13.14", Severity.ERROR, f"{where}: must be a mapping")
+            continue
+        if cfg.get("onAmbiguous") == "allow":
+            report.add(
+                "13.17",
+                Severity.ERROR,
+                f"{where}: onAmbiguous: allow is illegal — the gateway never "
+                f"auto-selects among candidate obligations (§7.16)",
+            )
+        reg_name = str(cfg.get("registry") or "")
+        decl = registry.obligation_registry(reg_name)
+        if decl is None:
+            report.add(
+                "13.14",
+                Severity.ERROR,
+                f"{where}: unknown obligation registry {reg_name!r}",
+            )
+        for section in ("match", "provenance"):
+            for clause in cfg.get(section) or []:
+                if isinstance(clause, str):
+                    for problem in parse_and_validate(
+                        clause, extra_namespaces=_OBLIGATION_NS
+                    ):
+                        report.add("13.14", Severity.ERROR, f"{where}.{section}: {problem}")
+                    if decl is not None:
+                        for path in _clause_obligation_paths(clause):
+                            if not decl.has_path(path):
+                                report.add(
+                                    "13.14",
+                                    Severity.ERROR,
+                                    f"{where}.{section}: obligation.{path} is not "
+                                    f"in {reg_name!r}'s declared schema",
+                                )
+                elif isinstance(clause, dict):
+                    _check_tolerance_clause(clause, decl, reg_name, f"{where}.{section}", report)
+                else:
+                    report.add(
+                        "13.14", Severity.ERROR, f"{where}.{section}: bad clause {clause!r}"
+                    )
+        consume = cfg.get("consume")
+        if isinstance(consume, str) and consume != "none" and consume.startswith("obligation."):
+            if decl is not None and not decl.has_path(consume[len("obligation.") :]):
+                report.add(
+                    "13.14",
+                    Severity.ERROR,
+                    f"{where}: consume path {consume} is not in {reg_name!r}'s declared schema",
+                )
+        elif consume != "none":
+            report.add(
+                "13.14",
+                Severity.ERROR,
+                f"{where}: consume must be an obligation.* path or 'none', got {consume!r}",
+            )
+
+
+def _check_tolerance_clause(
+    clause: dict[str, Any],
+    decl: Any,
+    reg_name: str,
+    where: str,
+    report: LintReport,
+) -> None:
+    field_path = clause.get("field")
+    if not (isinstance(field_path, str) and field_path.startswith("obligation.")):
+        report.add(
+            "13.14", Severity.ERROR, f"{where}: tolerance field must be obligation.*"
+        )
+        return
+    rel = field_path[len("obligation.") :]
+    if decl is not None:
+        if not decl.has_path(rel):
+            report.add(
+                "13.14",
+                Severity.ERROR,
+                f"{where}: {field_path} is not in {reg_name!r}'s declared schema",
+            )
+        elif not decl.is_numeric(rel):
+            report.add(
+                "13.14",
+                Severity.ERROR,
+                f"{where}: tolerance (within) on {field_path}, which is not a "
+                f"declared numeric/money field (§7.16)",
+            )
+
+
+def _matched_registry_connectors(
+    policy: Policy, registry: InMemoryRegistry
+) -> set[str]:
+    """Connectors backing every obligation registry this policy matches
+    against — the statically-visible link rule 15 checks."""
+    out: set[str] = set()
+    for gateset in policy.gates.values():
+        cfg = gateset.get("requireMatch")
+        if isinstance(cfg, dict):
+            decl = registry.obligation_registry(str(cfg.get("registry") or ""))
+            if decl is not None:
+                out.add(decl.connector)
+    return out
+
+
+def _check_creation_execution_separation(
+    policy: Policy, registry: InMemoryRegistry, report: LintReport
+) -> None:
+    """§13.15 (v0.6, CS-038) — the governed agent must not author its own
+    obligations. ERROR where the overlap is statically visible: the policy
+    allows a ``record``/``effect``/``transition`` on a resource backed by the
+    same connector as an obligation registry it matches against. Otherwise
+    (the registry is external) an INFO points at the deployment check
+    (docs/06 §5b: the agent's principal must not hold write access)."""
+    matched = _matched_registry_connectors(policy, registry)
+    if not matched:
+        return
+    overlap = False
+    for rname, aname, adef in _allowed_action_defs(policy, registry):
+        if adef.kind not in (Kind.RECORD, Kind.EFFECT, Kind.TRANSITION):
+            continue
+        rdef = registry.file.resources.get(rname)
+        connector = adef.connector or (rdef.connector if rdef else "")
+        if connector in matched:
+            overlap = True
+            report.add(
+                "13.15",
+                Severity.ERROR,
+                f"{adef.kind.value} {rname}.{aname} writes through connector "
+                f"{connector!r}, which backs an obligation registry this policy "
+                f"matches against — the agent must not author its own "
+                f"obligations (§7.16, docs/06 §5b)",
+            )
+    if not overlap:
+        report.add(
+            "13.15",
+            Severity.INFO,
+            "creation/execution separation is not statically visible for the "
+            "matched obligation registries — verify at deployment that the "
+            "agent's principal holds no write access to them (docs/06 §5b)",
+        )
+
+
+def _check_consume_none_irreversible(
+    policy: Policy, registry: InMemoryRegistry, report: LintReport
+) -> None:
+    """§13.16 (v0.6, CS-038) — ``consume: none`` on an irreversible effect ⇒
+    WARN: verification without consumption leaves the double-spend window open
+    in the decide→dispatch gap."""
+    for rname, aname, adef in _allowed_action_defs(policy, registry):
+        if adef.kind is not Kind.EFFECT:
+            continue
+        if adef.reversibility is not Reversibility.IRREVERSIBLE:
+            continue
+        cfg = _merged_gates(policy, rname, aname, adef.kind).get("requireMatch")
+        if isinstance(cfg, dict) and cfg.get("consume") == "none":
+            report.add(
+                "13.16",
+                Severity.WARN,
+                f"irreversible effect {rname}.{aname} uses requireMatch with "
+                f"consume: none — verification without consumption leaves the "
+                f"double-spend window open (§7.16)",
+            )
 
 
 def _iter_permission_targets(
@@ -357,8 +570,10 @@ def _check_transition_from_states(
 def _check_irreversible_unguarded(
     policy: Policy, registry: InMemoryRegistry, report: LintReport
 ) -> None:
-    """§13.4 — irreversible allowed action with no approval/dual-auth/precondition."""
-    guards = {"requireApproval", "dualAuthorization", "precondition"}
+    """§13.4 — irreversible allowed action with no approval/dual-auth/
+    precondition/requireMatch (rule 4 as amended by v0.6 CS-038: a matched
+    obligation is a satisfying guard)."""
+    guards = {"requireApproval", "dualAuthorization", "precondition", "requireMatch"}
     for rname, aname, adef in _allowed_action_defs(policy, registry):
         if adef.reversibility is not Reversibility.IRREVERSIBLE:
             continue
@@ -368,7 +583,7 @@ def _check_irreversible_unguarded(
                 "13.4",
                 Severity.WARN,
                 f"irreversible action {rname}.{aname} has no requireApproval/"
-                f"dualAuthorization/precondition gate",
+                f"dualAuthorization/precondition/requireMatch gate",
             )
 
 

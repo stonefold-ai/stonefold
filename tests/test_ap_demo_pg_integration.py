@@ -70,7 +70,10 @@ def _pay(bundle: APBundle, data: dict[str, Any], *, session: str = "pg") -> Any:
 
 
 _ACME_800 = {"payeeId": "PE-ACME-SUP", "accountId": "ACME-OPS", "amount": 800.0,
-             "currency": "USD", "destinationCountry": "GB", "invoiceId": "INV-1001"}
+             "currency": "USD", "destinationCountry": "GB", "invoiceId": "INV-1001",
+             # v0.6 requireMatch inputs: the payment must correspond to the
+             # vendor's open purchase order (RFC §7.16).
+             "vendorId": "PE-ACME-SUP", "sourceDomain": "acme.example"}
 
 
 def _payment_count(bundle: APBundle) -> int:
@@ -104,13 +107,16 @@ def test_attack_denied_over_postgres(bundle: APBundle) -> None:
               "amount": 50_000.0, "currency": "USD", "destinationCountry": "GB",
               "accountId": "ACME-OPS"}
     result = _pay(bundle, attack)
-    assert result.decision is Decision.DENY and "precondition" in result.rule
+    # v0.6: refused by matching — the fraudulent invoice corresponds to no
+    # purchase order (cooling-off remains behind it as defence in depth).
+    assert result.decision is Decision.DENY and "requireMatch" in result.rule
     assert bundle.drain() == 0 and _payment_count(bundle) == 0
 
 
 def test_approval_release_over_postgres(bundle: APBundle) -> None:
     data = {"payeeId": "PE-GLOBEX", "accountId": "ACME-OPS", "amount": 6_000.0,
-            "currency": "USD", "destinationCountry": "US"}
+            "currency": "USD", "destinationCountry": "US",
+            "vendorId": "PE-GLOBEX", "sourceDomain": "globex.example"}
     result = _pay(bundle, data)
     assert result.decision is Decision.HOLD and result.ticket is not None
     assert bundle.drain() == 0

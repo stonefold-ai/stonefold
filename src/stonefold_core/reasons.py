@@ -94,8 +94,13 @@ def classify(
             code = deciding.code or rule
             if deciding.retry_class is not None:
                 return code, deciding.retry_class
-            if deciding.outcome is Outcome.HOLD and not deciding.code:
-                return code, None  # approval-shaped hold: wait, not retry
+            if deciding.outcome is Outcome.HOLD:
+                # A hold with no declared class carries none: a gateway hold
+                # queues operator-side and the agent's move is to WAIT, which
+                # none of the three classes means (RFC §11). Check-declared
+                # classes took the branch above; this covers approval-shaped
+                # holds and the ``requireMatch`` gate's own holds alike.
+                return code, None
             return code, gate_class(gate)
         return rule, gate_class(gate)
     return rule, rule_class(rule)

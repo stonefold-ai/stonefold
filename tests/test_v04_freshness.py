@@ -286,8 +286,11 @@ def test_freshness_config_rejects_non_finite_ttls() -> None:
         FreshnessConfig(irreversible_ttl=timedelta(seconds=-1))
 
 
-def test_volatile_gate_set_is_the_specified_five() -> None:
-    # CS-017 freezes the volatile/non-volatile split; a drift here is a spec bug.
+def test_volatile_gate_set_is_the_specified_six() -> None:
+    # CS-017 freezes the volatile/non-volatile split; a drift here is a spec
+    # bug. v0.6 CS-032 rule 3 adds requireMatch (full re-query interim; CS-035
+    # replaces it with a reservation-liveness check).
     assert VOLATILE_GATES == {
-        "allowlist", "denylist", "window", "precondition", "emissionControl"
+        "allowlist", "denylist", "window", "precondition", "emissionControl",
+        "requireMatch",
     }

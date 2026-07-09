@@ -444,6 +444,7 @@ def _commit(
                     gates=decided.gate_results, approval=decided.approval,
                     releases=decided.releases,
                     expires_at=expires_at,
+                    staged_at=env.now if env is not None else None,
                 ),
                 reason="outbox-unavailable",
             )
@@ -485,6 +486,7 @@ def _commit(
                     correlation_id=session.correlation_id,
                     gates=gate_trace, compensation=resolved.compensation,
                     expires_at=effect_expires_at,
+                    staged_at=env.now if env is not None else None,
                 ),
                 reason="outbox-unavailable",
             )

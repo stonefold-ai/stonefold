@@ -239,8 +239,16 @@ class OutboxStore(Protocol):
         releases: tuple[ReleaseContract, ...] = (),
         compensation: Compensation | None = None,
         expires_at: datetime | None = None,
+        staged_at: datetime | None = None,
     ) -> PendingAction:
-        """Persist a new staged row and return it (with generated id + key)."""
+        """Persist a new staged row and return it (with generated id + key).
+
+        ``staged_at`` is the decision-time clock (``RequestEnv.now``) when one
+        is injected — it anchors ``created_at`` so the CS-028 hold-expiry
+        deadlines (``created_at + timeout``) and the CS-017 staging TTL
+        (``expires_at``) run on the SAME clock. ``None`` ⇒ the store's wall
+        clock (identical in production, where ``env.now`` is the wall clock).
+        """
         ...
 
     def get(self, action_id: str) -> PendingAction | None: ...

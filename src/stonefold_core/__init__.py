@@ -6,7 +6,13 @@ Re-exports the value model, registry, audit seam, and the enforcement pipeline.
 
 from __future__ import annotations
 
-from stonefold_core.audit import AuditSink, FallbackAuditSink, InMemoryAuditSink, build_record
+from stonefold_core.audit import (
+    AuditSink,
+    FallbackAuditSink,
+    InMemoryAuditSink,
+    build_record,
+    obligation_refs,
+)
 from stonefold_core.failure import Ok, Unavailable, guard, should_fail_closed
 from stonefold_core.freshness import (
     STALE_DECISION,
@@ -123,6 +129,22 @@ from stonefold_core.policy import (
     Standing,
     Targets,
 )
+from stonefold_core.obligation import (
+    MISSING,
+    Capability,
+    ConsumeOutcome,
+    ConsumeResult,
+    EqConstraint,
+    Obligation,
+    ObligationProperty,
+    ObligationRegistry,
+    ObligationRegistryDecl,
+    ReleaseOutcome,
+    ReserveOutcome,
+    Selector,
+    lookup_field,
+    values_equal,
+)
 from stonefold_core.registry import (
     ActionDef,
     InMemoryRegistry,
@@ -172,6 +194,22 @@ __all__ = [
     "InMemoryAuditSink",
     "FallbackAuditSink",
     "build_record",
+    "obligation_refs",
+    # obligation registries (v0.6 CS-032/034/036)
+    "MISSING",
+    "Capability",
+    "ConsumeOutcome",
+    "ConsumeResult",
+    "EqConstraint",
+    "Obligation",
+    "ObligationProperty",
+    "ObligationRegistry",
+    "ObligationRegistryDecl",
+    "ReleaseOutcome",
+    "ReserveOutcome",
+    "Selector",
+    "lookup_field",
+    "values_equal",
     # failure mode (RFC §10, design §12)
     "Ok",
     "Unavailable",

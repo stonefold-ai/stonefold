@@ -45,7 +45,8 @@ def test_inbox_lists_the_invoices(client: TestClient) -> None:
 def test_submit_intent_uses_header_identity(client: TestClient) -> None:
     body = {"resource": "Payment", "action": "pay",
             "data": {"payeeId": "PE-ACME-SUP", "accountId": "ACME-OPS", "amount": 800.0,
-                     "currency": "USD", "destinationCountry": "GB"}}
+                     "currency": "USD", "destinationCountry": "GB",
+                     "vendorId": "PE-ACME-SUP", "sourceDomain": "acme.example"}}
     r = client.post("/submit_intent", json=body, headers=_HDRS)
     assert r.json()["decision"] == "allow"
 

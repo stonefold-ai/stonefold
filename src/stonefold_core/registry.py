@@ -29,6 +29,7 @@ from stonefold_core.enums import (
     Reversibility,
 )
 from stonefold_core.models import Attributes, Compensation, RawCall, ResolvedAction
+from stonefold_core.obligation import ObligationRegistryDecl
 
 
 class UnknownActionError(Exception):
@@ -127,6 +128,13 @@ class RegistryFile(BaseModel):
     precondition_decls: dict[str, PreconditionCheckDecl] = Field(default_factory=dict)
     sets: dict[str, tuple[str, ...]] = Field(default_factory=dict)
     sinks: tuple[str, ...] = ()
+    # v0.6 (CS-034): the systems of record ``requireMatch`` matches against
+    # (docs/06 §5b). A declared ``digest`` pins the adapter connector's artifact
+    # — merged into ``connector_digests`` below so CS-020's load/dispatch
+    # verification covers obligation adapters with no extra machinery.
+    obligationRegistries: dict[str, ObligationRegistryDecl] = Field(
+        default_factory=dict
+    )
     # CS-024: the DECLARED ORDER of classification labels (lowest first) that
     # ``disclosure.maxClassification`` compares by. The default is the built-in
     # ``resultSensitivity`` order (RFC §7.12); a domain substituting its own
@@ -156,6 +164,37 @@ class RegistryFile(BaseModel):
             data = {**data, "connectors": tuple(connectors.keys()),
                     "connector_digests": digests}
         return data
+
+    @model_validator(mode="before")
+    @classmethod
+    def _merge_obligation_digests(cls, data: Any) -> Any:
+        """Merge each obligation registry's declared adapter ``digest`` into the
+        connector digest map (CS-034: "CS-020 pinning applies"). An explicit pin
+        on the same connector wins; order relative to the connectors-map split
+        is irrelevant because both merge over whatever is already present."""
+        if not isinstance(data, dict):
+            return data
+        registries = data.get("obligationRegistries")
+        if not isinstance(registries, Mapping):
+            return data
+        digests = dict(data.get("connector_digests") or {})
+        for decl in registries.values():
+            if isinstance(decl, Mapping) and decl.get("digest") and decl.get("connector"):
+                digests.setdefault(str(decl["connector"]), str(decl["digest"]))
+        return {**data, "connector_digests": digests}
+
+    @model_validator(mode="after")
+    def _obligation_connectors_declared(self) -> "RegistryFile":
+        """Docs/06 §5b: an obligation registry's ``connector`` MUST name a
+        declared connector — an undeclared adapter is a load error, not a
+        runtime surprise."""
+        for name, decl in self.obligationRegistries.items():
+            if decl.connector not in self.connectors:
+                raise ValueError(
+                    f"obligation registry {name!r} names undeclared connector "
+                    f"{decl.connector!r} (docs/06 §5b)"
+                )
+        return self
 
     @model_validator(mode="before")
     @classmethod
@@ -265,6 +304,19 @@ class InMemoryRegistry:
         if decl is None:
             return RetryClass.TERMINAL
         return decl.reasonCodes.get(code, RetryClass.TERMINAL)
+
+    def has_obligation_registry(self, name: str) -> bool:
+        return name in self._data.obligationRegistries
+
+    def obligation_registry(self, name: str) -> ObligationRegistryDecl | None:
+        """The declaration behind an obligation registry name (v0.6 CS-034);
+        ``None`` for an undeclared name — the ``requireMatch`` gate treats that
+        as fail-closed and §13 rule 14 rejects it at load."""
+        return self._data.obligationRegistries.get(name)
+
+    @property
+    def obligation_registries(self) -> Mapping[str, ObligationRegistryDecl]:
+        return self._data.obligationRegistries
 
     def has_named_set(self, name: str) -> bool:
         return name in self._data.sets

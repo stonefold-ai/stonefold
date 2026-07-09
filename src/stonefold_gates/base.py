@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from stonefold_core.condition import (
@@ -23,6 +23,7 @@ from stonefold_core.condition import (
 from stonefold_core.enums import Outcome, RetryClass
 from stonefold_core.gating import RequestEnv
 from stonefold_core.models import Actor, GateResult, ResolvedAction, Session
+from stonefold_core.obligation import ObligationRegistry
 from stonefold_core.policy import FailureMode
 from stonefold_core.registry import InMemoryRegistry
 from stonefold_store import CounterStore
@@ -78,6 +79,11 @@ class GateContext:
     preconditions: Mapping[str, PreconditionCheck]
     failure_mode: FailureMode
     agent: str
+    # v0.6 (CS-032/CS-034): the registered obligation-registry adapters, keyed
+    # by declared registry name. ``requireMatch`` resolves its ``registry:``
+    # here; a declared registry with no registered adapter is a dependency
+    # failure (RFC §10), not a policy decision.
+    obligations: Mapping[str, ObligationRegistry] = field(default_factory=dict)
 
 
 GateFn = Callable[[Any, GateContext], GateResult]
@@ -94,12 +100,13 @@ def failed(
     *,
     code: str = "",
     source: str = "",
+    evidence: dict[str, Any] | None = None,
     retry_class: "RetryClass | None" = None,
     fields: tuple[str, ...] = (),
 ) -> GateResult:
     return GateResult(
         gate=gate, outcome=Outcome.FAIL, reason=reason, code=code, source=source,
-        retry_class=retry_class, fields=fields,
+        evidence=evidence, retry_class=retry_class, fields=fields,
     )
 
 
@@ -111,10 +118,11 @@ def held(
     source: str = "",
     evidence: dict[str, Any] | None = None,
     retry_class: "RetryClass | None" = None,
+    fields: tuple[str, ...] = (),
 ) -> GateResult:
     return GateResult(
         gate=gate, outcome=Outcome.HOLD, reason=reason, code=code, source=source,
-        evidence=evidence, retry_class=retry_class,
+        evidence=evidence, retry_class=retry_class, fields=fields,
     )
 
 

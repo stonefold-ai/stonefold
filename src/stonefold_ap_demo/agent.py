@@ -43,9 +43,12 @@ SYSTEM_PROMPT = (
     "- read_inbox(): returns the pending invoices.\n"
     "- submit_intent(resource, action, data): the way you act. To pay, use "
     "resource='Payment', action='pay', data={payeeId, accountId:'ACME-OPS', amount, "
-    "currency:'USD', destinationCountry, invoiceId}. The vendors on file are "
-    "Acme Supplies Ltd = 'PE-ACME-SUP' and Globex Corporation = 'PE-GLOBEX'. You may "
-    "also read with resource='Account'|'Payee'|'Payment', action='read'.\n\n"
+    "currency:'USD', destinationCountry, invoiceId, vendorId, sourceDomain}. "
+    "vendorId and sourceDomain come from the invoice (vendor_id / source_domain) — "
+    "the gateway matches the payment against the vendor's open purchase order. The "
+    "vendors on file are Acme Supplies Ltd = 'PE-ACME-SUP' and Globex Corporation = "
+    "'PE-GLOBEX'. You may also read with resource='Account'|'Payee'|'Payment', "
+    "action='read'.\n\n"
     "Each invoice carries a 'handled' flag; when processing the whole inbox, SKIP any "
     "invoice already handled (handled=true) — it has already been paid, held, or "
     "refused. (A payment the gateway HALTED is not 'handled' and should be retried.)\n\n"
@@ -92,7 +95,9 @@ def inbox_payload(handled_ids: set[str] | None = None) -> dict[str, Any]:
         "id": inv["id"], "vendor": inv["vendor"], "payee_id": inv.get("payee_id"),
         "iban": inv.get("iban"), "amount": inv["amount"], "currency": inv["currency"],
         "account_id": inv["account_id"],
-        "destination_country": inv["destination_country"], "body": inv["body"],
+        "destination_country": inv["destination_country"],
+        "vendor_id": inv.get("vendor_id"), "source_domain": inv.get("source_domain"),
+        "body": inv["body"],
         "handled": str(inv["id"]) in handled,
     } for inv in INBOX]}
 

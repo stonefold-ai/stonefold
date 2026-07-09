@@ -68,6 +68,7 @@ def gate_ctx(
     counters: CounterStore | None = None,
     hooks: ContentHookRegistry | None = None,
     preconditions: dict[str, PreconditionCheck] | None = None,
+    obligations: dict[str, Any] | None = None,
     failure_mode: FailureMode = FailureMode.CLOSED,
     agent: str = "test-agent",
 ) -> GateContext:
@@ -88,4 +89,5 @@ def gate_ctx(
         preconditions=preconditions or {},
         failure_mode=failure_mode,
         agent=agent,
+        obligations=obligations or {},
     )

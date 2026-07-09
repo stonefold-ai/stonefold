@@ -16,10 +16,26 @@ from stonefold_core.models import (
     Actor,
     AuditRecord,
     EvalResult,
+    GateResult,
     RawCall,
     ResolvedAction,
     Session,
 )
+
+
+def obligation_refs(gates: list[GateResult] | tuple[GateResult, ...]) -> dict[str, Any] | None:
+    """The CS-037 ``obligationRefs`` audit field, lifted from the
+    ``requireMatch`` gate's trace evidence (registry, matched/candidate refs,
+    candidate count). ``None`` when no ``requireMatch`` gate ran — the field is
+    entitlement lineage, not a default."""
+    for g in gates:
+        if g.gate == "requireMatch" and g.evidence and "registry" in g.evidence:
+            return {
+                "registry": g.evidence.get("registry"),
+                "refs": list(g.evidence.get("refs") or []),
+                "candidates": g.evidence.get("candidates"),
+            }
+    return None
 
 
 class AuditSink(Protocol):
@@ -109,5 +125,6 @@ def build_record(
         approval=approval,
         outcome=outcome,
         resultRefs=list(result_refs or []),
+        obligationRefs=obligation_refs(result.gates),
         correlationId=session.correlation_id or session.id,
     )

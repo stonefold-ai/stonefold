@@ -356,15 +356,17 @@ def parse(src: str) -> Expr:
 # --------------------------------------------------------------------------
 # Static validation (RFC §13.9)
 # --------------------------------------------------------------------------
-def _check_operand(op: "Operand", problems: list[str]) -> None:
+def _check_operand(
+    op: "Operand", problems: list[str], namespaces: frozenset[str]
+) -> None:
     if isinstance(op, Path):
         # A single-segment non-namespace ident is an implicit string literal
         # (RFC examples: `== restricted`). Multi-segment paths MUST root in a
         # known namespace.
-        if len(op.parts) > 1 and op.parts[0] not in NAMESPACES:
+        if len(op.parts) > 1 and op.parts[0] not in namespaces:
             problems.append(
                 f"path {'.'.join(op.parts)!r} does not start with a known "
-                f"namespace {sorted(NAMESPACES)}"
+                f"namespace {sorted(namespaces)}"
             )
     elif isinstance(op, Func):
         if op.name not in FUNCTIONS:
@@ -372,36 +374,45 @@ def _check_operand(op: "Operand", problems: list[str]) -> None:
                 f"unknown function {op.name!r}; allowed: {sorted(FUNCTIONS)}"
             )
         for arg in op.args:
-            _check_operand(arg, problems)
+            _check_operand(arg, problems, namespaces)
     # Literal: nothing to check (lists hold literals only by construction)
 
 
-def _walk(node: object, problems: list[str]) -> None:
+def _walk(node: object, problems: list[str], namespaces: frozenset[str]) -> None:
     if isinstance(node, (And, Or)):
-        _walk(node.left, problems)
-        _walk(node.right, problems)
+        _walk(node.left, problems, namespaces)
+        _walk(node.right, problems, namespaces)
     elif isinstance(node, Not):
-        _walk(node.expr, problems)
+        _walk(node.expr, problems, namespaces)
     elif isinstance(node, Compare):
-        _check_operand(node.left, problems)
-        _check_operand(node.right, problems)
+        _check_operand(node.left, problems, namespaces)
+        _check_operand(node.right, problems, namespaces)
     elif isinstance(node, InExpr):
-        _check_operand(node.left, problems)
+        _check_operand(node.left, problems, namespaces)
         if not isinstance(node.right, Literal):
-            _check_operand(node.right, problems)
+            _check_operand(node.right, problems, namespaces)
     elif isinstance(node, Exists):
-        _check_operand(node.path, problems)
+        _check_operand(node.path, problems, namespaces)
 
 
-def validate(expr: Expr) -> list[str]:
+def validate(
+    expr: Expr, *, extra_namespaces: frozenset[str] = frozenset()
+) -> list[str]:
     """Return a list of RFC §13.9 problems (unknown namespace roots, unknown
-    functions). Empty list ⇒ the condition is structurally valid."""
+    functions). Empty list ⇒ the condition is structurally valid.
+
+    ``extra_namespaces`` admits a context-specific read-only namespace beyond
+    the frozen five — today only ``obligation`` inside ``requireMatch``'s
+    ``match``/``provenance`` clauses (RFC §8 note, v0.6 CS-036); it is not
+    available anywhere else a condition appears."""
     problems: list[str] = []
-    _walk(expr, problems)
+    _walk(expr, problems, NAMESPACES | extra_namespaces)
     return problems
 
 
-def parse_and_validate(src: str) -> list[str]:
+def parse_and_validate(
+    src: str, *, extra_namespaces: frozenset[str] = frozenset()
+) -> list[str]:
     """Parse ``src`` and return §13.9 problems. A parse failure is itself
     returned as a single problem (so the linter can report it rather than
     crash)."""
@@ -409,7 +420,7 @@ def parse_and_validate(src: str) -> list[str]:
         expr = parse(src)
     except ConditionError as exc:
         return [f"cannot parse condition {src!r}: {exc}"]
-    return validate(expr)
+    return validate(expr, extra_namespaces=extra_namespaces)
 
 
 # --------------------------------------------------------------------------
@@ -538,6 +549,14 @@ def evaluate(expr: Expr, ctx: EvalContext) -> bool:
 def evaluate_str(src: str, ctx: EvalContext) -> bool:
     """Parse and evaluate ``src`` in one step (used by gates' ``when:``)."""
     return evaluate(parse(src), ctx)
+
+
+def resolve_operand(op: Operand, ctx: EvalContext) -> Any:
+    """Resolve one parsed operand against a runtime context — the public form
+    of the evaluator's own resolution, used by ``requireMatch`` to make the
+    intent side of an equality clause concrete for the typed selector
+    (RFC §7.16 semantics 1). Raises ``ConditionRuntimeError`` fail-closed."""
+    return _resolve(op, ctx)
 
 
 def _resolve(op: Operand, ctx: EvalContext) -> Any:

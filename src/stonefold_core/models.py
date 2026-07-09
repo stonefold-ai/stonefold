@@ -236,4 +236,10 @@ class AuditRecord(BaseModel):
     # A *list* because one action may fan out to several records (a payment + its
     # ledger entry); empty for refusals, holds, and non-effect actions.
     resultRefs: list[str] = Field(default_factory=list)
+    # v0.6 (CS-037): the ENTITLEMENT-side lineage — which declared obligation
+    # registry was matched, the matched/candidate obligation ref(s), and the
+    # candidate count (1, 0, or n>1 for a held-ambiguous decision).
+    # ``resultRefs`` locate what the effect produced; ``obligationRefs`` locate
+    # what entitled it. ``None`` when no ``requireMatch`` gate ran.
+    obligationRefs: dict[str, Any] | None = None
     correlationId: str | None = None

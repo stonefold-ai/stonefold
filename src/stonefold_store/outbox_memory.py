@@ -41,10 +41,14 @@ def build_pending(
     compensation: Compensation | None,
     expires_at: datetime | None = None,
     releases: tuple[ReleaseContract, ...] = (),
+    staged_at: datetime | None = None,
 ) -> PendingAction:
     """Construct a staged row with generated id + idempotency key. id/clock
-    generation lives here (the I/O layer), not in the pure pipeline (invariant 1)."""
-    now = _now()
+    generation lives here (the I/O layer), not in the pure pipeline (invariant
+    1). ``staged_at`` (the injected decision clock, when the caller has one)
+    anchors ``created_at`` so hold-timeout deadlines and the staging TTL run on
+    one clock (CS-017/CS-028)."""
+    now = staged_at if staged_at is not None else _now()
     return PendingAction(
         id=f"act_{uuid.uuid4().hex[:12]}",
         idempotency_key=uuid.uuid4().hex,
@@ -86,12 +90,13 @@ class InMemoryOutboxStore:
         releases: tuple[ReleaseContract, ...] = (),
         compensation: Compensation | None = None,
         expires_at: datetime | None = None,
+        staged_at: datetime | None = None,
     ) -> PendingAction:
         row = build_pending(
             resolved=resolved, actor=actor, session_id=session_id, agent=agent,
             state=state, correlation_id=correlation_id, gates=gates,
             approval=approval, releases=releases, compensation=compensation,
-            expires_at=expires_at,
+            expires_at=expires_at, staged_at=staged_at,
         )
         self._rows[row.id] = row
         self._order.append(row.id)

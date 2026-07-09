@@ -28,16 +28,51 @@ ACCOUNTS: list[dict[str, Any]] = [
 ]
 
 # --- known payees ------------------------------------------------------------
+# ``domain`` is the vendor's billing domain — the provenance evidence the
+# policy's ``requireMatch.provenance`` binds the matched PO to (RFC §7.16).
 PAYEES: list[dict[str, Any]] = [
     {"id": "PE-ACME-SUP", "tenant_id": DEMO_TENANT, "name": "Acme Supplies Ltd",
-     "iban": "GB29ACME0000011111", "country": "GB", "created_days_ago": 420},
+     "iban": "GB29ACME0000011111", "country": "GB", "created_days_ago": 420,
+     "domain": "acme.example"},
     {"id": "PE-GLOBEX", "tenant_id": DEMO_TENANT, "name": "Globex Corporation",
-     "iban": "US44GLOBEX00002222", "country": "US", "created_days_ago": 300},
+     "iban": "US44GLOBEX00002222", "country": "US", "created_days_ago": 300,
+     "domain": "globex.example"},
     # an on-file vendor located in a sanctioned country — any payment to it is
     # refused by the gateway's `denylist` gate (compliance control).
     {"id": "PE-INITECH", "tenant_id": DEMO_TENANT, "name": "Initech Trading",
-     "iban": "IR55INITECH00003333", "country": "IR", "created_days_ago": 200},
+     "iban": "IR55INITECH00003333", "country": "IR", "created_days_ago": 200,
+     "domain": "initech.example"},
 ]
+
+# --- open purchase orders (the OBLIGATIONS, v0.6 CS-032/CS-034) ---------------
+# The system of record `requireMatch` matches payments against: an invoice is
+# payable only against an open, unconsumed PO line from the same vendor within
+# tolerance. One PO per legitimate inbox invoice; the fraudulent invoice has —
+# by definition — no PO, which is what refuses it. PE-INITECH has a real PO and
+# is still refused: a matched obligation never relaxes the denylist (§7.16
+# rule 5, composition).
+PURCHASE_ORDERS: list[dict[str, Any]] = [
+    {"ref": "PO-7001", "vendor_id": "PE-ACME-SUP", "vendor_domain": "acme.example",
+     "state": "open", "line_amount": 800.0, "line_state": "unconsumed"},
+    {"ref": "PO-7002", "vendor_id": "PE-GLOBEX", "vendor_domain": "globex.example",
+     "state": "open", "line_amount": 6_000.0, "line_state": "unconsumed"},
+    {"ref": "PO-7003", "vendor_id": "PE-INITECH", "vendor_domain": "initech.example",
+     "state": "open", "line_amount": 500.0, "line_state": "unconsumed"},
+]
+
+
+def purchase_order_records() -> dict[str, dict[str, Any]]:
+    """The PO seed shaped as obligation records (docs/06 §5b match surface),
+    keyed by ref — feeds the demo's in-memory obligation-registry adapter."""
+    return {
+        po["ref"]: {
+            "vendorId": po["vendor_id"],
+            "state": po["state"],
+            "vendor": {"domain": po["vendor_domain"]},
+            "line": {"amount": po["line_amount"], "state": po["line_state"]},
+        }
+        for po in PURCHASE_ORDERS
+    }
 
 
 def _legit_body(vendor: str, amount: float, invoice_no: str) -> str:
@@ -60,6 +95,7 @@ INBOX: list[dict[str, Any]] = [
         "vendor": "Acme Supplies Ltd", "payee_id": "PE-ACME-SUP", "iban": None,
         "amount": 800.0, "currency": "USD", "account_id": "ACME-OPS",
         "destination_country": "GB",
+        "vendor_id": "PE-ACME-SUP", "source_domain": "acme.example",
         "body": _legit_body("Acme Supplies Ltd", 800.0, "INV-1001"),
     },
     {
@@ -67,6 +103,7 @@ INBOX: list[dict[str, Any]] = [
         "vendor": "Globex Corporation", "payee_id": "PE-GLOBEX", "iban": None,
         "amount": 6_000.0, "currency": "USD", "account_id": "ACME-OPS",
         "destination_country": "US",
+        "vendor_id": "PE-GLOBEX", "source_domain": "globex.example",
         "body": _legit_body("Globex Corporation", 6_000.0, "INV-1002"),
     },
     {
@@ -76,6 +113,7 @@ INBOX: list[dict[str, Any]] = [
         "vendor": "Initech Trading", "payee_id": "PE-INITECH", "iban": None,
         "amount": 500.0, "currency": "USD", "account_id": "ACME-OPS",
         "destination_country": "IR",
+        "vendor_id": "PE-INITECH", "source_domain": "initech.example",
         "body": _legit_body("Initech Trading", 500.0, "INV-1003"),
     },
 ]

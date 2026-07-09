@@ -33,8 +33,11 @@ def _pay(bundle: APBundle, data: dict[str, object], *, actor: str = AP_OPERATOR,
 
 
 def _acme_800() -> dict[str, object]:
+    # vendorId + sourceDomain are the v0.6 requireMatch inputs: the payment
+    # must correspond to the vendor's open purchase order (RFC §7.16).
     return {"payeeId": "PE-ACME-SUP", "accountId": "ACME-OPS", "amount": 800.0,
-            "currency": "USD", "destinationCountry": "GB", "invoiceId": "INV-1001"}
+            "currency": "USD", "destinationCountry": "GB", "invoiceId": "INV-1001",
+            "vendorId": "PE-ACME-SUP", "sourceDomain": "acme.example"}
 
 
 # --- G1 happy path -------------------------------------------------------------
@@ -101,8 +104,25 @@ def test_g2_attack_new_payee_wire_denied(bundle: APBundle) -> None:
               "accountId": "ACME-OPS"}
     result = _pay(bundle, attack)
     assert result.decision is Decision.DENY
-    assert "precondition" in result.rule  # new-payee cooling-off
+    # v0.6: the fraudulent invoice is refused by *matching* — it corresponds to
+    # no purchase order (it does not even carry the fields to match one). The
+    # new-payee cooling-off precondition remains behind it as defence in depth.
+    assert "requireMatch" in result.rule
     assert bundle.drain() == 0
+    assert bundle.ledger.payments() == []  # type: ignore[attr-defined]
+
+
+def test_g2_attack_with_forged_vendor_fields_still_denied(bundle: APBundle) -> None:
+    # a smarter attacker copies a real vendor's id but the amount corresponds
+    # to no open PO line — no obligation, no payment (the in-bounds wrong action).
+    attack = {"newPayee": "QuickPay Settlements", "iban": "GB91QUICK0000099999",
+              "amount": 50_000.0, "currency": "USD", "destinationCountry": "GB",
+              "accountId": "ACME-OPS", "vendorId": "PE-ACME-SUP",
+              "sourceDomain": "acme.example"}
+    result = _pay(bundle, attack)
+    assert result.decision is Decision.DENY
+    assert "requireMatch" in result.rule
+    assert result.reason_code == "outside-tolerance"
     assert bundle.ledger.payments() == []  # type: ignore[attr-defined]
 
 
@@ -130,7 +150,8 @@ def test_export_is_default_denied(bundle: APBundle) -> None:
 # --- G3 approval in the loop ---------------------------------------------------
 def test_g3_midsize_holds_then_approves(bundle: APBundle) -> None:
     data = {"payeeId": "PE-GLOBEX", "accountId": "ACME-OPS", "amount": 6_000.0,
-            "currency": "USD", "destinationCountry": "US", "invoiceId": "INV-1002"}
+            "currency": "USD", "destinationCountry": "US", "invoiceId": "INV-1002",
+            "vendorId": "PE-GLOBEX", "sourceDomain": "globex.example"}
     result = _pay(bundle, data)
     assert result.decision is Decision.HOLD
     assert result.ticket is not None
@@ -146,7 +167,8 @@ def test_g3_midsize_holds_then_approves(bundle: APBundle) -> None:
 
 def test_g3_reject_never_pays(bundle: APBundle) -> None:
     data = {"payeeId": "PE-GLOBEX", "accountId": "ACME-OPS", "amount": 6_000.0,
-            "currency": "USD", "destinationCountry": "US"}
+            "currency": "USD", "destinationCountry": "US",
+            "vendorId": "PE-GLOBEX", "sourceDomain": "globex.example"}
     result = _pay(bundle, data)
     assert result.decision is Decision.HOLD
     assert result.ticket is not None

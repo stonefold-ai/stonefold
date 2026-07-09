@@ -57,6 +57,7 @@ from stonefold_store import (
     InFlightRegistry,
     InMemoryCounterStore,
     InMemoryKillStore,
+    InMemoryObligationRegistry,
     InMemoryOutboxStore,
     KillBus,
 )
@@ -73,7 +74,7 @@ from stonefold_ap_demo.ledger import (
     payee_cooling_off_elapsed,
 )
 from stonefold_ap_demo.principals import AP_OPERATOR, PrincipalDirectory, default_directory
-from stonefold_ap_demo.seed import ACCOUNTS, INBOX, PAYEES
+from stonefold_ap_demo.seed import ACCOUNTS, INBOX, PAYEES, purchase_order_records
 from stonefold_ap_demo.trace import TraceBus
 
 _ROOT = Path(__file__).resolve().parents[2]
@@ -339,6 +340,12 @@ def _build_common(
         counters=counters,
         hooks=default_hooks(),
         preconditions={"payeeCoolingOffElapsed": payee_cooling_off_elapsed},
+        # v0.6 (CS-032/CS-034): the policy's requireMatch gate matches payments
+        # against open purchase orders — the demo's system of record is this
+        # seeded in-memory adapter (a real deployment registers one over its ERP).
+        obligations={
+            "erp.purchase_orders": InMemoryObligationRegistry(purchase_order_records())
+        },
     )
 
     def _env_factory(call: RawCall) -> RequestEnv:

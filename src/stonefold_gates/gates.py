@@ -1,21 +1,46 @@
-"""The fourteen deterministic gates (RFC §7, design §6).
+"""The fifteen deterministic gates (RFC §7, design §6).
 
 Each is ``(cfg, GateContext) -> GateResult``. Stateless gates compute in-memory;
 the four counter gates (``rate``/``quota``/``quantityCap``/``spendLimit``) read a
-``CounterStore``; ``contentCheck`` calls a registered hook. A *dependency*
-failure (missing field, store down, hook timeout) is turned into **fail-closed
-FAIL** here — never a raised exception and never a silent pass (CLAUDE.md,
-design §10/§12). ``failureMode: open`` flips the content-hook case to pass.
+``CounterStore``; ``contentCheck`` calls a registered hook; ``requireMatch``
+(v0.6 CS-032) queries a declared obligation registry. A *dependency* failure
+(missing field, store down, hook timeout, registry unreachable) is turned into
+**fail-closed FAIL** here — never a raised exception and never a silent pass
+(CLAUDE.md, design §10/§12). ``failureMode: open`` flips the content-hook and
+registry-outage cases to pass — except under the irreversible floor (RFC §10).
 """
 
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from typing import Any
 
-from stonefold_core.condition import ConditionRuntimeError, MissingValueError
-from stonefold_core.enums import Outcome
+from stonefold_core.condition import (
+    NAMESPACES,
+    Compare,
+    ConditionError,
+    ConditionRuntimeError,
+    EvalContext,
+    Expr,
+    Func,
+    InExpr,
+    Literal,
+    MissingValueError,
+    Path,
+    evaluate,
+    parse,
+    resolve_operand,
+)
+from stonefold_core.enums import Outcome, RetryClass
+from stonefold_core.failure import should_fail_closed
 from stonefold_core.models import GateResult
+from stonefold_core.obligation import (
+    MISSING,
+    EqConstraint,
+    Obligation,
+    lookup_field,
+)
 from stonefold_core.policy import FailureMode
 from stonefold_gates.base import (
     CheckResult,
@@ -375,6 +400,321 @@ def require_explanation(cfg: Any, gctx: GateContext) -> GateResult:
     if isinstance(expl, str) and expl.strip():
         return passed("requireExplanation")
     return failed("requireExplanation", "action carries no recorded rationale")
+
+
+# --- 15. requireMatch (v0.6 CS-032/033/036) --------------------------------
+_MATCH = "requireMatch"
+_OBLIGATION_NS = "obligation"
+
+
+@dataclass(frozen=True)
+class _StringClause:
+    """One parsed §8-grammar conjunct of ``match``/``provenance``. ``eq`` is
+    set when the clause is selector-eligible — ``obligation.X == <intent-side>``
+    — carrying the record-relative field and the intent-side operand to resolve
+    at decision time (RFC §7.16 semantics 1). Every string clause, selector or
+    not, is re-evaluated against the matched record (defence in depth: an
+    adapter returning a non-matching record still fails closed)."""
+
+    src: str
+    expr: Expr
+    eq: "tuple[str, Any] | None"
+    intent_fields: tuple[str, ...]
+    provenance: bool
+
+
+@dataclass(frozen=True)
+class _ToleranceClause:
+    """A structured tolerance conjunct (CS-033): ``field`` (record-relative)
+    must equal ``matches`` (intent side) within ``pct`` percent of the
+    obligation-side value or ``abs_`` in the field's unit; 0 means exact."""
+
+    field: str
+    matches: str
+    pct: float | None
+    abs_: float | None
+    provenance: bool
+
+
+def _operand_paths(op: Any, out: list[Path]) -> None:
+    if isinstance(op, Path):
+        out.append(op)
+    elif isinstance(op, Func):
+        for arg in op.args:
+            _operand_paths(arg, out)
+
+
+def _expr_paths(node: Any) -> list[Path]:
+    out: list[Path] = []
+    stack: list[Any] = [node]
+    while stack:
+        n = stack.pop()
+        if isinstance(n, (Compare,)):
+            _operand_paths(n.left, out)
+            _operand_paths(n.right, out)
+        elif isinstance(n, InExpr):
+            _operand_paths(n.left, out)
+            if not isinstance(n.right, Literal):
+                _operand_paths(n.right, out)
+        elif hasattr(n, "left") and hasattr(n, "right"):  # And / Or
+            stack.append(n.left)
+            stack.append(n.right)
+        elif hasattr(n, "expr"):  # Not
+            stack.append(n.expr)
+        elif hasattr(n, "path"):  # Exists
+            out.append(n.path)
+    return out
+
+
+def _is_obligation_path(op: Any) -> bool:
+    return isinstance(op, Path) and len(op.parts) > 1 and op.parts[0] == _OBLIGATION_NS
+
+
+def _refs_obligation(op: Any) -> bool:
+    paths: list[Path] = []
+    _operand_paths(op, paths)
+    return any(p.parts[0] == _OBLIGATION_NS for p in paths)
+
+
+def _intent_fields(expr_paths: list[Path]) -> tuple[str, ...]:
+    """The intent-side namespace paths a clause compares (CS-030: what
+    ``code+fields`` visibility may reveal)."""
+    return tuple(
+        ".".join(p.parts)
+        for p in expr_paths
+        if len(p.parts) > 1 and p.parts[0] in NAMESPACES
+    )
+
+
+def _parse_within(raw: Any) -> tuple[float | None, float | None]:
+    """``within`` (CS-033): ``"N%"`` relative or a non-negative absolute
+    number. Raises ``ValueError`` on any other shape (fail closed)."""
+    if isinstance(raw, str) and raw.endswith("%"):
+        return float(raw[:-1]), None
+    if isinstance(raw, (int, float)) and not isinstance(raw, bool) and raw >= 0:
+        return None, float(raw)
+    raise ValueError(f"bad within {raw!r}")
+
+
+def _parse_clause(raw: Any, *, provenance: bool) -> "_StringClause | _ToleranceClause":
+    """Parse one ``match``/``provenance`` entry. Raises ``ValueError`` /
+    ``ConditionError`` on a malformed clause — the gate fails closed."""
+    if isinstance(raw, str):
+        expr = parse(raw)
+        paths = _expr_paths(expr)
+        eq: tuple[str, Any] | None = None
+        if isinstance(expr, Compare) and expr.op == "==":
+            left_obl = _is_obligation_path(expr.left)
+            right_obl = _is_obligation_path(expr.right)
+            if left_obl != right_obl:
+                obl_side, other = (
+                    (expr.left, expr.right) if left_obl else (expr.right, expr.left)
+                )
+                if not _refs_obligation(other):
+                    assert isinstance(obl_side, Path)
+                    eq = (".".join(obl_side.parts[1:]), other)
+        return _StringClause(
+            src=raw, expr=expr, eq=eq,
+            intent_fields=_intent_fields(paths), provenance=provenance,
+        )
+    if isinstance(raw, dict):
+        field_path = raw.get("field")
+        matches = raw.get("matches")
+        if not (isinstance(field_path, str) and field_path.startswith("obligation.")):
+            raise ValueError(f"tolerance field must be obligation.*, got {field_path!r}")
+        if not isinstance(matches, str) or not matches:
+            raise ValueError(f"bad tolerance matches {matches!r}")
+        pct, abs_ = _parse_within(raw.get("within"))
+        return _ToleranceClause(
+            field=field_path[len("obligation.") :], matches=matches,
+            pct=pct, abs_=abs_, provenance=provenance,
+        )
+    raise ValueError(f"bad match clause {raw!r}")
+
+
+def _registry_unavailable(reg: str, detail: str, gctx: GateContext) -> GateResult:
+    """An unreachable/unregistered obligation registry is a dependency failure
+    (RFC §10): ``failureMode`` decides, with the irreversible floor —
+    an irreversible effect MUST resolve closed (§7.16 semantics 4)."""
+    if should_fail_closed(gctx.resolved, gctx.failure_mode):
+        return failed(_MATCH, f"fail-closed: obligation registry {reg!r} unavailable: {detail}")
+    return passed(_MATCH, f"failureMode=open: obligation registry {reg!r} unavailable, gate skipped")
+
+
+def _check_tolerance(
+    clause: _ToleranceClause, ob: Obligation, gctx: GateContext,
+    evidence: dict[str, Any],
+) -> GateResult | None:
+    """Evaluate one tolerance conjunct against the matched record. ``None`` ⇒
+    within tolerance; a ``GateResult`` ⇒ the deciding failure."""
+    fields = (clause.matches,)
+    record_side = lookup_field(ob.fields, clause.field)
+    if record_side is MISSING or record_side is None:
+        # CS-032 semantics 4: an obligation path absent or null on the matched
+        # record fails the gate closed.
+        return failed(
+            _MATCH, f"fail-closed: obligation.{clause.field} absent/null on matched record",
+            evidence=evidence, fields=fields,
+        )
+    try:
+        obl_num = to_number(record_side)
+        intent_num = to_number(resolve_field(clause.matches, gctx))
+    except (MissingValueError, ConditionRuntimeError) as exc:
+        return failed(_MATCH, f"fail-closed: {exc}", evidence=evidence, fields=fields)
+    delta = abs(obl_num - intent_num)
+    limit = (
+        clause.pct / 100.0 * abs(obl_num) if clause.pct is not None
+        else (clause.abs_ if clause.abs_ is not None else 0.0)
+    )
+    if delta > limit:
+        within = f"{clause.pct:g}%" if clause.pct is not None else f"{clause.abs_:g}"
+        return failed(
+            _MATCH,
+            f"{clause.matches} outside tolerance {within} of obligation.{clause.field}",
+            code="outside-tolerance", retry_class=RetryClass.RETRYABLE,
+            evidence=evidence, fields=fields,
+        )
+    return None
+
+
+def require_match(cfg: Any, gctx: GateContext) -> GateResult:
+    """Gate 15 (RFC §7.16, v0.6 CS-032/033/036): the intent must correspond to
+    exactly one open obligation in a declared registry, within declared
+    tolerance. Deterministic at decision time: the gateway derives a typed
+    selector from the ``match`` conjunction's equality clauses, queries the
+    adapter, and decides on the candidate count — 0 ⇒ ``onNoMatch``, >1 ⇒
+    ``onAmbiguous`` (never auto-selects), 1 ⇒ the full conjunction plus
+    tolerance and ``provenance`` evaluate against the RE-READ record only
+    (CS-036: agent-supplied copies of obligation data are never match inputs;
+    a ``data.*`` pointer is just another equality clause — it narrows the
+    query, never substitutes for it)."""
+    if not isinstance(cfg, dict):
+        return failed(_MATCH, "fail-closed: gate needs {registry, match, consume}")
+    reg_name = str(cfg.get("registry") or "")
+    consume = cfg.get("consume")
+    if not (isinstance(consume, str) and (consume == "none" or consume.startswith("obligation."))):
+        return failed(_MATCH, f"fail-closed: consume must be an obligation.* path or 'none', got {consume!r}")
+    if cfg.get("onAmbiguous") == "allow":
+        # illegal value (§13 rule 17); a policy that somehow loaded with it must
+        # not make the gateway auto-select among candidates.
+        return failed(_MATCH, "fail-closed: onAmbiguous: allow is illegal (RFC §7.16)")
+    if not gctx.registry.has_obligation_registry(reg_name):
+        return failed(_MATCH, f"fail-closed: unknown obligation registry {reg_name!r}")
+
+    raw_match = cfg.get("match")
+    if not isinstance(raw_match, list) or not raw_match:
+        return failed(_MATCH, "fail-closed: match must be a non-empty list")
+    try:
+        clauses: list[_StringClause | _ToleranceClause] = [
+            _parse_clause(c, provenance=False) for c in raw_match
+        ]
+        clauses += [
+            _parse_clause(c, provenance=True) for c in (cfg.get("provenance") or [])
+        ]
+    except (ValueError, ConditionError) as exc:
+        return failed(_MATCH, f"fail-closed: bad match clause: {exc}")
+
+    all_fields = tuple(
+        dict.fromkeys(  # ordered de-dup
+            f
+            for c in clauses
+            for f in (c.intent_fields if isinstance(c, _StringClause) else (c.matches,))
+        )
+    )
+
+    # The typed selector: match-conjunction equality clauses made concrete by
+    # resolving their intent side now (provenance never narrows the query — it
+    # binds the matched record's counterparty to the intent's evidence AFTER
+    # identification, RFC §7.16).
+    selector: list[EqConstraint] = []
+    for clause in clauses:
+        if isinstance(clause, _StringClause) and clause.eq is not None and not clause.provenance:
+            rel_path, operand = clause.eq
+            try:
+                value = resolve_operand(operand, gctx.eval_ctx)
+            except (MissingValueError, ConditionRuntimeError) as exc:
+                return failed(_MATCH, f"fail-closed: {exc}", fields=clause.intent_fields)
+            selector.append(EqConstraint(field=rel_path, value=value))
+
+    adapter = gctx.obligations.get(reg_name)
+    if adapter is None:
+        return _registry_unavailable(reg_name, "no adapter registered", gctx)
+    try:
+        candidates = tuple(adapter.query(tuple(selector)))
+    except Exception as exc:  # registry unreachable ⇒ dependency failure (§10)
+        return _registry_unavailable(reg_name, str(exc), gctx)
+
+    count = len(candidates)
+    if count == 0:
+        evidence: dict[str, Any] = {"registry": reg_name, "refs": [], "candidates": 0}
+        if cfg.get("onNoMatch") == "hold":
+            return held(
+                _MATCH, "no obligation matches the intent", code="no-match",
+                evidence=evidence, fields=all_fields,
+            )
+        return failed(
+            _MATCH, "no obligation matches the intent", code="no-match",
+            retry_class=RetryClass.TERMINAL, evidence=evidence, fields=all_fields,
+        )
+    if count > 1:
+        evidence = {
+            "registry": reg_name,
+            "refs": [c.ref for c in candidates],
+            "candidates": count,
+        }
+        if cfg.get("onAmbiguous", "hold") == "deny":
+            return failed(
+                _MATCH, f"{count} obligations match; the gateway never auto-selects",
+                code="ambiguous-match", retry_class=RetryClass.ESCALATE,
+                evidence=evidence, fields=all_fields,
+            )
+        return held(
+            _MATCH, f"{count} obligations match; a human must decide",
+            code="ambiguous-match", evidence=evidence, fields=all_fields,
+        )
+
+    ob = candidates[0]
+    evidence = {"registry": reg_name, "refs": [ob.ref], "candidates": 1}
+    # CS-036 by construction: the ``obligation`` namespace is populated
+    # exclusively from the adapter's response — a forged copy in ``data.*``
+    # is just another intent field and changes nothing.
+    ext_ctx = EvalContext(
+        namespaces={**dict(gctx.eval_ctx.namespaces), _OBLIGATION_NS: dict(ob.fields)},
+        functions=gctx.eval_ctx.functions,
+    )
+    for clause in clauses:
+        if isinstance(clause, _ToleranceClause):
+            verdict = _check_tolerance(clause, ob, gctx, evidence)
+            if verdict is not None:
+                if clause.provenance and verdict.code == "outside-tolerance":
+                    verdict = verdict.model_copy(
+                        update={"code": "provenance-mismatch",
+                                "retry_class": RetryClass.TERMINAL},
+                    )
+                return verdict
+            continue
+        try:
+            ok = evaluate(clause.expr, ext_ctx)
+        except (MissingValueError, ConditionRuntimeError) as exc:
+            # an ``obligation.*`` path absent on the matched record lands here
+            # (CS-032 semantics 4) — fail closed, like any resolution error.
+            return failed(
+                _MATCH, f"fail-closed: {exc}", evidence=evidence,
+                fields=clause.intent_fields,
+            )
+        if not ok:
+            if clause.provenance:
+                return failed(
+                    _MATCH, f"provenance clause failed: {clause.src}",
+                    code="provenance-mismatch", retry_class=RetryClass.TERMINAL,
+                    evidence=evidence, fields=clause.intent_fields,
+                )
+            return failed(
+                _MATCH, f"match clause failed against the matched record: {clause.src}",
+                code="match-failed", retry_class=RetryClass.TERMINAL,
+                evidence=evidence, fields=clause.intent_fields,
+            )
+    return GateResult(gate=_MATCH, outcome=Outcome.PASS, evidence=evidence)
 
 
 # --- 1/2/4. rate / quota / spendLimit (counter gates) --------------------

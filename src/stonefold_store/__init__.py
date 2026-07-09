@@ -13,11 +13,13 @@ from stonefold_store.dispatch import DispatchWorker
 from stonefold_store.inflight import InFlightCall, InFlightRegistry
 from stonefold_store.kill_cached import CachedKillStore, KillBus
 from stonefold_store.kill_memory import InMemoryKillStore
+from stonefold_store.obligations import InMemoryObligationRegistry
 from stonefold_store.outbox_memory import InMemoryOutboxStore, build_pending
 
 __all__ = [
     "CounterStore",
     "InMemoryCounterStore",
+    "InMemoryObligationRegistry",
     "InMemoryOutboxStore",
     "build_pending",
     "DispatchWorker",
