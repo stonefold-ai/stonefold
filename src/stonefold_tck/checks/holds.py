@@ -181,12 +181,13 @@ def j5_outage_fails_never_holds(driver: ConformanceDriver) -> None:
     requires=[CAP_HOLD, CAP_STAGING, CAP_AUDIT],
 )
 def j6_duplicate_holds_collapse(driver: ConformanceDriver) -> None:
-    # CS-031: the same (agent, action, reason code, candidate refs) within the
-    # REQUIRED TCK dedupe window (one hour) is the same question wearing a
-    # second disguise — the agent gets the SAME ticket, and each attempt is
-    # still audited.
+    # CS-031: the same question asked twice within the REQUIRED TCK dedupe
+    # window (one hour) is one queue item — the agent gets the SAME ticket,
+    # and each attempt is still audited. CS-040 (v0.6.1) sharpens the
+    # identity: a DIFFERENT question (a different target here) must NOT
+    # collapse — over-collapsing loses a question.
     setup(driver, policy=POLICY_HOLD, seed_world=False)
-    _seed_targets(driver, PQ={"hold": True})
+    _seed_targets(driver, PQ={"hold": True}, PR={"hold": True})
     first = expect_decision(submit(driver, _pay(500, target="PQ")), "hold", "first attempt")
     ticket = expect_ticket(first, "the held intent")
     second = expect_decision(
@@ -197,7 +198,16 @@ def j6_duplicate_holds_collapse(driver: ConformanceDriver) -> None:
         f"the duplicate hold queued a second item ({second.ticket!r}) instead of "
         f"collapsing into {ticket!r} (CS-031)",
     )
+    distinct = expect_decision(
+        submit(driver, _pay(500, target="PR"), session="tck-s3"), "hold",
+        "a hold over a DIFFERENT target",
+    )
+    expect(
+        distinct.ticket is not None and distinct.ticket != ticket,
+        "a hold over a different target collapsed into an unrelated queue item "
+        "(CS-040: distinct questions never collapse)",
+    )
     holds = [r for r in driver.audit() if r.decision == "hold"]
-    expect(len(holds) >= 2, "each attempt must still leave its own audit record")
+    expect(len(holds) >= 3, "each attempt must still leave its own audit record")
     driver.dispatch_once()
     expect(len(driver.effects()) == 0, "a deduped hold must not dispatch anything")

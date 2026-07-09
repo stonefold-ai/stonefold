@@ -581,6 +581,50 @@ class TestEndToEnd:
 
 
 # ==========================================================================
+# CS-040 (v0.6.1) — the hold dedupe identity is the QUESTION, not the code
+# ==========================================================================
+class TestDedupeSharpness:
+    def _pay(self, h: Harness, vendor: str, amount: float, session: str) -> Any:
+        return enforce(
+            RawCall(resource="Payment", action="pay",
+                    data={**GOOD_DATA, "vendorId": vendor, "amount": amount}),
+            Actor(id="alice"),
+            Session(id=session, correlation_id=session),
+            registry=h.reg, audit=h.audit, policy=h.policy, gates=h.engine,
+            outbox=h.outbox, env=RequestEnv(now=T0), freshness=CFG_FRESHNESS,
+            obligations={PO_REGISTRY: h.adapter},
+            dedupe_window_s=3600.0,
+        )
+
+    def test_distinct_unmatched_intents_never_collapse(self) -> None:
+        # v0.6's key over-collapsed here: with zero candidates the refs are
+        # empty, so every no-match hold on one action shared a key. CS-040
+        # identifies a zero-candidate hold by what the intent CLAIMED — its
+        # compared field values — so two different vendors' unmatched invoices
+        # are two questions, while resubmitting the SAME one still collapses.
+        data = dict(POLICY_DATA)
+        data["gates"] = {"pay": {"requireMatch": {**MATCH_CFG, "onNoMatch": "hold"}}}
+        h = harness(data, records={})
+
+        first = self._pay(h, "V-77", 800, "s1")
+        assert first.decision is Decision.HOLD and first.reason_code == "no-match"
+
+        other_vendor = self._pay(h, "V-99", 800, "s2")
+        assert other_vendor.decision is Decision.HOLD
+        assert other_vendor.ticket != first.ticket  # a DIFFERENT question
+
+        other_amount = self._pay(h, "V-77", 990, "s3")
+        assert other_amount.ticket != first.ticket  # a different claim
+
+        same_again = self._pay(h, "V-77", 800, "s4")
+        assert same_again.ticket == first.ticket  # the same question collapses
+        row = h.outbox.get(first.ticket)
+        assert row is not None and row.attempts == 2
+
+        assert len(h.outbox.list_by_state(PendingState.PENDING_APPROVAL)) == 3
+
+
+# ==========================================================================
 # CS-038 — linter rules 14–17 and the rule-4 amendment
 # ==========================================================================
 def _lint_policy(gates: dict[str, Any], *, allow: list[dict[str, Any]] | None = None) -> Any:

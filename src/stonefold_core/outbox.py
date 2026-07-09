@@ -14,7 +14,8 @@ does the I/O.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+import json
+from collections.abc import Callable, Mapping
 from datetime import datetime
 from enum import Enum
 from typing import Any, Protocol
@@ -127,9 +128,20 @@ def expired_hold_reason(gate: str) -> str:
 def hold_dedupe_key(
     agent: str, resolved: ResolvedAction, gates: tuple[GateResult, ...]
 ) -> tuple[Any, ...] | None:
-    """The CS-031 identity of a hold: (agent, action, reason code(s),
-    matched-candidate refs). Two holds with the same key within the dedupe
-    window are the same question wearing two disguises — one queue item.
+    """The identity of a hold (CS-031, sharpened by CS-040): per holding gate,
+    (agent, action, reason code, the gate's EVIDENCE — which carries the
+    matched-candidate refs — and the VALUES of the intent fields the gate
+    compared, its CS-030 ``fields`` set). Two holds with the same key within
+    the dedupe window are the same question wearing two disguises — one queue
+    item.
+
+    The identity is deliberately asymmetric (CS-040): over-distinguishing
+    costs one extra queue item; over-collapsing loses a question. So a
+    zero-candidate hold is identified by what the intent CLAIMED (its
+    compared ``data.*`` values) — two different vendors' unmatched invoices
+    never share an item, while ten resubmissions of the same one do. A check
+    wanting precise dedupe puts what identifies its question (the target id,
+    the candidate set) in the hold's evidence.
 
     ``None`` when no holding gate carries a machine-readable reason code: an
     approval-shaped hold is a DISTINCT question per intent (two different
@@ -138,14 +150,27 @@ def hold_dedupe_key(
     """
     from stonefold_core.enums import Outcome
 
-    holds: list[tuple[str, str, tuple[str, ...]]] = []
+    holds: list[tuple[str, str, str, tuple[tuple[str, str], ...]]] = []
     for g in gates:
         if g.outcome is not Outcome.HOLD:
             continue
-        ev = g.evidence or {}
-        refs = tuple(str(r) for r in (ev.get("refs") or ev.get("candidates") or ()))
-        holds.append((g.gate, g.code, refs))
-    if not holds or not any(code for _gate, code, _refs in holds):
+        evidence = (
+            json.dumps(g.evidence, sort_keys=True, default=str) if g.evidence else ""
+        )
+        compared: list[tuple[str, str]] = []
+        for path in g.fields:
+            parts = path.split(".")
+            if parts[0] == "data":
+                value: Any = resolved.data
+                for part in parts[1:]:
+                    value = value.get(part) if isinstance(value, Mapping) else None
+                compared.append((path, str(value)))
+            else:
+                # resource./actor./context. paths are world-side, not intent
+                # claims; the world side of the question lives in ``evidence``.
+                compared.append((path, ""))
+        holds.append((g.gate, g.code, evidence, tuple(compared)))
+    if not holds or not any(code for _gate, code, _ev, _cmp in holds):
         return None
     return (agent, resolved.resource, resolved.action, tuple(holds))
 
