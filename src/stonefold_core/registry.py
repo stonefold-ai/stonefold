@@ -25,6 +25,7 @@ from stonefold_core.enums import (
     Explainability,
     Kind,
     OperativeForce,
+    RetryClass,
     Reversibility,
 )
 from stonefold_core.models import Attributes, Compensation, RawCall, ResolvedAction
@@ -77,6 +78,32 @@ class ResourceDef(BaseModel):
     actions: dict[str, ActionDef] = Field(default_factory=dict)
 
 
+class PreconditionCheckDecl(BaseModel):
+    """One declared precondition check (docs/06 §5, v0.6 CS-026/CS-029).
+
+    The bare-name form declares a two-valued check whose codes default
+    ``terminal``; the object form additionally declares hold capability and the
+    retry class of every code the check may emit. ``holdCapable`` without
+    ``reasonCodes`` is rejected at load (Stele §13 rule 18): every hold the
+    check returned would be code-less and resolve fail.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    name: str
+    holdCapable: bool = False
+    reasonCodes: dict[str, RetryClass] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _hold_capable_needs_codes(self) -> "PreconditionCheckDecl":
+        if self.holdCapable and not self.reasonCodes:
+            raise ValueError(
+                f"check {self.name!r} declares holdCapable without reasonCodes "
+                "(Stele §13 rule 18)"
+            )
+        return self
+
+
 class RegistryFile(BaseModel):
     """The full on-disk registry document."""
 
@@ -92,6 +119,12 @@ class RegistryFile(BaseModel):
     scopePredicates: tuple[str, ...] = ()
     contentHooks: tuple[str, ...] = ()
     preconditionChecks: tuple[str, ...] = ()
+    # v0.6 (CS-026/CS-029): the full declarations behind the name list — the
+    # loader accepts each ``preconditionChecks`` item as a bare name or an
+    # object (``{name, holdCapable, reasonCodes}``) and splits them here, the
+    # CS-020 ``connector_digests`` pattern. Every declared check has an entry
+    # (bare names get the two-valued default).
+    precondition_decls: dict[str, PreconditionCheckDecl] = Field(default_factory=dict)
     sets: dict[str, tuple[str, ...]] = Field(default_factory=dict)
     sinks: tuple[str, ...] = ()
     # CS-024: the DECLARED ORDER of classification labels (lowest first) that
@@ -123,6 +156,29 @@ class RegistryFile(BaseModel):
             data = {**data, "connectors": tuple(connectors.keys()),
                     "connector_digests": digests}
         return data
+
+    @model_validator(mode="before")
+    @classmethod
+    def _split_precondition_decls(cls, data: Any) -> Any:
+        """Normalise ``preconditionChecks`` items (bare name | object, v0.6
+        CS-029) into the name tuple plus a ``precondition_decls`` map. Every
+        check gets a declaration; bare names get the two-valued default."""
+        if not isinstance(data, dict):
+            return data
+        raw = data.get("preconditionChecks")
+        if raw is None:
+            return data
+        names: list[str] = []
+        decls = dict(data.get("precondition_decls") or {})
+        for item in raw:
+            if isinstance(item, Mapping):
+                name = str(item.get("name", ""))
+                names.append(name)
+                decls.setdefault(name, dict(item))
+            else:
+                names.append(str(item))
+                decls.setdefault(str(item), {"name": str(item)})
+        return {**data, "preconditionChecks": tuple(names), "precondition_decls": decls}
 
 
 class Registry(Protocol):
@@ -189,6 +245,26 @@ class InMemoryRegistry:
 
     def has_precondition_check(self, name: str) -> bool:
         return name in self._data.preconditionChecks
+
+    def precondition_decl(self, name: str) -> PreconditionCheckDecl | None:
+        """The full declaration behind a check name (v0.6 CS-029); ``None`` for
+        an undeclared name."""
+        return self._data.precondition_decls.get(name)
+
+    def check_hold_capable(self, name: str) -> bool:
+        """Whether the check declared ``holdCapable`` (RFC §7.6 rule 3, CS-026).
+        A hold from a check that didn't is an implementation error — the gate
+        resolves it fail-closed."""
+        decl = self._data.precondition_decls.get(name)
+        return decl is not None and decl.holdCapable
+
+    def reason_class(self, check: str, code: str) -> RetryClass:
+        """The declared retry class of one check code (CS-029); undeclared
+        codes default ``terminal`` — the safe direction is to stop retrying."""
+        decl = self._data.precondition_decls.get(check)
+        if decl is None:
+            return RetryClass.TERMINAL
+        return decl.reasonCodes.get(code, RetryClass.TERMINAL)
 
     def has_named_set(self, name: str) -> bool:
         return name in self._data.sets

@@ -22,6 +22,7 @@ from stonefold_core.enums import (
     Kind,
     OperativeForce,
     Outcome,
+    RetryClass,
     Reversibility,
 )
 from stonefold_core.models import (
@@ -123,6 +124,7 @@ from stonefold_core.policy import (
 from stonefold_core.registry import (
     ActionDef,
     InMemoryRegistry,
+    PreconditionCheckDecl,
     Registry,
     RegistryFile,
     ResourceDef,
@@ -135,6 +137,7 @@ __all__ = [
     "Kind",
     "Decision",
     "Outcome",
+    "RetryClass",
     "Reversibility",
     "Emission",
     "OperativeForce",
@@ -153,6 +156,7 @@ __all__ = [
     # registry
     "Registry",
     "InMemoryRegistry",
+    "PreconditionCheckDecl",
     "RegistryFile",
     "ResourceDef",
     "ActionDef",

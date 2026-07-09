@@ -42,6 +42,17 @@ class Outcome(str, Enum):
     HOLD = "hold"
 
 
+class RetryClass(str, Enum):
+    """The retry class every deny/hold reason code declares (RFC §11, v0.6
+    CS-029): what an iterating agent should do with the refusal. An
+    undeclared/unknown code defaults to ``TERMINAL`` — the safe direction is to
+    stop retrying."""
+
+    RETRYABLE = "retryable"  # the defect is in the intent; fix it and resubmit
+    TERMINAL = "terminal"  # nothing the agent can fix; do not resubmit
+    ESCALATE = "escalate"  # stop and surface to a human on the AGENT's side
+
+
 class Reversibility(str, Enum):
     """How recoverable an action is (RFC §5). Drives approval/gate strength."""
 

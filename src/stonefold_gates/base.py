@@ -20,7 +20,7 @@ from stonefold_core.condition import (
     EvalContext,
     MissingValueError,
 )
-from stonefold_core.enums import Outcome
+from stonefold_core.enums import Outcome, RetryClass
 from stonefold_core.gating import RequestEnv
 from stonefold_core.models import Actor, GateResult, ResolvedAction, Session
 from stonefold_core.policy import FailureMode
@@ -88,8 +88,18 @@ def passed(gate: str, reason: str = "") -> GateResult:
     return GateResult(gate=gate, outcome=Outcome.PASS, reason=reason)
 
 
-def failed(gate: str, reason: str, *, code: str = "", source: str = "") -> GateResult:
-    return GateResult(gate=gate, outcome=Outcome.FAIL, reason=reason, code=code, source=source)
+def failed(
+    gate: str,
+    reason: str,
+    *,
+    code: str = "",
+    source: str = "",
+    retry_class: "RetryClass | None" = None,
+) -> GateResult:
+    return GateResult(
+        gate=gate, outcome=Outcome.FAIL, reason=reason, code=code, source=source,
+        retry_class=retry_class,
+    )
 
 
 def held(
@@ -99,10 +109,11 @@ def held(
     code: str = "",
     source: str = "",
     evidence: dict[str, Any] | None = None,
+    retry_class: "RetryClass | None" = None,
 ) -> GateResult:
     return GateResult(
         gate=gate, outcome=Outcome.HOLD, reason=reason, code=code, source=source,
-        evidence=evidence,
+        evidence=evidence, retry_class=retry_class,
     )
 
 

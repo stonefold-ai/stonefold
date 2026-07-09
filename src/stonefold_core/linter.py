@@ -153,7 +153,40 @@ def lint(policy: Policy, registry: InMemoryRegistry) -> LintReport:
     _check_standing_deny_conflict(policy, report)
     _check_ambiguous_bare_allow(policy, registry, report)
     _check_dual_auth_quorum(policy, report)
+    _check_hold_capable_resolvers(policy, registry, report)
     return report
+
+
+def _check_hold_capable_resolvers(
+    policy: Policy, registry: InMemoryRegistry, report: LintReport
+) -> None:
+    """§13.18 (v0.6, CS-038) — a hold-capable check gated with no ``resolvers:``
+    ⇒ warn: its holds release under the deployment's default resolver role, and
+    are refused ``hold-unresolvable`` if none is configured. (The other half of
+    rule 18 — ``holdCapable`` without ``reasonCodes`` — is a registry load
+    error, ``PreconditionCheckDecl``.)"""
+    for key, gateset in policy.gates.items():
+        for gate_name in ("precondition", "emissionControl"):
+            cfg = gateset.get(gate_name)
+            if cfg is None:
+                continue
+            if isinstance(cfg, dict):
+                if cfg.get("resolvers"):
+                    continue
+                checks = list(cfg.get("checks") or [])
+            elif isinstance(cfg, list):
+                checks = list(cfg)
+            else:
+                checks = [cfg]
+            for chk in checks:
+                if registry.check_hold_capable(str(chk)):
+                    report.add(
+                        "13.18",
+                        Severity.WARN,
+                        f"hold-capable check {chk!r} in {key}.{gate_name} declares no "
+                        "resolvers: — its holds fall to the deployment default resolver "
+                        "role, and are refused hold-unresolvable if none is configured",
+                    )
 
 
 def _iter_permission_targets(

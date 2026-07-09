@@ -185,7 +185,13 @@ class Gateway:
     ) -> EvalResult:
         """An audited *structural* refusal that never enters the policy pipeline —
         used by the proxy for an unmapped tool (design §1.2: unmapped ⇒ deny)."""
-        result = EvalResult(decision=Decision.DENY, rule=reason)
+        from stonefold_core.reasons import classify
+
+        reason_code, retry_class = classify(Decision.DENY, reason, ())
+        result = EvalResult(
+            decision=Decision.DENY, rule=reason,
+            reason_code=reason_code, retry_class=retry_class,
+        )
         self._audit.write(
             build_record(
                 agent=self._agent,

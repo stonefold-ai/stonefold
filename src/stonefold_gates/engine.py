@@ -22,8 +22,9 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from stonefold_core.condition import ConditionRuntimeError, EvalContext, make_window
-from stonefold_core.enums import Kind, Outcome
+from stonefold_core.enums import Kind, Outcome, RetryClass
 from stonefold_core.freshness import VOLATILE_GATES, DispatchRevalidator
+from stonefold_core.reasons import gate_class
 from stonefold_core.gating import ApprovalSpec, GateOutcome, ReleaseContract, RequestEnv
 from stonefold_core.models import Actor, GateResult, ResolvedAction, Session
 from stonefold_core.outbox import PendingAction
@@ -268,12 +269,19 @@ class DefaultGateEngine:
                 return GateResult(
                     gate=name, outcome=Outcome.FAIL,
                     reason=f"fail-closed: condition error: {exc}",
+                    retry_class=RetryClass.TERMINAL,
                 )
             if not active:
                 return passed(name, "inactive: when=false")
         if name == _TRANSITION_GUARD:
-            return g.check_from_states(cfg["from"], gctx)
-        return _GATES[name][1](cfg, gctx)
+            result = g.check_from_states(cfg["from"], gctx)
+        else:
+            result = _GATES[name][1](cfg, gctx)
+        # CS-029: every FAIL carries a retry class — check-declared where the
+        # check supplied one (gates.py), else the gate's built-in default.
+        if result.outcome is Outcome.FAIL and result.retry_class is None:
+            result = result.model_copy(update={"retry_class": gate_class(result.gate)})
+        return result
 
 
 def make_dispatch_revalidator(

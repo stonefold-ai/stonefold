@@ -197,8 +197,13 @@ def cancellation_record(row: PendingAction, reason: str) -> AuditRecord:
     ``gates`` trace and the release contracts in ``approval``. Deferred import
     keeps the module import graph acyclic-by-inspection."""
     from stonefold_core.audit import build_record
+    from stonefold_core.reasons import classify
 
-    result = EvalResult(decision=Decision.DENY, rule=reason, gates=row.gates, ticket=row.id)
+    reason_code, retry_class = classify(Decision.DENY, reason, row.gates)
+    result = EvalResult(
+        decision=Decision.DENY, rule=reason, gates=row.gates, ticket=row.id,
+        reason_code=reason_code, retry_class=retry_class,
+    )
     return build_record(
         agent=row.agent,
         actor=row.actor,

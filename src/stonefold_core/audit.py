@@ -100,6 +100,8 @@ def build_record(
         gates=list(result.gates),
         decision=result.decision,
         rule=result.rule,
+        reasonCode=result.reason_code,
+        retryClass=result.retry_class,
         approval=approval,
         outcome=outcome,
         resultRefs=list(result_refs or []),

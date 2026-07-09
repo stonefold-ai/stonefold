@@ -19,6 +19,7 @@ from stonefold_core.enums import (
     Kind,
     OperativeForce,
     Outcome,
+    RetryClass,
     Reversibility,
 )
 
@@ -141,6 +142,10 @@ class GateResult(BaseModel):
     code: str = ""
     source: str = ""
     evidence: dict[str, Any] | None = None
+    # v0.6 CS-029: the code's declared retry class (check-declared, else the
+    # gate's built-in default assigned by the engine). ``None`` on PASS and on
+    # approval-shaped holds (the agent's move there is to wait).
+    retry_class: RetryClass | None = None
 
 
 class EvalResult(BaseModel):
@@ -151,6 +156,10 @@ class EvalResult(BaseModel):
     decision: Decision
     rule: str
     gates: tuple[GateResult, ...] = ()
+    # v0.6 CS-029: the machine-readable reason code + retry class for a
+    # deny/hold — the agent's convergence signal. Empty/None on ALLOW.
+    reason_code: str = ""
+    retry_class: RetryClass | None = None
     # Populated on HOLD/accepted-effect with the staged ``pending_actions`` id.
     ticket: str | None = None
     # The connector result on an executed ALLOW (rows for an observe, a receipt
@@ -204,6 +213,11 @@ class AuditRecord(BaseModel):
     # "with the deciding rule/gate") — e.g. "gate:denylist", "stale-decision",
     # "scope-lost", "dispatch".
     rule: str | None = None
+    # v0.6 CS-029: the machine-readable code + retry class of a deny/hold —
+    # what the agent was told (subject to CS-030 visibility; the audit always
+    # carries it). Empty/None on ALLOW.
+    reasonCode: str = ""
+    retryClass: RetryClass | None = None
     approval: dict[str, Any] | None = None
     # Connector result: "success" | "failure" | "not_executed".
     outcome: str = "not_executed"

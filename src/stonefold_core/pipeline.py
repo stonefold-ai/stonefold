@@ -48,6 +48,7 @@ from stonefold_core.models import (
 )
 from stonefold_core.outbox import OutboxStore, PendingState
 from stonefold_core.policy import FailureMode
+from stonefold_core.reasons import classify
 from stonefold_core.registry import Registry, UnknownActionError
 from stonefold_core.scope import ScopePredicate, ScopeResolver
 
@@ -623,10 +624,13 @@ def _terminal(
     audit.
     """
 
+    reason_code, retry_class = classify(decision, rule, gate_results)
     result = EvalResult(
         decision=decision,
         rule=rule,
         gates=gate_results,
+        reason_code=reason_code,
+        retry_class=retry_class,
         ticket=ticket,
         output=output,
         scope_applied=scope_applied,

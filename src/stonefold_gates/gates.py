@@ -134,6 +134,11 @@ def _run_checks(gate: str, names: list[Any], gctx: GateContext) -> GateResult:
                 f"{name} not satisfied",
                 code=result.code,
                 source=name,
+                # CS-029: the code's class comes from the check's registry
+                # declaration; undeclared/code-less ⇒ the engine's default.
+                retry_class=(
+                    gctx.registry.reason_class(name, result.code) if result.code else None
+                ),
             )
         if result.outcome is Outcome.HOLD:
             if not result.code:
@@ -146,6 +151,18 @@ def _run_checks(gate: str, names: list[Any], gctx: GateContext) -> GateResult:
                 return failed(
                     gate, f"fail-closed: {name} held without a reason code", source=name
                 )
+            if not gctx.registry.check_hold_capable(name):
+                # CS-026 rule 3: hold capability is declared in the registry
+                # (docs/06 §5). An undeclared hold is an implementation error.
+                logger.error(
+                    "check %r returned hold but is not declared holdCapable "
+                    "(CS-026); resolving fail-closed", name,
+                )
+                return failed(
+                    gate,
+                    f"fail-closed: {name} held without declared hold capability",
+                    source=name,
+                )
             if first_hold is None:
                 first_hold = (name, result)
     if first_hold is not None:
@@ -156,6 +173,7 @@ def _run_checks(gate: str, names: list[Any], gctx: GateContext) -> GateResult:
             code=result.code,
             source=name,
             evidence=dict(result.evidence) if result.evidence is not None else None,
+            retry_class=gctx.registry.reason_class(name, result.code),
         )
     return passed(gate)
 

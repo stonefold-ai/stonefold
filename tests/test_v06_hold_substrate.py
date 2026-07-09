@@ -43,8 +43,12 @@ T0 = datetime(2026, 7, 9, 9, 0, tzinfo=timezone.utc)
 CFG = FreshnessConfig(
     default_ttl=timedelta(hours=24), irreversible_ttl=timedelta(minutes=30)
 )
-# The scripted check registers under a name the central registry declares.
-CHECK = "payeeCoolingOffElapsed"
+# The scripted check registers under a name the central registry declares
+# hold-capable with reason codes (CS-026 rule 3 / CS-029 — a hold from a check
+# not declared holdCapable resolves fail-closed).
+CHECK = "matchesOpenPurchaseOrder"
+# A declared, bare-name (two-valued) check for the bool-compat tests.
+BOOL_CHECK = "payeeCoolingOffElapsed"
 
 
 class ScriptedCheck:
@@ -239,11 +243,22 @@ def test_crash_with_failure_mode_open_passes() -> None:
 
 
 def test_bool_checks_stay_valid() -> None:
-    # I6 at unit level: the two-valued form is unchanged.
-    h_true = harness({"precondition": [CHECK]}, ScriptedCheck(True))
-    assert h_true.enforce().decision is Decision.ALLOW
-    h_false = harness({"precondition": [CHECK]}, ScriptedCheck(False))
-    assert h_false.enforce().decision is Decision.DENY
+    # I6 at unit level: the two-valued, bare-name-declared form is unchanged.
+    reg = full_registry()
+    doc: dict[str, Any] = {
+        "agent": "ap-agent",
+        "allow": [{"effect": ["sendEmail"]}],
+        "gates": {"sendEmail": {"precondition": [BOOL_CHECK]}},
+    }
+    policy = load_policy(doc, reg, schema=load_schema())
+    for verdict, expected in ((True, Decision.ALLOW), (False, Decision.DENY)):
+        audit = InMemoryAuditSink()
+        h = Harness(
+            reg, policy, audit, InMemoryOutboxStore(audit=audit),
+            DefaultGateEngine(reg, preconditions={BOOL_CHECK: ScriptedCheck(verdict)}),
+            InMemoryConnector(),
+        )
+        assert h.enforce().decision is expected
 
 
 # --- CS-027: multi-hold release contracts ----------------------------------
