@@ -42,6 +42,11 @@ _EXACT: dict[str, RetryClass] = {
     "scope-denied": RetryClass.TERMINAL,
     "scope-unavailable": RetryClass.TERMINAL,
     "scope-lost": RetryClass.TERMINAL,
+    # v0.6 CS-035: the matched obligation was reserved/consumed by another
+    # intent between decision and staging — this line is spoken for; nothing
+    # about resubmitting the same intent can fix it.
+    "no-match": RetryClass.TERMINAL,
+    "reservation-unavailable": RetryClass.TERMINAL,
 }
 
 # Prefixed settle reasons: the world moved (re-decide) vs. the hold lapsed

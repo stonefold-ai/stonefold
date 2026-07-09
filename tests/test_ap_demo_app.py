@@ -149,11 +149,16 @@ def test_kill_halts_then_lift_resumes(client: TestClient) -> None:
     audit = client.get("/audit").json()
     assert any(a["decision"] == "halt" for a in audit)
 
-    # lift it → the active list empties and the agent resumes
+    # lift it → the active list empties and the agent resumes: no more HALTs.
+    # The re-submitted invoice cannot pay AGAIN — its PO line was consumed by
+    # the baseline run (v0.6 CS-035), so the resumed attempt no-matches and
+    # holds for the AP clerk instead. Kill-lift is proven by the absence of
+    # halt, not by a second payment against a spent line.
     client.post(f"/admin/kill/{order['id']}/lift", json={"lifted_by": "operator"})
     assert client.get("/admin/kill").json() == []
     resumed = client.post("/agent/run", json={"scenario": "happy", "provider": "fake"}).json()
-    assert any(d["decision"] == "allow" for d in resumed["decisions"])
+    assert resumed["decisions"] and all(d["decision"] != "halt" for d in resumed["decisions"])
+    assert any(d["decision"] == "hold" for d in resumed["decisions"])
 
 
 def test_lift_unknown_kill_is_404(client: TestClient) -> None:

@@ -22,8 +22,9 @@ does not refuse the batch).
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from dataclasses import dataclass
+import uuid
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, replace
 from typing import Any
 
 from datetime import datetime
@@ -45,6 +46,14 @@ from stonefold_core.models import (
     RawCall,
     ResolvedAction,
     Session,
+)
+from stonefold_core.obligation import (
+    Capability,
+    ConsumeOutcome,
+    ObligationClaim,
+    ObligationRegistry,
+    ReserveOutcome,
+    claim_evidence,
 )
 from stonefold_core.outbox import OutboxStore, PendingState
 from stonefold_core.policy import FailureMode
@@ -82,6 +91,10 @@ class _Decided:
     # v0.6 (CS-030): the policy-declared agent-feedback level, stamped on the
     # EvalResult so the transport can redact the return path.
     feedback: FeedbackLevel = FeedbackLevel.CODE_FIELDS
+    # v0.6 (CS-035): a reservation taken by the BATCH pre-pass, so the commit
+    # phase uses it instead of reserving again. ``None`` in the single-op path
+    # (the commit reserves itself, just before staging).
+    claim: ObligationClaim | None = None
 
 
 def enforce(
@@ -99,6 +112,7 @@ def enforce(
     outbox: OutboxStore | None = None,
     kill: KillStore | None = None,
     freshness: FreshnessConfig | None = None,
+    obligations: Mapping[str, ObligationRegistry] | None = None,
     agent: str = "unknown",
 ) -> EvalResult:
     """Evaluate one attempted action to a terminal, audited decision.
@@ -107,7 +121,9 @@ def enforce(
     ``_terminal``. The stages run in the strict RFC §12 order, stopping at the
     first terminal verdict. Stages whose dependency is not injected are skipped:
     no ``gates`` ⇒ authorization alone decides (M1); no ``connectors`` ⇒ an
-    allowed non-effect is not executed (M2 behaviour).
+    allowed non-effect is not executed (M2 behaviour). ``obligations`` supplies
+    the obligation-registry adapters the commit phase reserves/consumes from
+    (v0.6 CS-035) — the same map the gate engine matches against.
     """
 
     agent_name = policy.agent if policy is not None else agent
@@ -122,7 +138,7 @@ def enforce(
     result = _commit(
         decided, actor, session, audit=audit, connectors=connectors,
         outbox=outbox, freshness=freshness, env=env, agent_name=agent_name,
-        failure_mode=failure_mode,
+        failure_mode=failure_mode, obligations=obligations,
     )
     return _stamp_feedback(result, decided)
 
@@ -142,6 +158,7 @@ def enforce_batch(
     outbox: OutboxStore | None = None,
     kill: KillStore | None = None,
     freshness: FreshnessConfig | None = None,
+    obligations: Mapping[str, ObligationRegistry] | None = None,
     agent: str = "unknown",
 ) -> BatchResult:
     """Evaluate a SIF batch atomically (RFC §12, CS-023; SIF §5).
@@ -214,6 +231,53 @@ def enforce_batch(
             ),
         )
 
+    # Reservation pre-pass (v0.6 CS-035, CS-023 composition): every operation
+    # that matched a consumable obligation reserves it BEFORE anything commits;
+    # a refused reservation refuses the whole batch and releases every
+    # reservation taken for it — no partial claim survives a refused batch.
+    reserved: list[tuple[int, ObligationClaim]] = []
+    reserve_failure: tuple[int, str] | None = None
+    for i, d in enumerate(decided):
+        plan = claim_evidence(d.gate_results)
+        if plan is None:
+            continue
+        claim, refusal = _reserve_claim(plan, obligations)
+        if refusal is not None:
+            reserve_failure = (i, refusal)
+            break
+        assert claim is not None
+        reserved.append((i, claim))
+        decided[i] = replace(d, claim=claim)
+    if reserve_failure is not None:
+        for _i, claim in reserved:
+            _release_claim(claim, obligations)
+        failing, rule = reserve_failure
+        results = []
+        for i, d in enumerate(decided):
+            if i == failing:
+                results.append(
+                    _terminal(
+                        Decision.DENY, rule, d.call, d.resolved, actor, session,
+                        audit, agent_name, gate_results=d.gate_results,
+                        scope_applied=d.scope_applied,
+                    )
+                )
+            else:
+                results.append(
+                    _terminal(
+                        d.decision, d.rule, d.call, d.resolved, actor, session,
+                        audit, agent_name, gate_results=d.gate_results,
+                        scope_applied=d.scope_applied, outcome=BATCH_REFUSED,
+                    )
+                )
+        return BatchResult(
+            decision=Decision.DENY,
+            failing_index=failing,
+            results=tuple(
+                _stamp_feedback(r, d) for r, d in zip(results, decided, strict=True)
+            ),
+        )
+
     # Phase 2b — commit: stage every hold/effect, execute every read/write, in
     # submission order. Per §4.4 the record ops commit atomically with the
     # staging — the in-memory reference approximates that shared transaction by
@@ -228,7 +292,7 @@ def enforce_batch(
             _commit(
                 d, actor, session, audit=audit, connectors=connectors, outbox=outbox,
                 freshness=freshness, env=env_of(i), agent_name=agent_name,
-                failure_mode=failure_mode,
+                failure_mode=failure_mode, obligations=obligations,
             ),
             d,
         )
@@ -407,6 +471,7 @@ def _commit(
     env: RequestEnv | None,
     agent_name: str,
     failure_mode: FailureMode,
+    obligations: Mapping[str, ObligationRegistry] | None = None,
 ) -> EvalResult:
     """Step 6/7 for one decided operation: stage/execute, then audit (RFC §12)."""
 
@@ -422,6 +487,12 @@ def _commit(
 
     assert resolved is not None  # ALLOW/HOLD always carries the resolved action
 
+    # v0.6 (CS-035): the decision matched a consumable obligation — the row to
+    # be staged must hold its reservation BEFORE the staging commit returns
+    # (this closes the decide→dispatch double-spend window the TTL alone does
+    # not). A batch pre-pass may have reserved already (``decided.claim``).
+    claim_plan = claim_evidence(decided.gate_results)
+
     if decided.decision is Decision.HOLD:
         # A HOLD suspends the action: stage it as PENDING_APPROVAL so a human
         # can release it later (design §7). The ticket is returned to the agent.
@@ -436,6 +507,17 @@ def _commit(
                     scope_applied=decided.scope_applied,
                 )
             expires_at: datetime | None = expiry
+            claim = decided.claim
+            if claim is None and claim_plan is not None:
+                claim, refusal = _reserve_claim(claim_plan, obligations)
+                if refusal is not None:
+                    # AlreadyReserved/AlreadyConsumed between decision and
+                    # staging, or no adapter: refuse — never stage unreserved.
+                    return _terminal(
+                        Decision.DENY, refusal, call, resolved, actor, session,
+                        audit, agent_name, gate_results=decided.gate_results,
+                        scope_applied=decided.scope_applied,
+                    )
             held = guard(
                 lambda: ob.stage(
                     resolved=resolved, actor=actor, session_id=session.id,
@@ -445,17 +527,28 @@ def _commit(
                     releases=decided.releases,
                     expires_at=expires_at,
                     staged_at=env.now if env is not None else None,
+                    obligation=claim,
                 ),
                 reason="outbox-unavailable",
             )
             if isinstance(held, Unavailable):
-                # can't durably suspend the action ⇒ fail closed (design §11/§12).
+                # can't durably suspend the action ⇒ fail closed (design §11/§12);
+                # the reservation is returned (idempotent — a crash instead of an
+                # exception leaves an orphan the adapter's TTL expires, R6).
+                _release_claim(claim, obligations)
                 return _terminal(
                     Decision.DENY, "outbox-unavailable", call, resolved, actor,
                     session, audit, agent_name, gate_results=decided.gate_results,
                     scope_applied=decided.scope_applied,
                 )
             ticket = held.value.id
+            return _terminal(
+                Decision.HOLD, decided.rule, call, resolved, actor, session, audit,
+                agent_name, gate_results=decided.gate_results, ticket=ticket,
+                scope_applied=decided.scope_applied,
+                approval=_approval_audit(decided.approval, ticket, decided.releases),
+                consumption=claim.audit_dict("reserved") if claim is not None else None,
+            )
         return _terminal(
             Decision.HOLD, decided.rule, call, resolved, actor, session, audit,
             agent_name, gate_results=decided.gate_results, ticket=ticket,
@@ -479,6 +572,15 @@ def _commit(
                     scope_applied=decided.scope_applied,
                 )
             effect_expires_at: datetime | None = expiry
+            effect_claim = decided.claim
+            if effect_claim is None and claim_plan is not None:
+                effect_claim, refusal = _reserve_claim(claim_plan, obligations)
+                if refusal is not None:
+                    return _terminal(
+                        Decision.DENY, refusal, call, resolved, actor, session,
+                        audit, agent_name, gate_results=gate_trace,
+                        scope_applied=decided.scope_applied,
+                    )
             staged = guard(
                 lambda: ob.stage(
                     resolved=resolved, actor=actor, session_id=session.id,
@@ -487,6 +589,7 @@ def _commit(
                     gates=gate_trace, compensation=resolved.compensation,
                     expires_at=effect_expires_at,
                     staged_at=env.now if env is not None else None,
+                    obligation=effect_claim,
                 ),
                 reason="outbox-unavailable",
             )
@@ -494,6 +597,7 @@ def _commit(
                 # the durable staging+evidence substrate is down. We can neither
                 # stage, approve, nor record the effect, so failureMode 'open' does
                 # not apply here — always fail closed (design §11/§12, invariant 7).
+                _release_claim(effect_claim, obligations)
                 return _terminal(
                     Decision.DENY, "outbox-unavailable", call, resolved, actor,
                     session, audit, agent_name, gate_results=gate_trace,
@@ -504,6 +608,11 @@ def _commit(
                 agent_name, gate_results=gate_trace,
                 scope_applied=decided.scope_applied,
                 ticket=staged.value.id, outcome="staged",
+                consumption=(
+                    effect_claim.audit_dict("reserved")
+                    if effect_claim is not None
+                    else None
+                ),
             )
         return _terminal(
             Decision.ALLOW, decided.rule, call, resolved, actor, session, audit,
@@ -528,6 +637,18 @@ def _commit(
                 agent_name, gate_results=gate_trace,
                 scope_applied=decided.scope_applied,
             )
+        # CS-035, inline form: a record/transition with a consumable match runs
+        # reserve → execute → consume in one commit (there is no staged row to
+        # carry the claim to a later settle). Execution failure releases.
+        inline_claim = decided.claim
+        if inline_claim is None and claim_plan is not None:
+            inline_claim, refusal = _reserve_claim(claim_plan, obligations)
+            if refusal is not None:
+                return _terminal(
+                    Decision.DENY, refusal, call, resolved, actor, session,
+                    audit, agent_name, gate_results=gate_trace,
+                    scope_applied=decided.scope_applied,
+                )
         executed = guard(
             lambda: connectors.get(resolved.connector).execute(
                 resolved, decided.scope_pred, actor
@@ -537,6 +658,8 @@ def _commit(
         if isinstance(executed, Unavailable):
             # connector/dependency failure ⇒ honour failureMode (RFC §10). Closed
             # denies; open allows the read through with no output (low-stakes).
+            # Either way the effect did not land — the reservation is returned.
+            _release_claim(inline_claim, obligations)
             if should_fail_closed(resolved, failure_mode):
                 return _terminal(
                     Decision.DENY, "connector-unavailable", call, resolved, actor,
@@ -554,12 +677,92 @@ def _commit(
             Decision.ALLOW, decided.rule, call, resolved, actor, session, audit,
             agent_name, gate_results=gate_trace, scope_applied=decided.scope_applied,
             output=output, outcome="success",
+            consumption=_consume_claim(inline_claim, obligations),
         )
 
     return _terminal(
         Decision.ALLOW, decided.rule, call, resolved, actor, session, audit,
         agent_name, gate_results=gate_trace, scope_applied=decided.scope_applied,
     )
+
+
+def _reserve_claim(
+    plan: Mapping[str, Any],
+    obligations: Mapping[str, ObligationRegistry] | None,
+) -> tuple[ObligationClaim | None, str | None]:
+    """Reserve the matched obligation for a row about to stage/execute
+    (CS-035): returns ``(claim, None)`` on success or ``(None, refusal-rule)``.
+
+    ``AlreadyReserved``/``AlreadyConsumed`` refuse ``no-match`` — the line was
+    spoken for between decision and commit. A missing/erroring adapter refuses
+    ``reservation-unavailable`` unconditionally: staging a consumable match
+    without its reservation would reopen the double-spend window, so
+    ``failureMode: open`` does not apply here (same footing as the outbox
+    itself being down). The reservation id is generated here — the commit
+    phase is the I/O layer; determinism (invariant 1) protects ``_decide``.
+    """
+    registry_name = str(plan["registry"])
+    ref = str(plan["refs"][0])
+    adapter = obligations.get(registry_name) if obligations is not None else None
+    if adapter is None:
+        return None, "reservation-unavailable"
+    intent_id = f"itn_{uuid.uuid4().hex}"
+    try:
+        outcome = adapter.reserve(ref, intent_id)
+    except Exception:
+        return None, "reservation-unavailable"
+    if outcome is not ReserveOutcome.RESERVED:
+        return None, "no-match"
+    return (
+        ObligationClaim(
+            registry=registry_name,
+            ref=ref,
+            consume=str(plan["consume"]),
+            capability=Capability(str(plan["capability"])),
+            intent_id=intent_id,
+        ),
+        None,
+    )
+
+
+def _release_claim(
+    claim: ObligationClaim | None,
+    obligations: Mapping[str, ObligationRegistry] | None,
+) -> None:
+    """Return a reservation after a failed commit (CS-035) — best-effort and
+    idempotent: if this call is lost (crash, adapter blip) the reservation is
+    an orphan the adapter's own TTL expires (R6)."""
+    if claim is None or obligations is None:
+        return
+    adapter = obligations.get(claim.registry)
+    if adapter is None:
+        return
+    try:
+        adapter.release(claim.ref, claim.intent_id)
+    except Exception:
+        pass  # orphan: expired by the adapter's reservation TTL (R6)
+
+
+def _consume_claim(
+    claim: ObligationClaim | None,
+    obligations: Mapping[str, ObligationRegistry] | None,
+) -> dict[str, Any] | None:
+    """Consume an inline-executed action's reservation right after the
+    connector confirmed (CS-035, inline form) and return the CS-037
+    ``consumption`` audit field. The effect has landed either way — a consume
+    refusal/outage is recorded honestly, never hidden and never a rollback."""
+    if claim is None:
+        return None
+    adapter = obligations.get(claim.registry) if obligations is not None else None
+    if adapter is None:
+        return claim.audit_dict("consume-unavailable")
+    try:
+        result = adapter.consume(claim.ref, claim.intent_id)
+    except Exception:
+        return claim.audit_dict("consume-unavailable")
+    if result.outcome is ConsumeOutcome.CONSUMED:
+        return claim.audit_dict("consumed", receipt=result.receipt)
+    return claim.audit_dict("consume-refused")
 
 
 def _stamp_feedback(result: EvalResult, decided: _Decided) -> EvalResult:
@@ -641,6 +844,7 @@ def _terminal(
     scope_applied: tuple[str, ...] = (),
     outcome: str = "not_executed",
     approval: dict[str, Any] | None = None,
+    consumption: dict[str, Any] | None = None,
 ) -> EvalResult:
     """Build the terminal result, write its audit record, and return it.
 
@@ -669,6 +873,7 @@ def _terminal(
             result=result,
             outcome=outcome,
             approval=approval,
+            consumption=consumption,
         )
     )
     return result

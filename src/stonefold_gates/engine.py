@@ -27,7 +27,7 @@ from stonefold_core.freshness import VOLATILE_GATES, DispatchRevalidator
 from stonefold_core.reasons import gate_class
 from stonefold_core.gating import ApprovalSpec, GateOutcome, ReleaseContract, RequestEnv
 from stonefold_core.models import Actor, GateResult, ResolvedAction, Session
-from stonefold_core.obligation import ObligationRegistry
+from stonefold_core.obligation import ObligationClaim, ObligationRegistry, ReserveOutcome
 from stonefold_core.outbox import PendingAction
 from stonefold_store import CounterStore, InMemoryCounterStore
 from stonefold_gates import gates as g
@@ -35,6 +35,7 @@ from stonefold_gates.base import (
     GateContext,
     GateFn,
     PreconditionCheck,
+    failed,
     passed,
     window_seconds,
 )
@@ -247,6 +248,8 @@ class DefaultGateEngine:
         session: Session,
         policy: "CompiledPolicy",
         env: RequestEnv,
+        *,
+        claim: ObligationClaim | None = None,
     ) -> GateResult | None:
         """Dispatch-time re-validation of the VOLATILE gates only (v0.4 CS-017).
 
@@ -256,15 +259,62 @@ class DefaultGateEngine:
         decided — re-running them would double-count or re-request the grant.
         Returns the first non-PASS result (a HOLD here is treated as stale too:
         a claimed row cannot be re-suspended) or ``None`` when still fresh.
+
+        ``requireMatch`` refinement (v0.6 CS-032 rule 3 / CS-035): a row that
+        holds a reservation (``claim``) is checked for **reservation liveness**
+        instead of re-running the query — the reserved line's state moved to
+        ``reserved``, so a re-query would spuriously no-match the row's own
+        reservation. A row with no claim (``consume: none``) keeps the re-query.
         """
         gctx = self._context(resolved, actor, session, policy, env)
         for name, cfg in policy.gates_for(resolved).items():
             if name not in VOLATILE_GATES:
                 continue
-            result = self._run_one(name, cfg, gctx)
+            if name == "requireMatch" and claim is not None:
+                result = self._reservation_liveness(claim, resolved, policy)
+            else:
+                result = self._run_one(name, cfg, gctx)
             if result.outcome is not Outcome.PASS:
                 return result
         return None
+
+    def _reservation_liveness(
+        self, claim: ObligationClaim, resolved: ResolvedAction, policy: "CompiledPolicy"
+    ) -> GateResult:
+        """Still held, registry reachable (CS-035). The probe is an idempotent
+        re-``reserve``: RESERVED means the claim is live (an adapter-expired but
+        unclaimed reservation is legitimately re-acquired here, F5.2 — the line
+        was free, so re-closing the window is safe); anything else means the
+        line was lost to another intent ⇒ ``stale-guard:requireMatch``. An
+        unreachable registry is a dependency failure with the irreversible
+        floor (RFC §10)."""
+        from stonefold_core.failure import should_fail_closed
+
+        adapter = self.obligations.get(claim.registry)
+        failure_mode = policy.policy.defaults.failureMode
+        if adapter is None:
+            if should_fail_closed(resolved, failure_mode):
+                return failed(
+                    "requireMatch",
+                    f"fail-closed: obligation registry {claim.registry!r} has no adapter",
+                )
+            return passed("requireMatch", "failureMode=open: liveness unverifiable, skipped")
+        try:
+            outcome = adapter.reserve(claim.ref, claim.intent_id)
+        except Exception as exc:
+            if should_fail_closed(resolved, failure_mode):
+                return failed(
+                    "requireMatch",
+                    f"fail-closed: obligation registry {claim.registry!r} unreachable: {exc}",
+                )
+            return passed("requireMatch", "failureMode=open: liveness unverifiable, skipped")
+        if outcome is ReserveOutcome.RESERVED:
+            return passed("requireMatch", "reservation live")
+        return failed(
+            "requireMatch",
+            f"reservation on {claim.ref!r} lost ({outcome.value})",
+            code="no-match",
+        )
 
     def _run_one(self, name: str, cfg: Any, gctx: GateContext) -> GateResult:
         # `when:` makes ANY gate conditional (RFC §7). A runtime resolution error
@@ -302,7 +352,8 @@ def make_dispatch_revalidator(
     def revalidate(row: PendingAction, now: datetime) -> GateResult | None:
         session = Session(id=row.session_id, correlation_id=row.correlation_id)
         return engine.revalidate_volatile(
-            row.resolved, row.actor, session, policy, RequestEnv(now=now)
+            row.resolved, row.actor, session, policy, RequestEnv(now=now),
+            claim=row.obligation,
         )
 
     return revalidate

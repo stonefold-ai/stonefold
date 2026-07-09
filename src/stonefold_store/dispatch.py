@@ -18,8 +18,10 @@ The worker depends only on ``stonefold_core`` protocols (``OutboxStore``,
 
 from __future__ import annotations
 
-from collections.abc import Callable
+import logging
+from collections.abc import Callable, Mapping
 from datetime import datetime, timedelta, timezone
+from typing import Any
 
 from stonefold_core.audit import build_record
 from stonefold_core.digest import DIGEST_MISMATCH, digest_matches
@@ -37,6 +39,7 @@ from stonefold_core.enums import Decision, Reversibility
 from stonefold_core.freshness import STALE_DECISION, DispatchRevalidator, stale_guard_reason
 from stonefold_core.kill import KillStore, KillTarget
 from stonefold_core.models import AuditRecord, EvalResult, RawCall, ResolvedAction, Session
+from stonefold_core.obligation import ConsumeOutcome, ObligationRegistry
 from stonefold_core.outbox import (
     KillCheck,
     OutboxStore,
@@ -50,6 +53,8 @@ from stonefold_core.outbox import (
 from stonefold_core.registry import Registry
 from stonefold_core.scope import ScopePredicate, ScopeResolver
 from stonefold_store.inflight import InFlightCall, InFlightRegistry
+
+logger = logging.getLogger("stonefold.dispatch")
 
 
 def _result_refs_of(result: ConnectorResult) -> list[str]:
@@ -84,6 +89,7 @@ class DispatchWorker:
         clock: Callable[[], datetime] | None = None,
         revalidate: DispatchRevalidator | None = None,
         scopes: ScopeResolver | None = None,
+        obligations: Mapping[str, ObligationRegistry] | None = None,
     ) -> None:
         self._store = store
         self._connectors = connectors
@@ -97,6 +103,13 @@ class DispatchWorker:
         # transaction for a transactional connector, via a pre-dispatch target
         # re-resolve for a window connector. ``None`` = v0.3 behaviour.
         self._scopes = scopes
+        # v0.6 (CS-035): the obligation-registry adapters — the worker consumes
+        # a row's reservation at successful settle and releases it on any
+        # terminal non-success (the reconcile sweep below is the guarantee).
+        self._obligations: dict[str, ObligationRegistry] = dict(obligations or {})
+        # rows whose claim this worker already released — a memory cache over an
+        # IDEMPOTENT operation: a restart simply re-releases (NotHeld no-ops).
+        self._released: set[str] = set()
 
     def _default_kill_check(self, row: PendingAction) -> bool:
         # The authoritative, in-transaction kill re-check (design §8.4). Reads the
@@ -161,10 +174,96 @@ class DispatchWorker:
             audit=cancellation_record(row, reason),
         )
 
+    # --- CS-035: reservation release / consumption --------------------------
+    def release_terminal_claims(self) -> int:
+        """Release the reservation of every terminally non-successful row
+        (CS-035: kill, stale, expired hold, rejection, dispatch failure) — run
+        with the worker's loop, like the hold-expiry sweep.
+
+        One mechanism covers every cancel path, including the ones the STORE
+        settles internally (claim-time kill/stale cancellations) and the
+        transport-driven ``reject``. Correctness comes from idempotency
+        (releasing an already-released or adapter-expired reservation is a
+        ``NotHeld`` no-op — a restart just re-releases); the ``_released``
+        cache only keeps the sweep O(new terminals). Doubles as the CS-035
+        restart reconciliation (reservations ↔ staged rows).
+        """
+        released = 0
+        for state in (PendingState.CANCELLED, PendingState.FAILED):
+            for row in self._store.list_by_state(state):
+                if row.obligation is None or row.id in self._released:
+                    continue
+                self._release_claim(row)
+                released += 1
+        return released
+
+    def _release_claim(self, row: PendingAction) -> None:
+        claim = row.obligation
+        assert claim is not None
+        self._released.add(row.id)
+        adapter = self._obligations.get(claim.registry)
+        if adapter is None:
+            logger.error(
+                "no adapter for obligation registry %r: reservation %s on %r "
+                "left to the adapter TTL (R6)", claim.registry, claim.intent_id, claim.ref,
+            )
+            return
+        try:
+            adapter.release(claim.ref, claim.intent_id)
+        except Exception:  # orphan: expired by the adapter's reservation TTL (R6)
+            logger.exception(
+                "release of %r/%s failed; the adapter TTL is the backstop (R6)",
+                claim.ref, claim.intent_id,
+            )
+
+    def _consume_claim(self, row: PendingAction) -> dict[str, Any] | None:
+        """Consume the row's reservation with the successful settle (CS-035)
+        and return the CS-037 ``consumption`` audit field.
+
+        The reference consumes immediately after connector confirmation for
+        BOTH capabilities and records which one the registry declared:
+        a ``transactional`` registry's adapter may bind the consume into the
+        effect's own transaction (this in-memory reference approximates that
+        with idempotent consume + settle retry — the atomicity itself is the
+        documented not-black-box-observable exclusion, docs/12 §5); a
+        ``window`` registry's declared residual window is thereby surfaced,
+        priced, not hidden. The effect has landed either way — a consume
+        refusal or outage is recorded honestly, never hidden, never rolled
+        back.
+        """
+        claim = row.obligation
+        if claim is None:
+            return None
+        adapter = self._obligations.get(claim.registry)
+        if adapter is None:
+            logger.error(
+                "no adapter for obligation registry %r: consume of %r skipped",
+                claim.registry, claim.ref,
+            )
+            return claim.audit_dict("consume-unavailable")
+        try:
+            result = adapter.consume(claim.ref, claim.intent_id)
+        except Exception:
+            logger.exception("consume of %r/%s failed", claim.ref, claim.intent_id)
+            return claim.audit_dict("consume-unavailable")
+        if result.outcome is ConsumeOutcome.CONSUMED:
+            return claim.audit_dict("consumed", receipt=result.receipt)
+        return claim.audit_dict("consume-refused")
+
     def run_once(self, kill_check: KillCheck | None = None) -> bool:
         """Process at most one staged row. Returns ``True`` if one was handled."""
         self.sweep_expired_holds()  # CS-028: the worker's loop is the sweep
+        # CS-035: release claims of rows that went terminal since the last tick
+        # (reject, kill-service cancels) — and, in the ``finally``, of rows THIS
+        # tick cancelled inside the claim (kill / stale-decision / stale-guard),
+        # so a drain that ends on a cancellation does not strand a reservation.
+        self.release_terminal_claims()
+        try:
+            return self._run_claimed(kill_check)
+        finally:
+            self.release_terminal_claims()
 
+    def _run_claimed(self, kill_check: KillCheck | None = None) -> bool:
         check: KillCheck | None = kill_check
         if check is None and self._kill is not None:
             check = self._default_kill_check
@@ -270,13 +369,17 @@ class DispatchWorker:
             if call is not None and self._inflight is not None:
                 self._inflight.unregister(call.handle)
 
+        # CS-035: consumption executes with the settle — after the connector
+        # confirmed, before the settle record is written, so the audit and the
+        # spend can never disagree about what happened.
+        consumption = self._consume_claim(claimed)
         self._store.settle(
             claimed.id,
             state=PendingState.DONE,
             result=result.receipt,
             audit=self._audit_record(
                 claimed, Decision.ALLOW, "success", result_refs=_result_refs_of(result),
-                scope_applied=scope_trace,
+                scope_applied=scope_trace, consumption=consumption,
             ),
         )
         return True
@@ -359,7 +462,15 @@ class DispatchWorker:
         self, row: PendingAction, decision: Decision, outcome: str,
         *, result_refs: list[str] | None = None, rule: str = "dispatch",
         scope_applied: tuple[str, ...] = (),
+        consumption: dict[str, Any] | None = None,
     ) -> AuditRecord:
+        # CS-035/CS-037: a terminally non-successful settle of a row holding a
+        # reservation records the lifecycle outcome — the release itself is
+        # guaranteed by the reconcile sweep (idempotent).
+        if consumption is None and row.obligation is not None and outcome in (
+            "failure", "cancelled",
+        ):
+            consumption = row.obligation.audit_dict("released")
         result = EvalResult(
             decision=decision, rule=rule, gates=row.gates, ticket=row.id,
             scope_applied=scope_applied,
@@ -379,4 +490,5 @@ class DispatchWorker:
             result_refs=result_refs,
             # I7 (CS-027): the settle record carries who released which contract.
             approval=releases_audit(row, "released"),
+            consumption=consumption,
         )

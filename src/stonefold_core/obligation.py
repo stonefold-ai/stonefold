@@ -18,9 +18,12 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
+
+if TYPE_CHECKING:
+    from stonefold_core.models import GateResult
 
 # Declared property types a tolerance clause may apply to (§13 rule 14:
 # "tolerance applies to numeric/money fields only").
@@ -141,9 +144,6 @@ class ObligationRegistry(Protocol):
     def release(self, ref: str, intent_id: str) -> ReleaseOutcome: ...
 
 
-# --------------------------------------------------------------------------
-# The registry DECLARATION (docs/06 §5b — YAML, reviewable)
-# --------------------------------------------------------------------------
 class Capability(str, Enum):
     """How ``consume`` composes with the effect's settlement (CS-034/CS-035):
     ``transactional`` — inside the same transaction as the effect's commit and
@@ -152,6 +152,63 @@ class Capability(str, Enum):
 
     TRANSACTIONAL = "transactional"
     WINDOW = "window"
+
+
+class ObligationClaim(BaseModel):
+    """The reservation a staged row holds against its matched obligation
+    (CS-035): which registry and ref were matched at decision time, the
+    ``consume`` path to mark spent at settlement, the registry's declared
+    capability, and the reservation's idempotency key — ``reserve``/``consume``/
+    ``release`` are all keyed by (``ref``, ``intent_id``), so retries and
+    crash-recovery re-releases are no-ops. Carried on the ``PendingAction`` row
+    from staging to settle."""
+
+    model_config = ConfigDict(frozen=True)
+
+    registry: str
+    ref: str
+    consume: str
+    capability: Capability
+    intent_id: str
+
+    def audit_dict(self, state: str, *, receipt: str | None = None) -> dict[str, Any]:
+        """The RFC §11 ``consumption`` rendering (CS-037): the lifecycle state
+        (``reserved`` | ``consumed`` | ``released`` | a refusal note), the
+        registry+ref lineage, and — for ``window`` registries — the declared
+        capability, surfacing that consumption ran post-confirm rather than in
+        the effect's own transaction (priced, not hidden)."""
+        out: dict[str, Any] = {
+            "state": state,
+            "registry": self.registry,
+            "ref": self.ref,
+            "consume": self.consume,
+            "capability": self.capability.value,
+            "intentId": self.intent_id,
+        }
+        if receipt is not None:
+            out["receipt"] = receipt
+        return out
+
+
+def claim_evidence(gates: Sequence["GateResult"]) -> Mapping[str, Any] | None:
+    """The ``requireMatch`` PASS evidence when the decision matched a
+    CONSUMABLE obligation — the plan a staging commit reserves from (CS-035).
+    ``None`` when no match ran, the gate did not pass, or ``consume: none``
+    (pure verification reserves nothing)."""
+    from stonefold_core.enums import Outcome
+
+    for g in gates:
+        ev = g.evidence
+        if (
+            g.gate == "requireMatch"
+            and g.outcome is Outcome.PASS
+            and ev
+            and ev.get("consume")
+            and ev.get("consume") != "none"
+            and ev.get("refs")
+        ):
+            return dict(ev)
+    return None
 
 
 class ObligationProperty(BaseModel):

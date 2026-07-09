@@ -335,17 +335,28 @@ def _build_common(
         "in_memory": InMemoryConnector(),
     })
 
+    # v0.6 (CS-032/CS-034/CS-035): the policy's requireMatch gate matches
+    # payments against open purchase orders — the demo's system of record is
+    # this seeded in-memory adapter (a real deployment registers one over its
+    # ERP). One shared instance: the engine matches against it, the pipeline
+    # reserves from it at staging, the worker liveness-checks/consumes/releases.
+    # Reserving flips the PO line's state, so a resubmitted invoice no-matches
+    # at DECISION time (the RFC §14.4 beat); the reservation TTL is the CS-035
+    # orphan backstop, on the adapter's own clock (F5.2).
+    obligation_adapters: dict[str, Any] = {
+        "erp.purchase_orders": InMemoryObligationRegistry(
+            purchase_order_records(),
+            state_path="line.state",
+            reservation_ttl_s=24 * 3600.0,
+            clock=lambda: clock(),
+        )
+    }
     gates = DefaultGateEngine(
         registry,
         counters=counters,
         hooks=default_hooks(),
         preconditions={"payeeCoolingOffElapsed": payee_cooling_off_elapsed},
-        # v0.6 (CS-032/CS-034): the policy's requireMatch gate matches payments
-        # against open purchase orders — the demo's system of record is this
-        # seeded in-memory adapter (a real deployment registers one over its ERP).
-        obligations={
-            "erp.purchase_orders": InMemoryObligationRegistry(purchase_order_records())
-        },
+        obligations=obligation_adapters,
     )
 
     def _env_factory(call: RawCall) -> RequestEnv:
@@ -374,6 +385,7 @@ def _build_common(
         # v0.4 CS-017: bound how stale a staged payment decision may get — a
         # payee sanctioned or an approval granted long ago is caught at claim.
         freshness=FreshnessConfig(),
+        obligations=obligation_adapters,
     )
     # v0.4 wiring: the worker's clock is the same injected demo clock the
     # decisions use; it re-runs volatile gates inside the claim (CS-017) and
@@ -384,6 +396,7 @@ def _build_common(
         clock=clock,
         revalidate=make_dispatch_revalidator(gates, policy),
         scopes=scopes,
+        obligations=obligation_adapters,
     )
     kill_service = KillService(kill, audit=audit, inflight=inflight)
 

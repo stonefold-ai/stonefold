@@ -598,7 +598,8 @@ def require_match(cfg: Any, gctx: GateContext) -> GateResult:
         # illegal value (§13 rule 17); a policy that somehow loaded with it must
         # not make the gateway auto-select among candidates.
         return failed(_MATCH, "fail-closed: onAmbiguous: allow is illegal (RFC §7.16)")
-    if not gctx.registry.has_obligation_registry(reg_name):
+    decl = gctx.registry.obligation_registry(reg_name)
+    if decl is None:
         return failed(_MATCH, f"fail-closed: unknown obligation registry {reg_name!r}")
 
     raw_match = cfg.get("match")
@@ -674,7 +675,13 @@ def require_match(cfg: Any, gctx: GateContext) -> GateResult:
         )
 
     ob = candidates[0]
-    evidence = {"registry": reg_name, "refs": [ob.ref], "candidates": 1}
+    # A PASS additionally carries the consumption PLAN (CS-035): the staging
+    # commit reads consume/capability from here to reserve the matched ref
+    # before the commit returns. Deny/hold evidence stays lineage-only.
+    evidence = {
+        "registry": reg_name, "refs": [ob.ref], "candidates": 1,
+        "consume": consume, "capability": decl.capability.value,
+    }
     # CS-036 by construction: the ``obligation`` namespace is populated
     # exclusively from the adapter's response — a forged copy in ``data.*``
     # is just another intent field and changes nothing.

@@ -242,4 +242,9 @@ class AuditRecord(BaseModel):
     # ``resultRefs`` locate what the effect produced; ``obligationRefs`` locate
     # what entitled it. ``None`` when no ``requireMatch`` gate ran.
     obligationRefs: dict[str, Any] | None = None
+    # v0.6 (CS-037): the reservation lifecycle outcome for the matched
+    # obligation — ``reserved`` (staging record), ``consumed`` + receipt id
+    # (successful settle; ``window`` capability surfaced), or ``released``
+    # (terminal non-success). ``None`` when nothing was reserved.
+    consumption: dict[str, Any] | None = None
     correlationId: str | None = None

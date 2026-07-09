@@ -219,7 +219,12 @@ class TestRequireMatchGate:
     def test_unique_match_within_tolerance_passes_with_lineage(self) -> None:
         result = run_gate(MATCH_CFG, GOOD_DATA, po_adapter())
         assert result.outcome is Outcome.PASS
-        assert result.evidence == {"registry": PO_REGISTRY, "refs": ["po-1"], "candidates": 1}
+        # a PASS carries lineage + the consumption PLAN (CS-035: the staging
+        # commit reserves from consume/capability).
+        assert result.evidence == {
+            "registry": PO_REGISTRY, "refs": ["po-1"], "candidates": 1,
+            "consume": "obligation.line", "capability": "transactional",
+        }
 
     def test_tolerance_is_relative_to_the_obligation_side(self) -> None:
         # 10% of the $800 obligation ⇒ $880 passes, $881 fails.
@@ -432,6 +437,7 @@ class Harness:
             outbox=self.outbox,
             env=RequestEnv(now=T0),
             freshness=CFG_FRESHNESS,
+            obligations={PO_REGISTRY: self.adapter},
         )
 
     def worker_at(self, now: datetime) -> DispatchWorker:
@@ -445,6 +451,7 @@ class Harness:
             registry=self.reg,
             clock=lambda: now,
             revalidate=make_dispatch_revalidator(self.engine, self.policy),
+            obligations={PO_REGISTRY: self.adapter},
         )
 
 
@@ -464,7 +471,8 @@ def harness(
         obligations={PO_REGISTRY: adapter},
         default_resolver_role=default_resolver_role,
     )
-    return Harness(reg, policy, InMemoryAuditSink(), InMemoryOutboxStore(), engine, adapter)
+    audit = InMemoryAuditSink()
+    return Harness(reg, policy, audit, InMemoryOutboxStore(audit), engine, adapter)
 
 
 class TestEndToEnd:
@@ -539,18 +547,26 @@ class TestEndToEnd:
         assert result.decision is Decision.DENY
         assert result.rule == "gate:valueLimit"
 
-    def test_dispatch_revalidation_cancels_when_the_world_moved(self) -> None:
-        # CS-032 rule 3 (interim CS-017 form): requireMatch is volatile — the
-        # PO closing between staging and dispatch cancels stale-guard.
+    def test_dispatch_revalidation_cancels_when_the_reservation_is_lost(self) -> None:
+        # CS-032 rule 3 / CS-035: for a row holding a reservation, the dispatch
+        # claim checks reservation LIVENESS instead of re-running the query. A
+        # reservation lost to another intent cancels stale-guard:requireMatch.
         h = harness()
         result = h.enforce()
         assert result.decision is Decision.ALLOW and result.ticket is not None
-        h.adapter.set_field("po-1", "state", "closed")
-        h.worker_at(T0 + timedelta(minutes=1)).run_once()
         row = h.outbox.get(result.ticket)
-        assert row is not None
-        assert row.state is PendingState.CANCELLED
-        assert row.reason == "stale-guard:requireMatch"
+        assert row is not None and row.obligation is not None
+        # simulate the loss: the adapter forgets the row's hold and another
+        # intent takes the line before dispatch.
+        h.adapter.state_of("po-1").reserved_by = None
+        assert h.adapter.reserve("po-1", "someone-else") is not None
+        h.worker_at(T0 + timedelta(minutes=1)).run_once()
+        settled = h.outbox.get(result.ticket)
+        assert settled is not None
+        assert settled.state is PendingState.CANCELLED
+        assert settled.reason == "stale-guard:requireMatch"
+        rec = h.audit.records[-1]
+        assert rec.consumption is not None and rec.consumption["state"] == "released"
 
     def test_agent_view_redacts_evidence_but_audit_keeps_lineage(self) -> None:
         from stonefold_core import agent_view

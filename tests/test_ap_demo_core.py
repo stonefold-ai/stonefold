@@ -54,6 +54,18 @@ def test_g1_happy_path_pays(bundle: APBundle) -> None:
     assert payments[0]["payee_id"] == "PE-ACME-SUP"
 
 
+def test_g1_resubmitted_invoice_holds_after_consumption(bundle: APBundle) -> None:
+    # the RFC §14.4 beat no v0.5 gate could produce: the paid invoice's PO line
+    # is consumed, so the SAME invoice resubmitted matches nothing and lands in
+    # the AP clerk's queue (onNoMatch: hold) instead of paying twice.
+    assert _pay(bundle, _acme_800()).decision is Decision.ALLOW
+    assert bundle.drain() == 1
+    again = _pay(bundle, _acme_800())
+    assert again.decision is Decision.HOLD
+    assert again.reason_code == "no-match"
+    assert len(bundle.ledger.payments()) == 1  # type: ignore[attr-defined]
+
+
 def test_g1_dispatch_is_idempotent(bundle: APBundle) -> None:
     _pay(bundle, _acme_800())
     assert bundle.drain() == 1
@@ -179,13 +191,18 @@ def test_g3_reject_never_pays(bundle: APBundle) -> None:
 
 # --- E1 kill turns subsequent actions into HALT --------------------------------
 def test_e1_session_kill_halts(bundle: APBundle) -> None:
-    # pre-kill action allowed
+    # pre-kill action allowed (staged; its PO line is now reserved, CS-035)
     assert _pay(bundle, _acme_800(), session="live").decision is Decision.ALLOW
     bundle.issue_kill(KillScope.for_session("live"), issued_by="operator")
     after = _pay(bundle, _acme_800(), session="live")
     assert after.decision is Decision.HALT
-    # a different session is unaffected
-    assert _pay(bundle, _acme_800(), session="other").decision is Decision.ALLOW
+    # a different session is unaffected by the KILL — but the same invoice's PO
+    # line is already claimed by the first session's staged payment, so the
+    # resubmission no-matches and holds for the AP clerk (v0.6, never a second
+    # payment against one line). Not HALT is the kill-scoping property.
+    other = _pay(bundle, _acme_800(), session="other")
+    assert other.decision is Decision.HOLD
+    assert other.reason_code == "no-match"
 
 
 # --- identity comes from the directory, not the body (invariant 3) -------------

@@ -45,6 +45,7 @@ from stonefold_core import (
 )
 from stonefold_core.feedback import agent_view, agent_view_batch
 from stonefold_core.freshness import FreshnessConfig
+from stonefold_core.obligation import ObligationRegistry
 from stonefold_core.scope import ScopeResolver
 
 
@@ -68,6 +69,7 @@ class Gateway:
         env: RequestEnv | None = None,
         env_factory: Callable[[RawCall], RequestEnv] | None = None,
         freshness: FreshnessConfig | None = None,
+        obligations: Mapping[str, ObligationRegistry] | None = None,
         agent: str = "unknown",
     ) -> None:
         self._registry = registry
@@ -90,6 +92,9 @@ class Gateway:
         # Decision freshness (v0.4 CS-017), opt-in: with a config every staged
         # effect gets a TTL stamped from the request env's clock.
         self._freshness = freshness
+        # v0.6 (CS-035): the obligation-registry adapters the commit phase
+        # reserves/consumes from — the same map the gate engine matches against.
+        self._obligations = obligations
         self._agent = policy.agent if policy is not None else agent
 
     @property
@@ -131,6 +136,7 @@ class Gateway:
             outbox=self._outbox,
             kill=self._kill,
             freshness=self._freshness,
+            obligations=self._obligations,
             agent=self._agent,
         )
         return agent_view(result)
@@ -178,6 +184,7 @@ class Gateway:
                 outbox=self._outbox,
                 kill=self._kill,
                 freshness=self._freshness,
+                obligations=self._obligations,
                 agent=self._agent,
             )
         )

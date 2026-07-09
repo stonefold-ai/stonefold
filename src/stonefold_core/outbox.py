@@ -25,6 +25,7 @@ from dataclasses import replace
 
 from stonefold_core.enums import Decision
 from stonefold_core.gating import ApprovalSpec, ReleaseContract, contract_from_approval
+from stonefold_core.obligation import ObligationClaim
 from stonefold_core.models import (
     Actor,
     AuditRecord,
@@ -86,6 +87,11 @@ class PendingAction(BaseModel):
     # synthesises the legacy single contract from ``approval`` in that case.
     releases: tuple[ReleaseContract, ...] = ()
     compensation: Compensation | None = None
+    # v0.6 (CS-035): the reservation this row holds against its matched
+    # obligation — reserved before the staging commit returned, liveness-checked
+    # at the dispatch claim, consumed at settle, released on any terminal
+    # non-success. ``None`` when no requireMatch gate matched (or consume: none).
+    obligation: ObligationClaim | None = None
     result: dict[str, Any] | None = None  # connector result on settle
     reason: str | None = None  # why cancelled/failed
     # Decision TTL (v0.4 CS-017): the staging-time expiry. A row claimed at or
@@ -217,6 +223,12 @@ def cancellation_record(row: PendingAction, reason: str) -> AuditRecord:
         result=result,
         outcome="cancelled",
         approval=releases_audit(row, "cancelled"),
+        # CS-035/CS-037: a cancelled row's reservation is released — the
+        # worker's reconcile sweep guarantees it (idempotent), so the settle
+        # record states the lifecycle outcome.
+        consumption=(
+            row.obligation.audit_dict("released") if row.obligation is not None else None
+        ),
     )
 
 
@@ -240,6 +252,7 @@ class OutboxStore(Protocol):
         compensation: Compensation | None = None,
         expires_at: datetime | None = None,
         staged_at: datetime | None = None,
+        obligation: ObligationClaim | None = None,
     ) -> PendingAction:
         """Persist a new staged row and return it (with generated id + key).
 

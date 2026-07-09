@@ -20,6 +20,7 @@ from typing import Any
 
 from stonefold_core.gating import ApprovalSpec, ReleaseContract
 from stonefold_core.models import Actor, AuditRecord, Compensation, GateResult, ResolvedAction
+from stonefold_core.obligation import ObligationClaim
 from stonefold_core.outbox import (
     ApprovalError,
     KillCheck,
@@ -94,12 +95,13 @@ class PostgresOutboxStore:
         compensation: Compensation | None = None,
         expires_at: datetime | None = None,
         staged_at: datetime | None = None,
+        obligation: ObligationClaim | None = None,
     ) -> PendingAction:
         row = build_pending(
             resolved=resolved, actor=actor, session_id=session_id, agent=agent,
             state=state, correlation_id=correlation_id, gates=gates,
             approval=approval, releases=releases, compensation=compensation,
-            expires_at=expires_at, staged_at=staged_at,
+            expires_at=expires_at, staged_at=staged_at, obligation=obligation,
         )
         with self._conn.transaction(), self._conn.cursor() as cur:
             cur.execute(
