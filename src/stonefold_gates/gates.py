@@ -10,12 +10,15 @@ design §10/§12). ``failureMode: open`` flips the content-hook case to pass.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from stonefold_core.condition import ConditionRuntimeError, MissingValueError
+from stonefold_core.enums import Outcome
 from stonefold_core.models import GateResult
 from stonefold_core.policy import FailureMode
 from stonefold_gates.base import (
+    CheckResult,
     GateContext,
     failed,
     held,
@@ -27,6 +30,8 @@ from stonefold_gates.base import (
     window_seconds,
 )
 from stonefold_gates.content import HookError
+
+logger = logging.getLogger("stonefold.gates")
 
 _WEEKDAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 
@@ -87,25 +92,82 @@ def check_from_states(from_states: Any, gctx: GateContext) -> GateResult:
     return failed("precondition", f"state {current!r} not in from-states {allowed}")
 
 
-def _run_named_check(name: str, gctx: GateContext) -> bool:
-    """Run a registered precondition check. POC convention (STONEFOLD-AMBIGUITY,
-    RFC §7.6): with no registered implementation the check passes iff the call
-    carries a boolean flag of the same name set ``true`` — deterministic and
-    test-drivable; a real deployment registers code here."""
+def _run_named_check(name: str, gctx: GateContext) -> CheckResult:
+    """Run a registered precondition check, normalised to the three-valued
+    ``CheckResult`` (RFC §7.6, CS-026). A plain-``bool`` check stays valid.
+    POC convention (STONEFOLD-AMBIGUITY, RFC §7.6): with no registered
+    implementation the check passes iff the call carries a boolean flag of the
+    same name set ``true`` — deterministic and test-drivable; a real deployment
+    registers code here."""
     check = gctx.preconditions.get(name)
     if check is not None:
-        return check(gctx)
-    return gctx.resolved.data.get(name) is True
+        result = check(gctx)
+        if isinstance(result, CheckResult):
+            return result
+        return CheckResult(Outcome.PASS if result else Outcome.FAIL)
+    passes = gctx.resolved.data.get(name) is True
+    return CheckResult(Outcome.PASS if passes else Outcome.FAIL)
+
+
+def _run_checks(gate: str, names: list[Any], gctx: GateContext) -> GateResult:
+    """Shared check-runner for ``precondition``/``emissionControl`` (CS-026).
+
+    Verdict composition within one gate: any FAIL wins (a cheap deterministic
+    refusal beats a human interruption); else the first HOLD holds; else pass.
+    Guardrails enforced here, not left to check authors' goodwill: a crash is a
+    dependency failure under §10 (fail-closed unless ``failureMode: open``),
+    never a hold; a hold without a machine-readable reason code is a check
+    implementation error — resolved fail-closed, logged loudly.
+    """
+    first_hold: tuple[str, CheckResult] | None = None
+    for raw in names:
+        name = str(raw)
+        try:
+            result = _run_named_check(name, gctx)
+        except Exception as exc:  # crash ⇒ dependency failure, NEVER a hold (I5)
+            if gctx.failure_mode is FailureMode.OPEN:
+                continue
+            return failed(gate, f"fail-closed: {name} errored: {exc}", source=name)
+        if result.outcome is Outcome.FAIL:
+            return failed(
+                gate,
+                f"{name} not satisfied",
+                code=result.code,
+                source=name,
+            )
+        if result.outcome is Outcome.HOLD:
+            if not result.code:
+                # CS-026 rule 2 / I4: an uninformative interruption is worse
+                # than a deny — treat as an implementation error, fail closed.
+                logger.error(
+                    "check %r returned hold without a reason code (CS-026); "
+                    "resolving fail-closed", name,
+                )
+                return failed(
+                    gate, f"fail-closed: {name} held without a reason code", source=name
+                )
+            if first_hold is None:
+                first_hold = (name, result)
+    if first_hold is not None:
+        name, result = first_hold
+        return held(
+            gate,
+            f"{name}: {result.code}",
+            code=result.code,
+            source=name,
+            evidence=dict(result.evidence) if result.evidence is not None else None,
+        )
+    return passed(gate)
 
 
 def precondition(cfg: Any, gctx: GateContext) -> GateResult:
     if isinstance(cfg, dict) and "from" in cfg:
         return check_from_states(cfg["from"], gctx)
-    names = cfg if isinstance(cfg, list) else [cfg]
-    for name in names:
-        if not _run_named_check(str(name), gctx):
-            return failed("precondition", f"{name} not satisfied")
-    return passed("precondition")
+    if isinstance(cfg, dict):
+        names = list(cfg.get("checks", []))
+    else:
+        names = cfg if isinstance(cfg, list) else [cfg]
+    return _run_checks("precondition", names, gctx)
 
 
 # --- 7. contentCheck -----------------------------------------------------
@@ -258,10 +320,23 @@ def _disclosure_decide(cfg: Any, sink: str | None, withheld: str | None = None) 
 
 # --- 13. emissionControl -------------------------------------------------
 def emission_control(cfg: Any, gctx: GateContext) -> GateResult:
-    checks = cfg.get("precondition", []) if isinstance(cfg, dict) else []
-    for name in checks:
-        if not _run_named_check(str(name), gctx):
-            return failed("emissionControl", f"deconfliction failed: {name}")
+    # RFC §7.13 / CS-011: the gate's check list is spelled ``checks:``. The
+    # previous read of a ``precondition:`` key (never legal syntax) silently
+    # skipped every declared check — fixed in v0.6 alongside CS-026; the legacy
+    # key is still honoured so no deployed config loosens.
+    checks: list[Any] = []
+    if isinstance(cfg, dict):
+        checks = list(cfg.get("checks") or cfg.get("precondition") or [])
+    result = _run_checks("emissionControl", checks, gctx)
+    if result.outcome is not Outcome.PASS:
+        if result.outcome is Outcome.FAIL and result.source:
+            return failed(
+                "emissionControl",
+                f"deconfliction failed: {result.source}",
+                code=result.code,
+                source=result.source,
+            )
+        return result
     if isinstance(cfg, dict) and cfg.get("holdForAuthorization"):
         if gctx.resolved.data.get("emissionAuthorized") is not True:
             return held("emissionControl", "awaiting emission authorization")

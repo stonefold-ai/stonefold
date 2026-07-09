@@ -18,16 +18,16 @@ import json
 from datetime import datetime
 from typing import Any
 
-from stonefold_core.gating import ApprovalSpec
+from stonefold_core.gating import ApprovalSpec, ReleaseContract
 from stonefold_core.models import Actor, AuditRecord, Compensation, GateResult, ResolvedAction
 from stonefold_core.outbox import (
     ApprovalError,
     KillCheck,
     PendingAction,
     PendingState,
-    SelfApprovalError,
     StaleCheck,
     UnknownTicketError,
+    apply_release,
     cancellation_record,
 )
 from stonefold_store.outbox_memory import build_pending
@@ -90,13 +90,15 @@ class PostgresOutboxStore:
         correlation_id: str | None = None,
         gates: tuple[GateResult, ...] = (),
         approval: ApprovalSpec | None = None,
+        releases: tuple[ReleaseContract, ...] = (),
         compensation: Compensation | None = None,
         expires_at: datetime | None = None,
     ) -> PendingAction:
         row = build_pending(
             resolved=resolved, actor=actor, session_id=session_id, agent=agent,
             state=state, correlation_id=correlation_id, gates=gates,
-            approval=approval, compensation=compensation, expires_at=expires_at,
+            approval=approval, releases=releases, compensation=compensation,
+            expires_at=expires_at,
         )
         with self._conn.transaction(), self._conn.cursor() as cur:
             cur.execute(
@@ -191,21 +193,14 @@ class PostgresOutboxStore:
                 self._write_audit(cur, audit)  # same transaction as the settle
         return settled
 
-    def approve(self, action_id: str, approver_id: str) -> PendingAction:
+    def approve(
+        self, action_id: str, approver_id: str, *, gate: str | None = None
+    ) -> PendingAction:
         with self._conn.transaction(), self._conn.cursor() as cur:
             row = self._lock(cur, action_id)
-            if row.state is not PendingState.PENDING_APPROVAL:
-                raise ApprovalError(f"{action_id} is {row.state.value}, not awaiting approval")
-            spec = row.approval or ApprovalSpec()
-            if (spec.dual_auth or spec.distinct_from_actor) and approver_id == row.actor.id:
-                raise SelfApprovalError(f"{approver_id} cannot approve its own action")
-            approvals = tuple(sorted(set(row.approvals) | {approver_id}))
-            new_state = (
-                PendingState.PENDING
-                if len(approvals) >= spec.quorum
-                else PendingState.PENDING_APPROVAL
-            )
-            updated = row.model_copy(update={"approvals": approvals, "state": new_state})
+            # CS-027: shared, pure release logic — every contract must be
+            # satisfied; the FOR UPDATE lock serialises concurrent releases.
+            updated = apply_release(row, approver_id, gate=gate)
             self._write(cur, updated)
         return updated
 

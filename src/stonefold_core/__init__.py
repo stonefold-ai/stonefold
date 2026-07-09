@@ -59,7 +59,13 @@ from stonefold_core.condition import (
     parse_and_validate,
     validate as validate_condition,
 )
-from stonefold_core.gating import ApprovalSpec, GateEngine, GateOutcome, RequestEnv
+from stonefold_core.gating import (
+    ApprovalSpec,
+    GateEngine,
+    GateOutcome,
+    ReleaseContract,
+    RequestEnv,
+)
 from stonefold_core.connector import (
     SCOPE_LOST,
     Connector,
@@ -200,6 +206,7 @@ __all__ = [
     "GateOutcome",
     "RequestEnv",
     "ApprovalSpec",
+    "ReleaseContract",
     # outbox seam
     "OutboxStore",
     "PendingAction",

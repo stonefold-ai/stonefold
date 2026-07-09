@@ -19,7 +19,7 @@ The worker depends only on ``stonefold_core`` protocols (``OutboxStore``,
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from stonefold_core.audit import build_record
 from stonefold_core.digest import DIGEST_MISMATCH, digest_matches
@@ -37,7 +37,16 @@ from stonefold_core.enums import Decision, Reversibility
 from stonefold_core.freshness import STALE_DECISION, DispatchRevalidator, stale_guard_reason
 from stonefold_core.kill import KillStore, KillTarget
 from stonefold_core.models import AuditRecord, EvalResult, RawCall, ResolvedAction, Session
-from stonefold_core.outbox import KillCheck, OutboxStore, PendingAction, PendingState
+from stonefold_core.outbox import (
+    KillCheck,
+    OutboxStore,
+    PendingAction,
+    PendingState,
+    cancellation_record,
+    effective_contracts,
+    expired_hold_reason,
+    releases_audit,
+)
 from stonefold_core.registry import Registry
 from stonefold_core.scope import ScopePredicate, ScopeResolver
 from stonefold_store.inflight import InFlightCall, InFlightRegistry
@@ -108,8 +117,54 @@ class DispatchWorker:
                 return stale_guard_reason(failing.gate)
         return None
 
+    def sweep_expired_holds(self) -> int:
+        """Expire lapsed held rows (v0.6 CS-028) — run with the worker's loop.
+
+        A held row expires at the earlier of (a) its staging TTL and (b) any
+        unsatisfied contract's declared ``timeout``. Expiry settles
+        ``CANCELLED``/``expired-hold:<gate>``, audited, with the original hold
+        reason code preserved in the ``gates`` trace. ``onTimeout: allow``
+        satisfies **that contract only** (credited as ``system:timeout``); the
+        row promotes iff every other contract is also satisfied (CS-027).
+        Returns the number of rows acted on.
+        """
+        now = self._clock() if self._clock is not None else datetime.now(timezone.utc)
+        handled = 0
+        for row in self._store.list_by_state(PendingState.PENDING_APPROVAL):
+            contracts = effective_contracts(row)
+            if row.expires_at is not None and now >= row.expires_at:
+                gate = next(
+                    (c.gate for c in contracts if not c.satisfied), contracts[0].gate
+                )
+                self._cancel_hold(row, expired_hold_reason(gate))
+                handled += 1
+                continue
+            for contract in contracts:
+                if contract.satisfied or contract.timeout_s is None:
+                    continue
+                deadline = row.created_at + timedelta(seconds=contract.timeout_s)
+                if now < deadline:
+                    continue
+                if contract.on_timeout == "allow":
+                    self._store.approve(row.id, "system:timeout", gate=contract.gate)
+                else:
+                    self._cancel_hold(row, expired_hold_reason(contract.gate))
+                handled += 1
+                break
+        return handled
+
+    def _cancel_hold(self, row: PendingAction, reason: str) -> None:
+        self._store.settle(
+            row.id,
+            state=PendingState.CANCELLED,
+            reason=reason,
+            audit=cancellation_record(row, reason),
+        )
+
     def run_once(self, kill_check: KillCheck | None = None) -> bool:
         """Process at most one staged row. Returns ``True`` if one was handled."""
+        self.sweep_expired_holds()  # CS-028: the worker's loop is the sweep
+
         check: KillCheck | None = kill_check
         if check is None and self._kill is not None:
             check = self._default_kill_check
@@ -322,4 +377,6 @@ class DispatchWorker:
             result=result,
             outcome=outcome,
             result_refs=result_refs,
+            # I7 (CS-027): the settle record carries who released which contract.
+            approval=releases_audit(row, "released"),
         )

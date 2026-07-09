@@ -124,13 +124,23 @@ class Session(BaseModel):
 
 
 class GateResult(BaseModel):
-    """The result of evaluating one gate (design §2)."""
+    """The result of evaluating one gate (design §2).
+
+    v0.6 (CS-026/CS-029): a deny/hold additionally carries a machine-readable
+    ``code``; ``source`` names the registered check/hook that produced the
+    verdict (empty for the gate's own logic); ``evidence`` is optional
+    check-supplied context for the human resolving a hold. All additive —
+    pre-v0.6 records validate unchanged.
+    """
 
     model_config = ConfigDict(frozen=True)
 
     gate: str
     outcome: Outcome
     reason: str = ""
+    code: str = ""
+    source: str = ""
+    evidence: dict[str, Any] | None = None
 
 
 class EvalResult(BaseModel):

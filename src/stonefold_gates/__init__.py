@@ -7,7 +7,14 @@ the engine is injected into ``enforce`` through ``stonefold_core.gating.GateEngi
 
 from __future__ import annotations
 
-from stonefold_gates.base import GateContext, PreconditionCheck
+from stonefold_gates.base import (
+    CheckResult,
+    GateContext,
+    PreconditionCheck,
+    check_fail,
+    check_hold,
+    check_pass,
+)
 from stonefold_gates.content import (
     ContentHookRegistry,
     HookError,
@@ -23,6 +30,10 @@ __all__ = [
     "build_eval_context",
     "GateContext",
     "PreconditionCheck",
+    "CheckResult",
+    "check_pass",
+    "check_fail",
+    "check_hold",
     "ContentHookRegistry",
     "HookError",
     "HookTimeout",

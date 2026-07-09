@@ -45,7 +45,9 @@ class RequestEnv:
 class ApprovalSpec:
     """What a HOLD needs to be released by a human (RFC §7.8/§7.9). Derived from
     the holding gate's config and carried to the outbox so the staged row knows
-    how many distinct approvals it requires."""
+    how many distinct approvals it requires. v0.6 (CS-027) generalises this into
+    ``ReleaseContract`` — one per holding gate; ``ApprovalSpec`` remains for
+    pre-v0.6 rows and callers."""
 
     quorum: int = 1
     dual_auth: bool = False
@@ -56,16 +58,77 @@ class ApprovalSpec:
 
 
 @dataclass(frozen=True)
+class ReleaseContract:
+    """What ONE holding gate demands before the staged row may promote
+    (RFC §12, CS-027). A held row carries one contract per holding gate and
+    promotes only when every contract is satisfied — satisfying one never
+    satisfies another. ``satisfied_by`` records the identities credited so far
+    (a human approver/resolver, or ``system:timeout`` for ``onTimeout: allow``,
+    CS-028)."""
+
+    gate: str  # the holding gate key, e.g. "requireApproval", "precondition"
+    cause: str = ""  # audit cause, e.g. "precondition:matchesOpenPurchaseOrder"
+    quorum: int = 1
+    dual_auth: bool = False
+    distinct_from_actor: bool = False
+    approvers: tuple[str, ...] = ()  # approver/resolver role names (identity seam)
+    timeout_s: float | None = None
+    on_timeout: str = "deny"  # "deny" (default) | "allow"
+    reason_code: str = ""  # the hold's machine-readable code (CS-026 rule 2)
+    evidence: dict[str, Any] | None = None  # optional check-supplied context
+    satisfied_by: tuple[str, ...] = ()
+
+    @property
+    def satisfied(self) -> bool:
+        return len(self.satisfied_by) >= self.quorum
+
+    def audit_dict(self) -> dict[str, Any]:
+        """The RFC §11 rendering of this contract (one entry of ``releases``)."""
+        return {
+            "gate": self.gate,
+            "cause": self.cause or self.gate,
+            "quorum": self.quorum,
+            "dualAuthorization": self.dual_auth,
+            "approvers": list(self.approvers),
+            "timeoutSeconds": self.timeout_s,
+            "onTimeout": self.on_timeout,
+            "reasonCode": self.reason_code,
+            "evidence": self.evidence,
+            "satisfiedBy": list(self.satisfied_by),
+            "satisfied": self.satisfied,
+        }
+
+
+def contract_from_approval(spec: ApprovalSpec) -> ReleaseContract:
+    """Adapt a pre-v0.6 ``ApprovalSpec`` row to the contract model (CS-027
+    compatibility: legacy held rows keep their exact release semantics)."""
+    gate = "dualAuthorization" if spec.dual_auth else "requireApproval"
+    return ReleaseContract(
+        gate=gate,
+        cause=gate,
+        quorum=spec.quorum,
+        dual_auth=spec.dual_auth,
+        distinct_from_actor=spec.distinct_from_actor,
+        approvers=spec.approvers,
+        timeout_s=spec.timeout_s,
+        on_timeout=spec.on_timeout,
+    )
+
+
+@dataclass(frozen=True)
 class GateOutcome:
     """The gate stage's verdict: PASS ⇒ ALLOW, FAIL ⇒ DENY, HOLD ⇒ HOLD
     (RFC §12 step 4). ``results`` is the per-gate trace for the audit record;
-    ``approval`` is set when the HOLD came from an approval gate."""
+    ``releases`` carries the release contract of EVERY holding gate (CS-027);
+    ``approval`` mirrors the first approval-shaped contract for pre-v0.6
+    consumers."""
 
     outcome: Outcome
     results: tuple[GateResult, ...] = ()
     reason: str = ""
     ticket: str | None = None
     approval: "ApprovalSpec | None" = None
+    releases: tuple[ReleaseContract, ...] = ()
 
 
 class GateEngine(Protocol):

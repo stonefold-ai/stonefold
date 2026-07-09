@@ -10,16 +10,16 @@ from datetime import datetime, timezone
 from typing import Any
 
 from stonefold_core.audit import AuditSink
-from stonefold_core.gating import ApprovalSpec
+from stonefold_core.gating import ApprovalSpec, ReleaseContract
 from stonefold_core.models import Actor, AuditRecord, Compensation, GateResult, ResolvedAction
 from stonefold_core.outbox import (
     ApprovalError,
     KillCheck,
     PendingAction,
     PendingState,
-    SelfApprovalError,
     StaleCheck,
     UnknownTicketError,
+    apply_release,
     cancellation_record,
 )
 
@@ -40,6 +40,7 @@ def build_pending(
     approval: ApprovalSpec | None,
     compensation: Compensation | None,
     expires_at: datetime | None = None,
+    releases: tuple[ReleaseContract, ...] = (),
 ) -> PendingAction:
     """Construct a staged row with generated id + idempotency key. id/clock
     generation lives here (the I/O layer), not in the pure pipeline (invariant 1)."""
@@ -55,6 +56,7 @@ def build_pending(
         correlation_id=correlation_id,
         gates=gates,
         approval=approval,
+        releases=releases,
         compensation=compensation,
         expires_at=expires_at,
         created_at=now,
@@ -81,13 +83,15 @@ class InMemoryOutboxStore:
         correlation_id: str | None = None,
         gates: tuple[GateResult, ...] = (),
         approval: ApprovalSpec | None = None,
+        releases: tuple[ReleaseContract, ...] = (),
         compensation: Compensation | None = None,
         expires_at: datetime | None = None,
     ) -> PendingAction:
         row = build_pending(
             resolved=resolved, actor=actor, session_id=session_id, agent=agent,
             state=state, correlation_id=correlation_id, gates=gates,
-            approval=approval, compensation=compensation, expires_at=expires_at,
+            approval=approval, releases=releases, compensation=compensation,
+            expires_at=expires_at,
         )
         self._rows[row.id] = row
         self._order.append(row.id)
@@ -150,19 +154,13 @@ class InMemoryOutboxStore:
             self._audit.write(audit)
         return settled
 
-    def approve(self, action_id: str, approver_id: str) -> PendingAction:
+    def approve(
+        self, action_id: str, approver_id: str, *, gate: str | None = None
+    ) -> PendingAction:
         row = self._require(action_id)
-        if row.state is not PendingState.PENDING_APPROVAL:
-            raise ApprovalError(f"{action_id} is {row.state.value}, not awaiting approval")
-        spec = row.approval or ApprovalSpec()
-        if (spec.dual_auth or spec.distinct_from_actor) and approver_id == row.actor.id:
-            raise SelfApprovalError(f"{approver_id} cannot approve its own action")
-        approvals = tuple(sorted(set(row.approvals) | {approver_id}))
-        new_state = (
-            PendingState.PENDING if len(approvals) >= spec.quorum else PendingState.PENDING_APPROVAL
-        )
-        updated = row.model_copy(
-            update={"approvals": approvals, "state": new_state, "updated_at": _now()}
+        # CS-027: shared, pure release logic — every contract must be satisfied.
+        updated = apply_release(row, approver_id, gate=gate).model_copy(
+            update={"updated_at": _now()}
         )
         self._rows[action_id] = updated
         return updated

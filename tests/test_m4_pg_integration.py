@@ -257,3 +257,52 @@ def test_approval_release_over_postgres(container: PostgresContainer) -> None:
     assert worker.drain() == 1
     assert _state(store, held.id) is PendingState.DONE
     conn.close()
+
+
+def test_multi_contract_release_over_postgres(container: PostgresContainer) -> None:
+    """v0.6 CS-027: a row held by TWO gates promotes only when both contracts
+    are satisfied — the JSONB round-trip preserves the contracts, and the
+    shared ``apply_release`` runs under the row's FOR UPDATE lock."""
+    conn = _connect(container)
+    _truncate(conn)
+    store = PostgresOutboxStore(conn)
+    effect_conn = InMemoryConnector()
+    worker = DispatchWorker(store, Connectors({"in_memory": effect_conn}), registry=full_registry())
+
+    from stonefold_core import ReleaseContract
+
+    held = store.stage(
+        resolved=_resolve("Prescribing", "prescribe", {"drug": "X"}),
+        actor=Actor(id="alice"),
+        session_id="s1",
+        agent="rx",
+        state=PendingState.PENDING_APPROVAL,
+        releases=(
+            ReleaseContract(
+                gate="precondition", cause="precondition:matchesActiveOrder",
+                approvers=("role:pharmacist",), reason_code="multiple-candidates",
+            ),
+            ReleaseContract(
+                gate="dualAuthorization", cause="dualAuthorization",
+                quorum=2, dual_auth=True, distinct_from_actor=True,
+                approvers=("role:clinician",),
+            ),
+        ),
+    )
+    # the actor can resolve the ambiguity contract but never promote alone (R1)
+    store.approve(held.id, "alice")
+    assert _state(store, held.id) is PendingState.PENDING_APPROVAL
+    store.approve(held.id, "dr-house", gate="dualAuthorization")
+    assert _state(store, held.id) is PendingState.PENDING_APPROVAL
+    store.approve(held.id, "dr-wilson", gate="dualAuthorization")
+    assert _state(store, held.id) is PendingState.PENDING
+
+    reloaded = store.get(held.id)
+    assert reloaded is not None
+    by_gate = {c.gate: c for c in reloaded.releases}
+    assert by_gate["precondition"].satisfied_by == ("alice",)
+    assert set(by_gate["dualAuthorization"].satisfied_by) == {"dr-house", "dr-wilson"}
+
+    assert worker.drain() == 1
+    assert _state(store, held.id) is PendingState.DONE
+    conn.close()

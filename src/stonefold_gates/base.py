@@ -31,7 +31,36 @@ from stonefold_store import CounterStore
 # as a very long sliding window so one mechanism serves both forms.
 SESSION_WINDOW_S: float = 10.0 * 365 * 24 * 3600
 
-PreconditionCheck = Callable[["GateContext"], bool]
+
+@dataclass(frozen=True)
+class CheckResult:
+    """The three-valued result of a registered precondition check (RFC §7.6,
+    v0.6 CS-026): pass / fail(code) / hold(code, evidence). ``hold`` is legal
+    only for successfully-read, judgment-shaped ambiguity and MUST carry a
+    reason code — the gate resolves a code-less hold to fail-closed FAIL
+    (implementation error). A check may still return a plain ``bool``: the
+    two-valued form stays valid indefinitely (opt-in per check)."""
+
+    outcome: Outcome
+    code: str = ""
+    evidence: dict[str, Any] | None = None
+
+
+def check_pass() -> CheckResult:
+    return CheckResult(Outcome.PASS)
+
+
+def check_fail(code: str = "") -> CheckResult:
+    return CheckResult(Outcome.FAIL, code=code)
+
+
+def check_hold(code: str, evidence: dict[str, Any] | None = None) -> CheckResult:
+    return CheckResult(Outcome.HOLD, code=code, evidence=evidence)
+
+
+# A registered check returns a plain bool (two-valued, pre-v0.6) or a
+# CheckResult (three-valued, CS-026). The gate normalises both.
+PreconditionCheck = Callable[["GateContext"], "bool | CheckResult"]
 
 
 @dataclass(frozen=True)
@@ -59,12 +88,22 @@ def passed(gate: str, reason: str = "") -> GateResult:
     return GateResult(gate=gate, outcome=Outcome.PASS, reason=reason)
 
 
-def failed(gate: str, reason: str) -> GateResult:
-    return GateResult(gate=gate, outcome=Outcome.FAIL, reason=reason)
+def failed(gate: str, reason: str, *, code: str = "", source: str = "") -> GateResult:
+    return GateResult(gate=gate, outcome=Outcome.FAIL, reason=reason, code=code, source=source)
 
 
-def held(gate: str, reason: str) -> GateResult:
-    return GateResult(gate=gate, outcome=Outcome.HOLD, reason=reason)
+def held(
+    gate: str,
+    reason: str,
+    *,
+    code: str = "",
+    source: str = "",
+    evidence: dict[str, Any] | None = None,
+) -> GateResult:
+    return GateResult(
+        gate=gate, outcome=Outcome.HOLD, reason=reason, code=code, source=source,
+        evidence=evidence,
+    )
 
 
 # --- value resolution ----------------------------------------------------

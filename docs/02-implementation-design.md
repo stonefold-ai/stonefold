@@ -153,7 +153,7 @@ Each gate is a small deterministic function `GateResult eval(ResolvedAction, Act
 | `valueLimit` | none (stateless) | read `data.field`, compare | in-memory |
 | `spendLimit` | Redis accumulator per session | add estimated cost, compare | ~1 op |
 | `allowlist`/`denylist` | named sets cached in memory (refreshed) | set membership on `data.field` | in-memory |
-| `precondition` | registry (transition from-states) + registered check fns | call check(s); transition: read current state, test ∈ from | 0–1 read |
+| `precondition` | registry (transition from-states) + registered check fns | call check(s) — three-valued since v0.6 CS-026 (pass/fail/hold; bool stays valid; crash ⇒ fail, code-less hold ⇒ fail); transition: read current state, test ∈ from | 0–1 read |
 | `contentCheck` | external hook (DLP svc) | sync call, deterministic verdict pass/block | network call |
 | `requireApproval` | DB (approval request) | returns HOLD; resolved out-of-band (§7) | 1 DB write |
 | `dualAuthorization` | DB (2 approvals, distinct ids) | returns HOLD until 2 distinct approve | DB |

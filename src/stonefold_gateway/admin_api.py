@@ -39,6 +39,9 @@ class ReplayableAudit(Protocol):
 
 class ApproverBody(BaseModel):
     approver: str
+    # v0.6 (CS-027): target one release contract by its gate key (e.g.
+    # "precondition"); None credits every contract the identity may satisfy.
+    gate: str | None = None
 
 
 def create_admin_router(*, audit: ReplayableAudit, outbox: OutboxStore) -> APIRouter:
@@ -56,7 +59,7 @@ def create_admin_router(*, audit: ReplayableAudit, outbox: OutboxStore) -> APIRo
     @router.post("/approvals/{action_id}/approve")
     def approve(action_id: str, body: ApproverBody) -> dict[str, Any]:
         try:
-            row = outbox.approve(action_id, body.approver)
+            row = outbox.approve(action_id, body.approver, gate=body.gate)
         except SelfApprovalError as exc:
             raise HTTPException(status_code=409, detail=str(exc))
         except UnknownTicketError:

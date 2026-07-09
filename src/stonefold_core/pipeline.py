@@ -35,7 +35,7 @@ from stonefold_core.digest import DIGEST_MISMATCH, pinned_connector_mismatch
 from stonefold_core.enums import Decision, Kind, Outcome
 from stonefold_core.failure import Unavailable, guard, should_fail_closed
 from stonefold_core.freshness import FreshnessConfig
-from stonefold_core.gating import ApprovalSpec, GateEngine, RequestEnv
+from stonefold_core.gating import ApprovalSpec, GateEngine, ReleaseContract, RequestEnv
 from stonefold_core.kill import KillStore, KillTarget
 from stonefold_core.models import (
     Actor,
@@ -74,6 +74,8 @@ class _Decided:
     outcome: str = "not_executed"  # audit outcome if refused terminal
     gate_results: tuple[GateResult, ...] = ()
     approval: ApprovalSpec | None = None
+    # v0.6 (CS-027): one release contract per holding gate; all must be satisfied.
+    releases: tuple[ReleaseContract, ...] = ()
     scope_pred: ScopePredicate | None = None
     scope_applied: tuple[str, ...] = ()
 
@@ -338,6 +340,7 @@ def _decide(
             return _Decided(
                 call, resolved, Decision.HOLD, outcome.reason or "gate-hold",
                 gate_results=outcome.results, approval=outcome.approval,
+                releases=outcome.releases,
                 scope_pred=scope_pred, scope_applied=scope_applied,
             )
         gate_trace = outcome.results
@@ -425,6 +428,7 @@ def _commit(
                     agent=agent_name, state=PendingState.PENDING_APPROVAL,
                     correlation_id=session.correlation_id,
                     gates=decided.gate_results, approval=decided.approval,
+                    releases=decided.releases,
                     expires_at=expires_at,
                 ),
                 reason="outbox-unavailable",
@@ -441,7 +445,7 @@ def _commit(
             Decision.HOLD, decided.rule, call, resolved, actor, session, audit,
             agent_name, gate_results=decided.gate_results, ticket=ticket,
             scope_applied=decided.scope_applied,
-            approval=_approval_audit(decided.approval, ticket),
+            approval=_approval_audit(decided.approval, ticket, decided.releases),
         )
 
     # 6. EXECUTE (decision is ALLOW).
@@ -564,26 +568,36 @@ def _staging_expiry(
 
 
 def _approval_audit(
-    spec: "ApprovalSpec | None", ticket: str | None
+    spec: "ApprovalSpec | None",
+    ticket: str | None,
+    releases: tuple[ReleaseContract, ...] = (),
 ) -> dict[str, Any] | None:
-    """Render the approval contract for the audit record (RFC §11 ``approval``).
+    """Render the release contract(s) for the audit record (RFC §11 ``approval``).
 
     A held action records *who* may release it and the quorum/timeout terms, with
-    a ``pending`` status — the eventual approver(s) and outcome are written by the
-    outbox when the row is approved/rejected. ``None`` when no approval applies.
+    a ``pending`` status — the eventual approver(s)/resolver(s) and outcome are
+    written when the row settles. The legacy top-level keys mirror the first
+    contract (pre-v0.6 consumers); ``releases`` lists EVERY holding gate's
+    contract (CS-027), each with its cause, reason code, and evidence (I7).
+    ``None`` when nothing holds the action.
     """
-    if spec is None:
+    if spec is None and not releases:
         return None
-    return {
-        "status": "pending",
-        "ticket": ticket,
-        "quorum": spec.quorum,
-        "dualAuthorization": spec.dual_auth,
-        "distinctFromActor": spec.distinct_from_actor,
-        "approvers": list(spec.approvers),
-        "timeoutSeconds": spec.timeout_s,
-        "onTimeout": spec.on_timeout,
-    }
+    rendered: dict[str, Any] = {"status": "pending", "ticket": ticket}
+    if spec is not None:
+        rendered.update(
+            {
+                "quorum": spec.quorum,
+                "dualAuthorization": spec.dual_auth,
+                "distinctFromActor": spec.distinct_from_actor,
+                "approvers": list(spec.approvers),
+                "timeoutSeconds": spec.timeout_s,
+                "onTimeout": spec.on_timeout,
+            }
+        )
+    if releases:
+        rendered["releases"] = [contract.audit_dict() for contract in releases]
+    return rendered
 
 
 def _terminal(
