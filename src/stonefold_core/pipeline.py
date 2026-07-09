@@ -55,7 +55,12 @@ from stonefold_core.obligation import (
     ReserveOutcome,
     claim_evidence,
 )
-from stonefold_core.outbox import OutboxStore, PendingState
+from stonefold_core.outbox import (
+    OutboxStore,
+    PendingAction,
+    PendingState,
+    hold_dedupe_key,
+)
 from stonefold_core.policy import FailureMode
 from stonefold_core.reasons import classify
 from stonefold_core.registry import Registry, UnknownActionError
@@ -113,6 +118,7 @@ def enforce(
     kill: KillStore | None = None,
     freshness: FreshnessConfig | None = None,
     obligations: Mapping[str, ObligationRegistry] | None = None,
+    dedupe_window_s: float | None = None,
     agent: str = "unknown",
 ) -> EvalResult:
     """Evaluate one attempted action to a terminal, audited decision.
@@ -139,6 +145,7 @@ def enforce(
         decided, actor, session, audit=audit, connectors=connectors,
         outbox=outbox, freshness=freshness, env=env, agent_name=agent_name,
         failure_mode=failure_mode, obligations=obligations,
+        dedupe_window_s=dedupe_window_s,
     )
     return _stamp_feedback(result, decided)
 
@@ -159,6 +166,7 @@ def enforce_batch(
     kill: KillStore | None = None,
     freshness: FreshnessConfig | None = None,
     obligations: Mapping[str, ObligationRegistry] | None = None,
+    dedupe_window_s: float | None = None,
     agent: str = "unknown",
 ) -> BatchResult:
     """Evaluate a SIF batch atomically (RFC §12, CS-023; SIF §5).
@@ -293,6 +301,7 @@ def enforce_batch(
                 d, actor, session, audit=audit, connectors=connectors, outbox=outbox,
                 freshness=freshness, env=env_of(i), agent_name=agent_name,
                 failure_mode=failure_mode, obligations=obligations,
+                dedupe_window_s=dedupe_window_s,
             ),
             d,
         )
@@ -472,6 +481,7 @@ def _commit(
     agent_name: str,
     failure_mode: FailureMode,
     obligations: Mapping[str, ObligationRegistry] | None = None,
+    dedupe_window_s: float | None = None,
 ) -> EvalResult:
     """Step 6/7 for one decided operation: stage/execute, then audit (RFC §12)."""
 
@@ -499,6 +509,32 @@ def _commit(
         ticket = None
         if outbox is not None:
             ob = outbox
+            # v0.6 (CS-031): holds that are the same question collapse — the
+            # same (agent, action, reason code, candidate refs) as an OPEN held
+            # row within the deployment's dedupe window bumps that row's
+            # attempt count instead of queueing a second item. The agent gets
+            # the SAME ticket; the attempt is audited as always. Denies are
+            # cheap; holds spend human attention.
+            duplicate = _find_duplicate_hold(
+                ob, decided, agent_name, env, dedupe_window_s
+            )
+            if duplicate is not None:
+                bumped = guard(
+                    lambda: ob.bump_attempts(duplicate.id),
+                    reason="outbox-unavailable",
+                )
+                if not isinstance(bumped, Unavailable):
+                    return _terminal(
+                        Decision.HOLD, decided.rule, call, resolved, actor,
+                        session, audit, agent_name,
+                        gate_results=decided.gate_results, ticket=duplicate.id,
+                        scope_applied=decided.scope_applied,
+                        outcome="hold-deduped",
+                        approval=_approval_audit(
+                            decided.approval, duplicate.id, decided.releases
+                        ),
+                    )
+                # the bump raced the row's settlement — fall through and stage.
             expiry = _staging_expiry(freshness, env, resolved)
             if isinstance(expiry, Unavailable):
                 return _terminal(
@@ -684,6 +720,39 @@ def _commit(
         Decision.ALLOW, decided.rule, call, resolved, actor, session, audit,
         agent_name, gate_results=gate_trace, scope_applied=decided.scope_applied,
     )
+
+
+def _find_duplicate_hold(
+    outbox: OutboxStore,
+    decided: _Decided,
+    agent_name: str,
+    env: RequestEnv | None,
+    dedupe_window_s: float | None,
+) -> PendingAction | None:
+    """The open held row this hold would duplicate (CS-031), or ``None``.
+
+    Requires the deployment to have configured a dedupe window AND an injected
+    clock (the window is meaningless without one), and only code-bearing holds
+    have a dedupe identity (``hold_dedupe_key``). A store error disables
+    dedupe for this request — a failed collapse degrades to one extra queue
+    item, never to a lost hold.
+    """
+    if dedupe_window_s is None or env is None or env.now is None:
+        return None
+    assert decided.resolved is not None
+    key = hold_dedupe_key(agent_name, decided.resolved, decided.gate_results)
+    if key is None:
+        return None
+    try:
+        rows = outbox.list_by_state(PendingState.PENDING_APPROVAL)
+    except Exception:
+        return None
+    for row in rows:
+        if (env.now - row.created_at).total_seconds() > dedupe_window_s:
+            continue
+        if hold_dedupe_key(row.agent, row.resolved, row.gates) == key:
+            return row
+    return None
 
 
 def _reserve_claim(

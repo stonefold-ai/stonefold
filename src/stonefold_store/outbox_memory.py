@@ -188,6 +188,16 @@ class InMemoryOutboxStore:
         self._rows[action_id] = updated
         return updated
 
+    def bump_attempts(self, action_id: str) -> PendingAction:
+        row = self._require(action_id)
+        if row.state is not PendingState.PENDING_APPROVAL:
+            raise ApprovalError(f"{action_id} is {row.state.value}, not an open hold")
+        updated = row.model_copy(
+            update={"attempts": row.attempts + 1, "updated_at": _now()}
+        )
+        self._rows[action_id] = updated
+        return updated
+
     def _require(self, action_id: str) -> PendingAction:
         row = self._rows.get(action_id)
         if row is None:

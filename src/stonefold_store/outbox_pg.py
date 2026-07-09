@@ -218,6 +218,15 @@ class PostgresOutboxStore:
             self._write(cur, updated)
         return updated
 
+    def bump_attempts(self, action_id: str) -> PendingAction:
+        with self._conn.transaction(), self._conn.cursor() as cur:
+            row = self._lock(cur, action_id)
+            if row.state is not PendingState.PENDING_APPROVAL:
+                raise ApprovalError(f"{action_id} is {row.state.value}, not an open hold")
+            updated = row.model_copy(update={"attempts": row.attempts + 1})
+            self._write(cur, updated)
+        return updated
+
     # --- helpers ---------------------------------------------------------
     def _lock(self, cur: Any, action_id: str) -> PendingAction:
         cur.execute(

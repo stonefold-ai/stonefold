@@ -294,6 +294,9 @@ class ReferenceDriver:
             env_factory=self._env_factory,
             freshness=_TCK_FRESHNESS,  # v0.4 CS-017: TTL stamped at staging
             obligations=self._obligations,  # v0.6 CS-035: reserve at staging
+            # v0.6 CS-031: the REQUIRED TCK dedupe window — one hour, like the
+            # freshness TTLs a fixture semantics the J6 check counts on.
+            dedupe_window_s=3600.0,
             agent=policy.agent,
         )
         # CS-020: the load-time digest gate — a pinned connector that fails

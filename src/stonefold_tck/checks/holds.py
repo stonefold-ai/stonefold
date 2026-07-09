@@ -172,3 +172,32 @@ def j5_outage_fails_never_holds(driver: ConformanceDriver) -> None:
     _seed_targets(driver, PX={"crash": True})
     expect_decision(submit(driver, _pay(500, target="PX")), "deny",
                     "a crashing check (CS-026 rule 1)")
+
+
+@check(
+    "J6",
+    "duplicate holds collapse — one question, one queue item, an attempt count",
+    PROFILE_HOLD,
+    requires=[CAP_HOLD, CAP_STAGING, CAP_AUDIT],
+)
+def j6_duplicate_holds_collapse(driver: ConformanceDriver) -> None:
+    # CS-031: the same (agent, action, reason code, candidate refs) within the
+    # REQUIRED TCK dedupe window (one hour) is the same question wearing a
+    # second disguise — the agent gets the SAME ticket, and each attempt is
+    # still audited.
+    setup(driver, policy=POLICY_HOLD, seed_world=False)
+    _seed_targets(driver, PQ={"hold": True})
+    first = expect_decision(submit(driver, _pay(500, target="PQ")), "hold", "first attempt")
+    ticket = expect_ticket(first, "the held intent")
+    second = expect_decision(
+        submit(driver, _pay(500, target="PQ"), session="tck-s2"), "hold", "second attempt"
+    )
+    expect(
+        second.ticket == ticket,
+        f"the duplicate hold queued a second item ({second.ticket!r}) instead of "
+        f"collapsing into {ticket!r} (CS-031)",
+    )
+    holds = [r for r in driver.audit() if r.decision == "hold"]
+    expect(len(holds) >= 2, "each attempt must still leave its own audit record")
+    driver.dispatch_once()
+    expect(len(driver.effects()) == 0, "a deduped hold must not dispatch anything")

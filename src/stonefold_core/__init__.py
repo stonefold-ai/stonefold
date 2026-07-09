@@ -108,6 +108,7 @@ from stonefold_core.outbox import (
     StaleCheck,
     UnknownTicketError,
     cancellation_record,
+    hold_dedupe_key,
 )
 from stonefold_core.scope import (
     AttributeScope,
@@ -268,6 +269,7 @@ __all__ = [
     "StaleCheck",
     "UnknownTicketError",
     "cancellation_record",
+    "hold_dedupe_key",
     # decision freshness (v0.4 CS-017)
     "FreshnessConfig",
     "DispatchRevalidator",

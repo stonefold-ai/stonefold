@@ -386,6 +386,9 @@ def _build_common(
         # payee sanctioned or an approval granted long ago is caught at claim.
         freshness=FreshnessConfig(),
         obligations=obligation_adapters,
+        # v0.6 CS-031: ten resubmissions of the same unmatched invoice are one
+        # question in the AP clerk's queue, with an attempt count.
+        dedupe_window_s=24 * 3600.0,
     )
     # v0.4 wiring: the worker's clock is the same injected demo clock the
     # decisions use; it re-runs volatile gates inside the claim (CS-017) and

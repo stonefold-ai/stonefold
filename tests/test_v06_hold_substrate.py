@@ -440,3 +440,86 @@ def test_emission_control_runs_declared_checks() -> None:
     assert result.decision is Decision.DENY
     assert result.rule == "gate:emissionControl"
     assert failing.calls == 1
+
+
+# --- CS-031: hold dedupe ------------------------------------------------------
+
+
+def _enforce_dedupe(
+    h: Harness,
+    *,
+    session: str = "s1",
+    now: datetime | None = None,
+    window_s: float | None = 3600.0,
+) -> Any:
+    from stonefold_core import RawCall, enforce
+
+    return enforce(
+        RawCall(resource="Email", action="sendEmail", data={"to": "x@a.example"}),
+        Actor(id="alice"),
+        Session(id=session, correlation_id=session),
+        registry=h.reg,
+        audit=h.audit,
+        policy=h.policy,
+        gates=h.engine,
+        outbox=h.outbox,
+        env=RequestEnv(now=now or T0),
+        freshness=CFG,
+        dedupe_window_s=window_s,
+    )
+
+
+def test_duplicate_holds_collapse_into_one_queue_item() -> None:
+    # CS-031: the same (agent, action, reason code, candidate refs) within the
+    # dedupe window is one question - the agent gets the SAME ticket, the row
+    # counts the attempt, and each attempt still writes its own audit record.
+    check = ScriptedCheck(check_hold("no-open-match", {"candidates": ["PO-9"]}))
+    h = harness(HOLD_GATE, check)
+    first = _enforce_dedupe(h)
+    second = _enforce_dedupe(h, session="s2")
+    assert first.decision is Decision.HOLD and second.decision is Decision.HOLD
+    assert second.ticket == first.ticket
+    assert h.get(first.ticket).attempts == 2
+    holds = [r for r in h.audit.records if r.decision is Decision.HOLD]
+    assert len(holds) == 2
+    assert h.audit.records[-1].outcome == "hold-deduped"
+    # only ONE open queue item exists
+    assert len(h.outbox.list_by_state(PendingState.PENDING_APPROVAL)) == 1
+
+
+def test_approval_holds_never_dedupe() -> None:
+    # an approval-shaped hold carries no reason code: each intent is a DISTINCT
+    # question and must queue separately.
+    check = ScriptedCheck(check_pass())
+    gates = {"requireApproval": {"approvers": "role:manager"}}
+    h = harness(gates, check)
+    first = _enforce_dedupe(h)
+    second = _enforce_dedupe(h, session="s2")
+    assert first.ticket != second.ticket
+    assert len(h.outbox.list_by_state(PendingState.PENDING_APPROVAL)) == 2
+
+
+def test_dedupe_respects_the_window() -> None:
+    check = ScriptedCheck(check_hold("no-open-match"))
+    h = harness(HOLD_GATE, check)
+    first = _enforce_dedupe(h)
+    late = _enforce_dedupe(h, session="s2", now=T0 + timedelta(hours=2))
+    assert late.ticket != first.ticket  # outside the window: a fresh question
+
+
+def test_dedupe_disabled_without_a_window() -> None:
+    check = ScriptedCheck(check_hold("no-open-match"))
+    h = harness(HOLD_GATE, check)
+    first = _enforce_dedupe(h, window_s=None)
+    second = _enforce_dedupe(h, session="s2", window_s=None)
+    assert first.ticket != second.ticket  # pre-v0.6 behaviour when unconfigured
+
+
+def test_settled_hold_does_not_absorb_new_attempts() -> None:
+    check = ScriptedCheck(check_hold("no-open-match"))
+    h = harness(HOLD_GATE, check)
+    first = _enforce_dedupe(h)
+    h.outbox.reject(first.ticket, "clerk-1")
+    fresh = _enforce_dedupe(h, session="s2")
+    assert fresh.decision is Decision.HOLD
+    assert fresh.ticket != first.ticket  # a settled row is not an open question

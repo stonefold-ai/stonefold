@@ -82,6 +82,10 @@ class PendingAction(BaseModel):
     gates: tuple[GateResult, ...] = ()
     approval: ApprovalSpec | None = None
     approvals: tuple[str, ...] = ()  # distinct approver ids recorded so far
+    # v0.6 (CS-031): how many times this same question was asked — a duplicate
+    # hold within the deployment's dedupe window collapses into this row and
+    # increments the count instead of queueing a second item.
+    attempts: int = 1
     # v0.6 (CS-027): the release contract of EVERY holding gate; the row promotes
     # only when all are satisfied. Empty for pre-v0.6 rows — ``effective_contracts``
     # synthesises the legacy single contract from ``approval`` in that case.
@@ -118,6 +122,32 @@ def expired_hold_reason(gate: str) -> str:
     """Settle reason for a held row cancelled by the expiry sweep (v0.6 CS-028) —
     normative, like ``stale-decision``."""
     return f"expired-hold:{gate}"
+
+
+def hold_dedupe_key(
+    agent: str, resolved: ResolvedAction, gates: tuple[GateResult, ...]
+) -> tuple[Any, ...] | None:
+    """The CS-031 identity of a hold: (agent, action, reason code(s),
+    matched-candidate refs). Two holds with the same key within the dedupe
+    window are the same question wearing two disguises — one queue item.
+
+    ``None`` when no holding gate carries a machine-readable reason code: an
+    approval-shaped hold is a DISTINCT question per intent (two different
+    payments awaiting approval must never collapse), so only check/match-driven
+    holds dedupe.
+    """
+    from stonefold_core.enums import Outcome
+
+    holds: list[tuple[str, str, tuple[str, ...]]] = []
+    for g in gates:
+        if g.outcome is not Outcome.HOLD:
+            continue
+        ev = g.evidence or {}
+        refs = tuple(str(r) for r in (ev.get("refs") or ev.get("candidates") or ()))
+        holds.append((g.gate, g.code, refs))
+    if not holds or not any(code for _gate, code, _refs in holds):
+        return None
+    return (agent, resolved.resource, resolved.action, tuple(holds))
 
 
 def effective_contracts(row: PendingAction) -> tuple[ReleaseContract, ...]:
@@ -327,4 +357,10 @@ class OutboxStore(Protocol):
 
     def reject(self, action_id: str, approver_id: str) -> PendingAction:
         """Reject a held row ⇒ ``CANCELLED`` (never dispatched)."""
+        ...
+
+    def bump_attempts(self, action_id: str) -> PendingAction:
+        """Record one more attempt at the same held question (v0.6 CS-031):
+        increment ``attempts`` on an open held row and return it. The audit
+        record for the attempt is written by the pipeline as always."""
         ...

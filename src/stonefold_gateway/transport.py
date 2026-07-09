@@ -70,6 +70,7 @@ class Gateway:
         env_factory: Callable[[RawCall], RequestEnv] | None = None,
         freshness: FreshnessConfig | None = None,
         obligations: Mapping[str, ObligationRegistry] | None = None,
+        dedupe_window_s: float | None = None,
         agent: str = "unknown",
     ) -> None:
         self._registry = registry
@@ -95,6 +96,9 @@ class Gateway:
         # v0.6 (CS-035): the obligation-registry adapters the commit phase
         # reserves/consumes from — the same map the gate engine matches against.
         self._obligations = obligations
+        # v0.6 (CS-031): the deployment's hold-dedupe window (seconds); ``None``
+        # disables collapsing — deployment configuration, like decision TTLs.
+        self._dedupe_window_s = dedupe_window_s
         self._agent = policy.agent if policy is not None else agent
 
     @property
@@ -137,6 +141,7 @@ class Gateway:
             kill=self._kill,
             freshness=self._freshness,
             obligations=self._obligations,
+            dedupe_window_s=self._dedupe_window_s,
             agent=self._agent,
         )
         return agent_view(result)
@@ -185,6 +190,7 @@ class Gateway:
                 kill=self._kill,
                 freshness=self._freshness,
                 obligations=self._obligations,
+                dedupe_window_s=self._dedupe_window_s,
                 agent=self._agent,
             )
         )
