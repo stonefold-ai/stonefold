@@ -14,7 +14,19 @@ from typing import Any
 
 from fastapi import FastAPI
 
-from stonefold_tck.driver import ConformanceDriver, Operation, TckActor
+from stonefold_tck.driver import ConformanceDriver, Operation, SubmitResult, TckActor
+
+
+def _submit_json(result: SubmitResult) -> dict[str, Any]:
+    return {
+        "decision": result.decision,
+        "ticket": result.ticket,
+        "rows": None if result.rows is None else [dict(r) for r in result.rows],
+        "reason": result.reason,
+        "reasonCode": result.reason_code,
+        "retryClass": result.retry_class,
+        "agentView": result.agent_view,
+    }
 
 
 def create_tck_harness(driver: ConformanceDriver, *, implementation: str) -> FastAPI:
@@ -59,12 +71,7 @@ def create_tck_harness(driver: ConformanceDriver, *, implementation: str) -> Fas
                 context=dict(op_raw.get("context", {})),
             ),
         )
-        return {
-            "decision": result.decision,
-            "ticket": result.ticket,
-            "rows": None if result.rows is None else [dict(r) for r in result.rows],
-            "reason": result.reason,
-        }
+        return _submit_json(result)
 
     @app.post("/tck/submit-batch")
     def submit_batch(body: dict[str, Any]) -> dict[str, Any]:
@@ -91,15 +98,7 @@ def create_tck_harness(driver: ConformanceDriver, *, implementation: str) -> Fas
         return {
             "decision": result.decision,
             "failingIndex": result.failing_index,
-            "results": [
-                {
-                    "decision": r.decision,
-                    "ticket": r.ticket,
-                    "rows": None if r.rows is None else [dict(row) for row in r.rows],
-                    "reason": r.reason,
-                }
-                for r in result.results
-            ],
+            "results": [_submit_json(r) for r in result.results],
         }
 
     @app.get("/tck/connector-digest/{name}")
@@ -167,6 +166,29 @@ def create_tck_harness(driver: ConformanceDriver, *, implementation: str) -> Fas
     @app.post("/tck/update-set")
     def update_set(body: dict[str, Any]) -> dict[str, Any]:
         driver.update_named_set(str(body["name"]), [str(v) for v in body["values"]])
+        return {}
+
+    # --- v0.6 (OPEN change set): hold-precondition / obligation --------------
+    @app.post("/tck/resolve")
+    def resolve(body: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "accepted": driver.resolve(
+                str(body["ticket"]), str(body["resolverId"]), str(body["gate"])
+            )
+        }
+
+    @app.post("/tck/sweep-holds")
+    def sweep_holds(body: dict[str, Any]) -> dict[str, Any]:
+        return {"handled": driver.sweep_holds()}
+
+    @app.post("/tck/seed-obligations")
+    def seed_obligations(body: dict[str, Any]) -> dict[str, Any]:
+        driver.seed_obligations(str(body["registry"]), dict(body["records"]))
+        return {}
+
+    @app.post("/tck/obligation-outage")
+    def obligation_outage(body: dict[str, Any]) -> dict[str, Any]:
+        driver.set_obligation_outage(str(body["registry"]), bool(body["active"]))
         return {}
 
     return app

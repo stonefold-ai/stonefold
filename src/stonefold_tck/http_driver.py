@@ -18,9 +18,13 @@ Wire protocol (all JSON; camelCase keys):
 | POST   | /tck/load                       | {registryYaml, policyYaml} → {ok, errors, warnings} |
 | POST   | /tck/clock                      | {now: ISO-8601} → {} |
 | POST   | /tck/seed                       | {resource, rows: [obj]} → {} |
-| POST   | /tck/submit                     | {actor: {id, roles, claims}, sessionId, op: {resource, action?, data, target?, sink?, context}} → {decision, ticket?, rows?, reason} |
+| POST   | /tck/submit                     | {actor: {id, roles, claims}, sessionId, op: {resource, action?, data, target?, sink?, context}} → {decision, ticket?, rows?, reason, reasonCode?, retryClass?, agentView?} |
 | POST   | /tck/approve                    | {ticket, approverId} → {accepted: bool} |
 | POST   | /tck/reject                     | {ticket, approverId} → {accepted: bool} |
+| POST   | /tck/resolve                    | {ticket, resolverId, gate} → {accepted: bool} |
+| POST   | /tck/sweep-holds                | {} → {handled: int} |
+| POST   | /tck/seed-obligations           | {registry, records: {ref: fields}} → {} |
+| POST   | /tck/obligation-outage          | {registry, active: bool} → {} |
 | POST   | /tck/dispatch                   | {} → {settled: int} |
 | GET    | /tck/effects                    | → {effects: [{resource, action, data}]} |
 | POST   | /tck/kill                       | {scope, agent?, sessionId?, resource?, action?, issuedBy} → {killId} |
@@ -37,7 +41,10 @@ Omit an endpoint (404/501) only if its capability is not advertised.
 ``freshness``/``scope-reassert`` capabilities. ``/tck/update-set`` backs
 ``freshness``; ``/tck/submit-batch`` backs ``batch`` (v0.5 CS-023);
 ``/tck/connector-digest`` + ``/tck/tamper-connector`` back ``digest-pinning``
-(v0.5 CS-020).)
+(v0.5 CS-020); ``/tck/resolve`` + ``/tck/sweep-holds`` back
+``hold-precondition``, ``reasonCode``/``retryClass``/``agentView`` back
+``feedback``, and ``/tck/seed-obligations`` + ``/tck/obligation-outage`` back
+``obligation`` (v0.6, OPEN change set).)
 """
 
 from __future__ import annotations
@@ -59,6 +66,20 @@ from stonefold_tck.driver import (
 
 # transport: (method, path, payload-or-None) -> parsed JSON body
 Transport = Callable[[str, str, Mapping[str, Any] | None], Mapping[str, Any]]
+
+
+def _submit_result(body: Mapping[str, Any]) -> SubmitResult:
+    rows = body.get("rows")
+    retry = body.get("retryClass")
+    return SubmitResult(
+        decision=str(body.get("decision", "")),
+        ticket=body.get("ticket"),
+        rows=None if rows is None else [dict(r) for r in rows],
+        reason=str(body.get("reason", "")),
+        reason_code=str(body.get("reasonCode", "") or ""),
+        retry_class=None if retry is None else str(retry),
+        agent_view=str(body.get("agentView", "") or ""),
+    )
 
 
 def _urllib_transport(base_url: str, timeout_s: float) -> Transport:
@@ -144,13 +165,7 @@ class HttpDriver:
                 },
             },
         )
-        rows = body.get("rows")
-        return SubmitResult(
-            decision=str(body.get("decision", "")),
-            ticket=body.get("ticket"),
-            rows=None if rows is None else [dict(r) for r in rows],
-            reason=str(body.get("reason", "")),
-        )
+        return _submit_result(body)
 
     def approve(self, ticket: str, approver_id: str) -> bool:
         body = self._call("POST", "/tck/approve", {"ticket": ticket, "approverId": approver_id})
@@ -234,22 +249,11 @@ class HttpDriver:
                 ],
             },
         )
-        results = []
-        for r in body.get("results", []):
-            rows = r.get("rows")
-            results.append(
-                SubmitResult(
-                    decision=str(r.get("decision", "")),
-                    ticket=r.get("ticket"),
-                    rows=None if rows is None else [dict(row) for row in rows],
-                    reason=str(r.get("reason", "")),
-                )
-            )
         failing = body.get("failingIndex")
         return BatchSubmitResult(
             decision=str(body.get("decision", "")),
             failing_index=None if failing is None else int(failing),
-            results=results,
+            results=[_submit_result(r) for r in body.get("results", [])],
         )
 
     def connector_digest(self, name: str) -> str:
@@ -264,3 +268,28 @@ class HttpDriver:
 
     def update_named_set(self, name: str, values: Sequence[str]) -> None:
         self._call("POST", "/tck/update-set", {"name": name, "values": list(values)})
+
+    def resolve(self, ticket: str, resolver_id: str, gate: str) -> bool:
+        body = self._call(
+            "POST", "/tck/resolve",
+            {"ticket": ticket, "resolverId": resolver_id, "gate": gate},
+        )
+        return bool(body.get("accepted"))
+
+    def sweep_holds(self) -> int:
+        body = self._call("POST", "/tck/sweep-holds", {})
+        return int(body.get("handled", 0))
+
+    def seed_obligations(
+        self, registry: str, records: Mapping[str, Mapping[str, Any]]
+    ) -> None:
+        self._call(
+            "POST", "/tck/seed-obligations",
+            {"registry": registry,
+             "records": {ref: dict(fields) for ref, fields in records.items()}},
+        )
+
+    def set_obligation_outage(self, registry: str, active: bool) -> None:
+        self._call(
+            "POST", "/tck/obligation-outage", {"registry": registry, "active": active}
+        )

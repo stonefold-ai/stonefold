@@ -24,6 +24,10 @@ PROFILE_AUDIT = "audit"  # decision log completeness & consistency
 PROFILE_FRESHNESS = "freshness"  # v0.4 CS-017/018: decision TTL, volatile re-validation, scope no-race
 PROFILE_BATCH = "batch"  # v0.5 CS-023: atomic batch decision semantics
 PROFILE_DIGEST = "digest"  # v0.5 CS-020: connector digest pinning (load + dispatch)
+PROFILE_HOLD = "hold-precondition"  # v0.6 CS-026/027/028: three-valued checks, multi-hold, expiry
+PROFILE_FEEDBACK = "feedback"  # v0.6 CS-029/030: reason codes + retry classes, visibility redaction
+PROFILE_MATCH = "match"  # v0.6 CS-032/033/036: requireMatch decision semantics
+PROFILE_CONSUME = "consume"  # v0.6 CS-035: reservation lifecycle
 
 ALL_PROFILES = (
     PROFILE_CORE,
@@ -35,6 +39,10 @@ ALL_PROFILES = (
     PROFILE_FRESHNESS,
     PROFILE_BATCH,
     PROFILE_DIGEST,
+    PROFILE_HOLD,
+    PROFILE_FEEDBACK,
+    PROFILE_MATCH,
+    PROFILE_CONSUME,
 )
 
 
@@ -78,9 +86,12 @@ def all_checks() -> tuple[Check, ...]:
         batch,
         core,
         digest,
+        feedback,
         freshness,
+        holds,
         kill,
         lint,
+        obligation,
         scope,
         staging,
     )

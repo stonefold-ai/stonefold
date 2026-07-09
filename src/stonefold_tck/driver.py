@@ -49,6 +49,24 @@ CAP_BATCH = "batch"
 # mismatch MUST settle with reason ``connector-digest-mismatch`` (normative,
 # like the v0.4 settle reasons).
 CAP_DIGEST = "digest-pinning"
+# v0.6 CS-026/027/028: three-valued precondition checks with multi-hold release
+# contracts and active held-row expiry. ``resolve`` releases ONE named gate's
+# contract (a resolver identity, distinct from ``approve``'s credit-everything
+# form); ``sweep_holds`` steps the expiry sweep like ``dispatch_once``. The
+# settle/decision reasons ``expired-hold:<gate>`` and ``hold-unresolvable`` are
+# normative for drivers claiming this.
+CAP_HOLD = "hold-precondition"
+# v0.6 CS-029/030: deny/hold results carry a machine-readable ``reason_code``
+# and ``retry_class``, and ``agent_view`` renders EXACTLY what the agent
+# received (post-redaction) so the kit can assert what leaked and what didn't.
+CAP_FEEDBACK = "feedback"
+# v0.6 CS-032–CS-036: ``requireMatch`` with the reservation lifecycle. The
+# driver registers a mock obligation-registry adapter with the REQUIRED
+# semantics (docs/12 §3) behind the fixture's declared registry;
+# ``seed_obligations`` loads its records, ``set_obligation_outage`` makes it
+# unreachable. The ``no-match`` refusal and ``stale-guard:requireMatch`` settle
+# reason are normative for drivers claiming this.
+CAP_OBLIGATION = "obligation"
 
 ALL_CAPABILITIES = frozenset(
     {
@@ -63,6 +81,9 @@ ALL_CAPABILITIES = frozenset(
         CAP_SCOPE_REASSERT,
         CAP_BATCH,
         CAP_DIGEST,
+        CAP_HOLD,
+        CAP_FEEDBACK,
+        CAP_OBLIGATION,
     }
 )
 
@@ -85,12 +106,23 @@ class SubmitResult:
     ``decision`` is one of ``allow | hold | deny | halt`` (RFC §2).
     ``ticket`` identifies a staged/held action (staging/approvals capability).
     ``rows`` carries an ``observe``'s result (already scope-filtered).
+
+    The v0.6 fields (populated by drivers claiming ``CAP_FEEDBACK``):
+    ``reason_code``/``retry_class`` are the CS-029 machine-readable code and
+    class on a deny/hold (``retry_class`` is ``retryable | terminal |
+    escalate`` or ``None`` — a hold with no class means "wait");
+    ``agent_view`` renders EXACTLY what the agent received, post-redaction
+    (CS-030), so the kit can assert a record-side value did NOT leak without
+    knowing the implementation's result shape.
     """
 
     decision: str
     ticket: str | None = None
     rows: Sequence[Mapping[str, Any]] | None = None
     reason: str = ""
+    reason_code: str = ""
+    retry_class: str | None = None
+    agent_view: str = ""
 
 
 @dataclass(frozen=True)
@@ -248,4 +280,35 @@ class ConformanceDriver(Protocol):
         WITHOUT reloading policy, so its artifact no longer matches any pinned
         digest — the supply-chain replacement CS-020 defends against. Takes
         effect for subsequent dispatches until the next ``load``. (CAP_DIGEST)"""
+        ...
+
+    def resolve(self, ticket: str, resolver_id: str, gate: str) -> bool:
+        """Credit ``resolver_id`` against the held row's ``gate`` release
+        contract ONLY (v0.6 CS-027) — a resolver releasing a precondition/match
+        hold, distinct from ``approve``'s credit-everything form. ``False``
+        when refused (unknown gate, self-release on a distinct-from-actor
+        contract). The row promotes only when EVERY contract is satisfied.
+        (CAP_HOLD)"""
+        ...
+
+    def sweep_holds(self) -> int:
+        """Synchronously run the held-row expiry sweep (v0.6 CS-028) — the
+        deadline arithmetic MUST run on the injected clock (``set_clock``), the
+        same clock that anchored the staging TTL. Returns how many rows were
+        acted on. (CAP_HOLD)"""
+        ...
+
+    def seed_obligations(
+        self, registry: str, records: Mapping[str, Mapping[str, Any]]
+    ) -> None:
+        """Load obligation records (ref → typed fields) into the mock adapter
+        behind the declared obligation registry ``registry`` — the obligation
+        analogue of ``seed``. Replaces the adapter's prior records and clears
+        its reservation state. (CAP_OBLIGATION)"""
+        ...
+
+    def set_obligation_outage(self, registry: str, active: bool) -> None:
+        """Make the obligation registry's adapter unreachable (every operation
+        raises) or restore it — the registry-down dependency failure §7.16
+        semantics 4 fail-closes on. (CAP_OBLIGATION)"""
         ...

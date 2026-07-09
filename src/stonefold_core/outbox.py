@@ -134,32 +134,54 @@ def effective_contracts(row: PendingAction) -> tuple[ReleaseContract, ...]:
     return (replace(legacy, satisfied_by=row.approvals),)
 
 
+# The approval-shaped gates a bare (untargeted) release may credit.
+_APPROVAL_GATES = frozenset({"requireApproval", "dualAuthorization"})
+
+
 def apply_release(
     row: PendingAction, approver_id: str, *, gate: str | None = None
 ) -> PendingAction:
     """Credit one release identity against a held row's contracts and return the
     updated row (CS-027). Pure — both stores persist the result.
 
-    ``gate=None`` credits every contract the identity may satisfy (the pre-v0.6
-    call shape); ``gate="precondition"`` credits only that gate's contract.
+    ``gate="precondition"`` credits only that gate's contract — a resolution is
+    recorded as (who, when, WHICH contract). ``gate=None`` is the pre-v0.6
+    approval call shape: it credits the APPROVAL-SHAPED contracts only
+    (``requireApproval``/``dualAuthorization``) — never a check-driven
+    resolver contract, or one untargeted approval would silently release a
+    hold whose question a different role owns (the CS-027 bypass the TCK's J3
+    check exists for). A row whose only contract is check-driven keeps the
+    single-contract convenience (the bare call targets it unambiguously).
     Rules: a ``dual_auth``/``distinct_from_actor`` contract never accepts the
     acting principal; an identity is counted at most once per contract; the row
     promotes to ``PENDING`` only when EVERY contract is satisfied. Raises
     ``SelfApprovalError`` when the call could credit nothing because every
     targeted unsatisfied contract refused the actor; ``ApprovalError`` when
-    ``gate`` names no contract on the row.
+    ``gate`` names no contract on the row, or a bare call has no unambiguous
+    target.
     """
     if row.state is not PendingState.PENDING_APPROVAL:
         raise ApprovalError(f"{row.id} is {row.state.value}, not awaiting approval")
     contracts = effective_contracts(row)
     if gate is not None and not any(c.gate == gate for c in contracts):
         raise ApprovalError(f"{row.id} has no {gate!r} release contract")
+    if gate is None:
+        targeted_gates = {c.gate for c in contracts if c.gate in _APPROVAL_GATES}
+        if not targeted_gates:
+            if len(contracts) != 1:
+                raise ApprovalError(
+                    f"{row.id} is held by several non-approval contracts; "
+                    f"the release must name its gate (CS-027)"
+                )
+            targeted_gates = {contracts[0].gate}
+    else:
+        targeted_gates = {gate}
 
     credited = False
     refused_self = False
     updated: list[ReleaseContract] = []
     for contract in contracts:
-        targeted = (gate is None or contract.gate == gate) and not contract.satisfied
+        targeted = contract.gate in targeted_gates and not contract.satisfied
         if not targeted or approver_id in contract.satisfied_by:
             updated.append(contract)
             continue

@@ -298,9 +298,12 @@ def test_precondition_hold_cannot_bypass_dual_authorization() -> None:
     assert {c.gate for c in row.releases} == {"precondition", "dualAuthorization"}
 
     check.result = check_pass()
-    # the acting principal can resolve the ambiguity contract, but that alone
+    # the acting principal can resolve the ambiguity contract — via the
+    # TARGETED form, the only call shape that credits a check-driven contract
+    # (a bare approve targets the approval-shaped contracts only; anything
+    # else re-opens the very bypass this test exists for) — but that alone
     # must NOT promote the row...
-    h.outbox.approve(result.ticket, "alice")
+    h.outbox.approve(result.ticket, "alice", gate="precondition")
     assert h.get(result.ticket).state is PendingState.PENDING_APPROVAL
     # ...and alice can contribute nothing further: only the refusing dual-auth
     # contract remains, and it rejects the actor.

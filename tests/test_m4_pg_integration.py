@@ -289,8 +289,11 @@ def test_multi_contract_release_over_postgres(container: PostgresContainer) -> N
             ),
         ),
     )
-    # the actor can resolve the ambiguity contract but never promote alone (R1)
-    store.approve(held.id, "alice")
+    # the actor can resolve the ambiguity contract — via the TARGETED form,
+    # the only call shape that credits a check-driven contract (a bare approve
+    # targets the approval-shaped contracts only, TCK J3) — but never promote
+    # alone (R1)
+    store.approve(held.id, "alice", gate="precondition")
     assert _state(store, held.id) is PendingState.PENDING_APPROVAL
     store.approve(held.id, "dr-house", gate="dualAuthorization")
     assert _state(store, held.id) is PendingState.PENDING_APPROVAL

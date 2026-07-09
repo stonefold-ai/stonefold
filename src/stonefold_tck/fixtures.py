@@ -10,6 +10,24 @@ driver must provide:
 * content hook    ``tck.rejectMarker`` — BLOCK iff the payload contains "BLOCK-ME"
 * precondition    ``tck.flagSet``   — pass iff the resolved target's ``flag`` is true
 * disclosure sink ``tckSink``       — the only sink a restricted read may flow to
+
+The v0.6 names (drivers claiming ``hold-precondition`` / ``obligation``) read
+the resolved TARGET's fields (like ``tck.flagSet``), so the world — not the
+frozen payload — decides, and a resolved question stays resolved at the
+dispatch-time re-validation:
+
+* precondition ``tck.holdOnMarker`` — HOLD with code ``tck-queue`` iff the
+  target's ``hold`` field is truthy; RAISE iff its ``crash`` field is truthy;
+  else pass
+* precondition ``tck.codelessHold`` — a CODE-LESS hold iff the target's
+  ``badhold`` field is truthy; else pass (the gateway must resolve that hold
+  FAIL — CS-026 rule 2)
+* obligation registry ``tck.orders`` — a mock adapter (docs/12 §3): records
+  seeded via ``seed_obligations``; ``reserve``/``consume``/``release``
+  idempotent per (ref, intent id); reserving/consuming/releasing moves the
+  record's ``line.state`` through ``reserved``/``consumed``/``unconsumed`` so
+  an ``== 'unconsumed'`` match clause refuses a spoken-for line at decision
+  time
 """
 
 from __future__ import annotations
@@ -21,11 +39,34 @@ domain: tck
 connectors:
   tck-data:    { type: sql }      # serves observe / record / transition
   tck-effects: { type: method }   # every effect binding
+  tck-orders:  { type: method }   # the mock obligation-registry adapter (v0.6)
 
-scopePredicates:    [ tckOwnedBy, tckTenantOf ]
-preconditionChecks: [ tck.flagSet ]
+scopePredicates: [ tckOwnedBy, tckTenantOf ]
+preconditionChecks:
+  - tck.flagSet
+  # v0.6 (CS-026/CS-029): hold-capable checks declare their codes + classes.
+  - name: tck.holdOnMarker
+    holdCapable: true
+    reasonCodes:
+      tck-queue: escalate
+  - name: tck.codelessHold
+    holdCapable: true
+    reasonCodes:
+      tck-never: terminal
 hooks:              [ tck.rejectMarker ]
 sinks:              [ tckSink ]
+
+obligationRegistries:               # v0.6 (CS-034): the requireMatch source
+  tck.orders:
+    connector: tck-orders
+    capability: transactional
+    schema:
+      vendorId: { type: string }
+      state:    { values: [open, closed] }
+      line:
+        properties:
+          amount: { type: decimal }
+          state:  { values: [unconsumed, reserved, consumed] }
 
 namedSets:
   tck-domains:           { values: [good.example, dual.example] }
@@ -59,8 +100,11 @@ entities:
   Payment:
     dataSource: tck-data
     properties:
-      id:     { type: string }
-      tenant: { type: string }
+      id:      { type: string }
+      tenant:  { type: string }
+      hold:    { type: boolean }   # read by tck.holdOnMarker (v0.6)
+      crash:   { type: boolean }   # makes tck.holdOnMarker RAISE (v0.6)
+      badhold: { type: boolean }   # read by tck.codelessHold (v0.6)
     actions:
       pay:
         kind: effect
@@ -263,4 +307,49 @@ agent: tck-warn-agent
 defaults: { failureMode: closed, audit: full }
 allow:
   - observe: '*'
+"""
+
+# --- v0.6 variants ---------------------------------------------------------
+# J1–J5 (CS-026/027/028): a hold-capable check gated with a resolver, composed
+# with an approval tier above $1000 so J3 can prove BOTH contracts bind.
+POLICY_HOLD = """\
+apiVersion: stele/v0.1
+agent: tck-agent
+defaults: { failureMode: closed, audit: full }
+killable: true
+allow:
+  - effect: [pay]
+gates:
+  pay:
+    precondition:
+      checks: [tck.holdOnMarker, tck.codelessHold]
+      resolvers: role:tck-resolver
+    requireApproval:
+      when: "data.amount > 1000"
+      approvers: role:tck-approver
+"""
+
+# L1–L5 / M1–M4 / K2–K3 (CS-032–CS-036): the payment must correspond to
+# exactly one open order line in the mock registry, within 10% tolerance;
+# the line is reserved at staging and consumed at settlement.
+POLICY_MATCH = """\
+apiVersion: stele/v0.1
+agent: tck-agent
+defaults: { failureMode: closed, audit: full }
+killable: true
+allow:
+  - effect: [pay]
+gates:
+  pay:
+    requireMatch:
+      registry: tck.orders
+      match:
+        - "obligation.vendorId == data.payeeId"
+        - "obligation.state == 'open'"
+        - "obligation.line.state == 'unconsumed'"
+        - { field: obligation.line.amount, matches: data.amount, within: "10%" }
+      consume: obligation.line
+      onNoMatch: deny
+      onAmbiguous: hold
+      resolvers: role:tck-clerk
 """

@@ -36,14 +36,19 @@ from stonefold_core.digest import (
 )
 from stonefold_core.kill import KillScope, KillScopeKind
 from stonefold_core.linter import PolicyError
+from stonefold_core.enums import Outcome
 from stonefold_core.models import RawCall, ResolvedAction
 from stonefold_core.scope import AttributeScope, ScopePredicate, ScopeRegistry, make_scope_resolver
-from stonefold_gates.base import GateContext
+from stonefold_gates.base import CheckResult, GateContext, check_hold
 from stonefold_gates.content import ContentHookRegistry
-from stonefold_gates.engine import DefaultGateEngine, make_dispatch_revalidator
+from stonefold_gates.engine import DefaultGateEngine
 from stonefold_gateway.transport import Gateway
 from stonefold_connectors import InMemoryConnector
-from stonefold_store import DispatchWorker, InMemoryOutboxStore
+from stonefold_store import (
+    DispatchWorker,
+    InMemoryObligationRegistry,
+    InMemoryOutboxStore,
+)
 from stonefold_store.kill_memory import InMemoryKillStore
 from stonefold_tck.driver import (
     ALL_CAPABILITIES,
@@ -104,6 +109,8 @@ def authoring_to_compact(authoring: Mapping[str, Any]) -> dict[str, Any]:
             if isinstance(decl, Mapping) and decl.get("digest") is not None
         },
         "scopePredicates": list(authoring.get("scopePredicates") or []),
+        # v0.6 CS-029: the object form (name/holdCapable/reasonCodes) is the
+        # same in both dialects — pass items through untouched.
         "preconditionChecks": list(authoring.get("preconditionChecks") or []),
         "contentHooks": list(authoring.get("hooks") or []),
         "sinks": list(authoring.get("sinks") or []),
@@ -111,6 +118,8 @@ def authoring_to_compact(authoring: Mapping[str, Any]) -> dict[str, Any]:
             name: list(spec.get("values") or [])
             for name, spec in dict(authoring.get("namedSets") or {}).items()
         },
+        # v0.6 CS-034: the declaration shape is shared between the dialects.
+        "obligationRegistries": dict(authoring.get("obligationRegistries") or {}),
         "resources": resources,
     }
 
@@ -131,6 +140,64 @@ def _reject_marker(content: Mapping[str, Any]) -> bool:
 
 def _flag_set(ctx: GateContext) -> bool:
     return bool(ctx.env.resource.get("flag"))
+
+
+def _hold_on_marker(ctx: GateContext) -> "bool | CheckResult":
+    """docs/12 §3: HOLD with code ``tck-queue`` iff the resolved TARGET's
+    ``hold`` field is truthy; RAISE iff its ``crash`` field is truthy (the
+    outage a check must never turn into a hold); else pass. World-driven, like
+    ``tck.flagSet`` — a resolved question stays resolved at the dispatch-time
+    re-validation."""
+    if ctx.env.resource.get("crash"):
+        raise ConnectionError("TCK-injected check outage")
+    if ctx.env.resource.get("hold"):
+        return check_hold("tck-queue", evidence={"target": ctx.env.resource.get("id")})
+    return True
+
+
+def _codeless_hold(ctx: GateContext) -> "bool | CheckResult":
+    """docs/12 §3: a CODE-LESS hold iff the target's ``badhold`` field is
+    truthy — the implementation error the gateway must resolve fail-closed
+    (CS-026 rule 2); else pass."""
+    if ctx.env.resource.get("badhold"):
+        return CheckResult(Outcome.HOLD)  # deliberately no reason code
+    return True
+
+
+class _FailableObligationRegistry(InMemoryObligationRegistry):
+    """The TCK mock obligation-registry adapter (docs/12 §3), with an outage
+    switch for L5: when flagged, every operation raises — the registry-down
+    dependency failure the gate must fail closed on."""
+
+    def __init__(self) -> None:
+        super().__init__(state_path="line.state")
+        self.outage = False
+
+    def _check(self) -> None:
+        if self.outage:
+            raise ConnectionError("TCK-injected obligation registry outage")
+
+    def query(self, selector: Any) -> Any:
+        self._check()
+        return super().query(selector)
+
+    def reserve(self, ref: str, intent_id: str) -> Any:
+        self._check()
+        return super().reserve(ref, intent_id)
+
+    def consume(self, ref: str, intent_id: str) -> Any:
+        self._check()
+        return super().consume(ref, intent_id)
+
+    def release(self, ref: str, intent_id: str) -> Any:
+        self._check()
+        return super().release(ref, intent_id)
+
+    def reset(self, records: Mapping[str, Mapping[str, Any]]) -> None:
+        """Replace the records and clear reservation state (``seed_obligations``)."""
+        self._records.clear()
+        self._records.update({ref: dict(fields) for ref, fields in records.items()})
+        self._state.clear()
 
 
 class _FailableConnector(InMemoryConnector):
@@ -169,6 +236,7 @@ class ReferenceDriver:
         self._audit: InMemoryAuditSink = InMemoryAuditSink()
         self._registry: InMemoryRegistry | None = None
         self._connectors: Connectors | None = None
+        self._obligations: dict[str, _FailableObligationRegistry] = {}
 
     # --- driver contract ---------------------------------------------------
     def capabilities(self) -> frozenset[str]:
@@ -196,10 +264,21 @@ class ReferenceDriver:
         self._world = _FailableConnector()
         connectors = Connectors({"tck-data": self._world, "tck-effects": self._world})
         self._connectors = connectors
+        # v0.6 (CS-034): one mock adapter per declared obligation registry —
+        # the docs/12 §3 fixture semantics (line.state moves with the lifecycle).
+        self._obligations = {
+            name: _FailableObligationRegistry()
+            for name in registry.obligation_registries
+        }
         engine = DefaultGateEngine(
             registry,
             hooks=ContentHookRegistry({"tck.rejectMarker": _reject_marker}),
-            preconditions={"tck.flagSet": _flag_set},
+            preconditions={
+                "tck.flagSet": _flag_set,
+                "tck.holdOnMarker": _hold_on_marker,
+                "tck.codelessHold": _codeless_hold,
+            },
+            obligations=self._obligations,
         )
         self._registry = registry
         scopes = make_scope_resolver(policy, _tck_scope_registry())
@@ -214,6 +293,7 @@ class ReferenceDriver:
             kill=self._kill,
             env_factory=self._env_factory,
             freshness=_TCK_FRESHNESS,  # v0.4 CS-017: TTL stamped at staging
+            obligations=self._obligations,  # v0.6 CS-035: reserve at staging
             agent=policy.agent,
         )
         # CS-020: the load-time digest gate — a pinned connector that fails
@@ -234,10 +314,38 @@ class ReferenceDriver:
             registry=registry,
             kill=self._kill,
             clock=self._worker_clock,
-            revalidate=make_dispatch_revalidator(engine, policy),
+            revalidate=self._make_revalidator(engine, policy),
             scopes=scopes,
+            obligations=self._obligations,  # v0.6 CS-035: consume/release
         )
         return LoadResult(ok=True, warnings=warnings)
+
+    def _make_revalidator(self, engine: DefaultGateEngine, policy: Any) -> Any:
+        """The CS-017 dispatch revalidator, with the target's resource facts
+        RE-RESOLVED at dispatch time — the whole point of volatile-gate
+        re-validation is that the world may have moved, and a target-fact
+        check (``tck.flagSet``, ``tck.holdOnMarker``) re-validated against an
+        empty resource would judge nothing. Identity stays the STAGED one
+        (invariant 3); only the clock and the world are dispatch-time."""
+        from stonefold_core.outbox import PendingAction
+
+        def revalidate(row: PendingAction, now: datetime) -> Any:
+            session = Session(id=row.session_id, correlation_id=row.correlation_id)
+            base = self._env_factory(
+                RawCall(
+                    resource=row.resolved.resource,
+                    action=row.resolved.action,
+                    data=dict(row.resolved.data),
+                )
+            )
+            env = RequestEnv(
+                resource=base.resource, context=base.context, now=now, sink=base.sink
+            )
+            return engine.revalidate_volatile(
+                row.resolved, row.actor, session, policy, env, claim=row.obligation
+            )
+
+        return revalidate
 
     def set_clock(self, now: datetime) -> None:
         self._now = now
@@ -259,9 +367,15 @@ class ReferenceDriver:
             actor=Actor(id=actor.id, roles=set(actor.roles), claims=dict(actor.claims)),
             session=Session(id=session_id),
         )
+        # ``result`` IS the agent view (Gateway.submit applies the CS-030
+        # redaction); serializing it verbatim is what lets the kit assert what
+        # the agent did and did not see.
         return SubmitResult(
             decision=result.decision.value, ticket=result.ticket,
             rows=self._rows_of(result.output), reason=result.rule,
+            reason_code=result.reason_code,
+            retry_class=result.retry_class.value if result.retry_class else None,
+            agent_view=json.dumps(result.model_dump(mode="json"), default=str),
         )
 
     @staticmethod
@@ -331,6 +445,26 @@ class ReferenceDriver:
         except Exception:
             return False
         return True
+
+    def resolve(self, ticket: str, resolver_id: str, gate: str) -> bool:
+        assert self._outbox is not None
+        try:
+            self._outbox.approve(ticket, resolver_id, gate=gate)
+        except Exception:
+            return False
+        return True
+
+    def sweep_holds(self) -> int:
+        assert self._worker is not None
+        return self._worker.sweep_expired_holds()
+
+    def seed_obligations(
+        self, registry: str, records: Mapping[str, Mapping[str, Any]]
+    ) -> None:
+        self._obligations[registry].reset(records)
+
+    def set_obligation_outage(self, registry: str, active: bool) -> None:
+        self._obligations[registry].outage = active
 
     def dispatch_once(self) -> int:
         assert self._worker is not None

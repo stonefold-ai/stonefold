@@ -255,3 +255,69 @@ Real LLM agent (API key; a scripted fake-LLM mode for CI/no-key); rulebook is th
 **G6 — audit replay**
 - Given any gated run
 - When the audit log is read (by correlation) → every outcome (allow / hold / deny) appears as an append-only record with its reason and the RFC §11 fields.
+
+**G7 — the obligation beats (v0.6 CS-032/CS-035; the refusal no v0.5 gate could produce)**
+- Given the seeded open purchase orders (one PO line per legitimate invoice) and the unmodified `payments-ops.stele.yaml` (its `requireMatch` on `pay`, `onNoMatch: hold`)
+- When the $800 Acme invoice is paid → it matches its open PO line within tolerance, passes limits **and** matching, dispatches, and the line is **consumed** (audit `consumption: consumed` with the receipt id, `obligationRefs` naming the line);
+- When the **same invoice is resubmitted** → it matches nothing (the line is spent) and **holds `no-match`** in the AP clerk's queue — never a second payment against one line;
+- When the fraudulent invoice (no purchase order) is submitted → it is refused by **matching**, with the new-payee cooling-off behind it as defence in depth;
+- When two open lines could match one payment → the intent **holds ambiguous** for the clerk; the gateway never picks.
+
+---
+
+## J. The hold substrate (v0.6 CS-026/027/028 — RFC §7.6, §12)
+
+**J1 — judgment-shaped ambiguity holds, with its reason code**
+- Given a hold-capable check whose source reads ambiguous for the target
+- When the intent is submitted → it is **held** (staged `PENDING_APPROVAL`) with the check's machine-readable reason code; nothing dispatches.
+
+**J2 — a code-less hold is an implementation error**
+- Given a hold-capable check that returns a hold with no reason code
+- When submitted → the intent is **denied** (fail-closed), never staged as an uninformative interruption.
+
+**J3 — composed holds bind every contract (the approval-bypass regression)**
+- Given an intent held by BOTH a precondition check and `requireApproval`
+- When only the approver releases → nothing dispatches; when only the resolver releases → nothing dispatches; when **both** contracts are satisfied → the effect dispatches exactly once.
+
+**J4 — held rows expire actively, on the injected clock**
+- Given a held irreversible effect (staging TTL 30 minutes)
+- When the clock advances to 29 minutes → the sweep expires nothing; at 31 minutes → the row settles `CANCELLED`/`expired-hold:<gate>`, audited; a late release cannot resurrect it. (Both deadlines anchored at staging, on the clock that stamped the TTL — F5.1.)
+
+**J5 — outages fail, never hold**
+- Given a hold-capable check whose source is unreachable (the check raises)
+- When submitted → the intent is **denied** under `failureMode`; a registry blip never becomes a human interruption.
+
+---
+
+## K. The agent feedback channel (v0.6 CS-029/030 — RFC §11)
+
+**K1 — codes and retry classes**
+- Given a valueLimit refusal and a denylist refusal
+- When returned to the agent → each carries a machine-readable code; the valueLimit refusal is classed `retryable` (fix the intent), the denylist refusal `terminal` (stop resubmitting).
+
+**K2 — `code+fields` never leaks record-side values**
+- Given a `requireMatch` tolerance refusal against an order line whose amount the agent does not know
+- When returned at the default visibility → the result names the failing intent field, but neither the record-side amount nor the matched candidate's ref appears anywhere in the agent-facing payload.
+
+**K3 — redact on return, never on write**
+- Given the same refusal
+- When the audit log is read → the record carries the full deciding rule (and evidence) the agent-facing result did not.
+
+---
+
+## L. Obligation matching (v0.6 CS-032/033/036 — RFC §7.16)
+
+**L1 — exactly one open obligation passes** (within declared tolerance; the effect dispatches).
+**L2 — zero candidates refuse `no-match`** (normative code) while an unrelated open line stays matchable.
+**L3 — several candidates hold** — the gateway NEVER auto-selects; nothing dispatches.
+**L4 — a forged obligation copy in `data.*` changes nothing** — every `obligation.*` operand resolves from the registry's response (a pointer narrows the query, never substitutes).
+**L5 — an unreachable registry fails closed** for the irreversible effect; recovery restores matching.
+
+---
+
+## M. The reservation lifecycle (v0.6 CS-035 — RFC §12)
+
+**M1 — reserved with the staging commit**: a second intent against the staged-but-undispatched line refuses `no-match` (the decide→dispatch double-spend window is closed).
+**M2 — consumed with the settle**: after dispatch, the same invoice resubmitted refuses `no-match`.
+**M3 — released on cancellation**: a killed staged payment never dispatches and its line matches a fresh intent, which dispatches exactly once.
+**M4 — retries never double-consume**: repeated worker passes dispatch one effect and settle one success; the line is spent exactly once.
