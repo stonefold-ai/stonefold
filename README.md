@@ -152,6 +152,10 @@ Already cloned without it, or `spec/` is empty after a pull? One command fixes i
 git submodule update --init
 ```
 
+### Building on it: the developer's guide
+
+If you want to put the gateway in front of **your own** agent — start it, connect an agent, write your first policy, implement the checks and hooks the policy names, and run the v0.6 obligation-matching flow — the step-by-step path is **[`guide/`](guide/README.md)**: five complete, runnable programs (no Docker, no API key), each executed by the test suite on every commit so the guide can never drift from the code.
+
 ## How this relates to existing policy tools
 
 Stonefold is not a new access-control theory, and it does not replace the policy engines you may already use. The decision layer — "is this request allowed?" — is deliberately in the same family as AWS Cedar and Open Policy Agent (OPA/Rego), which themselves build on decades of authorization work (XACML, ABAC/RBAC). Default-deny, explicit-deny-wins, a typed schema of entities and actions, attribute-based conditions — those are shared, well-established ideas Stonefold inherits from that lineage.
@@ -170,6 +174,7 @@ The full version of this argument — the PDP/PEP category error, the four-verdi
 
 ## Learn more
 
+- **[The developer's guide](guide/README.md)** — from a clean checkout to a running gateway with an agent behind it: five runnable, test-guarded programs covering setup, the one-tool agent connection, the functions you write, staged effects with approvals and kill, and v0.6 obligation matching.
 - **[SIF — the intent format](https://github.com/stonefold-ai/spec/blob/main/docs/00-RFC-sif-intent-format.md)** — the five action kinds and the shape the agent emits; the layer everything else builds on.
 - **[Stele — the policy language](https://github.com/stonefold-ai/spec/blob/main/docs/01-RFC-agent-control-policy.md)** — the rulebook language, with worked examples across five domains.
 - **[Implementation design](docs/02-implementation-design.md)** — how the gateway executes it, including the stop button in full.

@@ -1,0 +1,132 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 620" font-family="ui-monospace, 'Cascadia Mono', Consolas, monospace">
+  <defs>
+    <marker id="a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="#a89c8c"/>
+    </marker>
+    <marker id="ab" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="#d59a45"/>
+    </marker>
+  </defs>
+  <style>
+    .box{fill:#1d1a17;stroke:#37312a;stroke-width:1}
+    .inner{fill:#232019;stroke:#37312a;stroke-width:1}
+    .hl{stroke:#d59a45;stroke-width:1.4}
+    .t{fill:#ece6d9;font-size:13px;font-weight:600;letter-spacing:.06em}
+    .s{fill:#a89c8c;font-size:10.5px}
+    .b{fill:#d59a45;font-size:11px;font-weight:600;letter-spacing:.05em}
+    .flow{stroke:#a89c8c;stroke-width:1.2;fill:none}
+    .flowb{stroke:#d59a45;stroke-width:1.2;fill:none}
+  </style>
+
+  <rect x="0" y="0" width="1000" height="620" fill="#141210"/>
+  <text class="b" x="24" y="30">STONEFOLD — HOW THE PIECES FIT (v0.6)</text>
+
+  <!-- AGENT -->
+  <rect class="box" x="24" y="120" width="150" height="76" rx="6"/>
+  <text class="t" x="99" y="152" text-anchor="middle">AGENT</text>
+  <text class="s" x="99" y="170" text-anchor="middle">untrusted · foolable</text>
+  <text class="s" x="99" y="184" text-anchor="middle">an LLM loop (yours)</text>
+
+  <!-- submit_intent arrow -->
+  <line class="flowb" x1="174" y1="158" x2="248" y2="158" marker-end="url(#ab)"/>
+  <text class="s" x="211" y="140" text-anchor="middle">submit_intent</text>
+  <text class="s" x="211" y="152" text-anchor="middle">(SIF, typed)</text>
+  <text class="s" x="211" y="176" text-anchor="middle">the ONLY path</text>
+
+  <!-- identity from transport -->
+  <path class="flow" d="M99 220 v40 h150 v-32" marker-end="url(#a)"/>
+  <text class="s" x="99" y="214" text-anchor="middle">your transport / auth</text>
+  <line class="flow" x1="99" y1="196" x2="99" y2="220"/>
+  <text class="s" x="200" y="252" text-anchor="middle">actor + session (identity —</text>
+  <text class="s" x="200" y="264" text-anchor="middle">never from the payload)</text>
+
+  <!-- GATEWAY -->
+  <rect x="250" y="64" width="240" height="330" rx="8" class="box hl"/>
+  <text class="b" x="370" y="90" text-anchor="middle">GATEWAY  (deterministic)</text>
+  <text class="s" x="370" y="106" text-anchor="middle">default deny · deny wins · no LLM inside</text>
+
+  <rect class="inner" x="268" y="118" width="204" height="26" rx="4"/>
+  <text class="s" x="370" y="135" text-anchor="middle" fill="#ece6d9">1 resolve — registry lookup</text>
+  <rect class="inner" x="268" y="150" width="204" height="26" rx="4"/>
+  <text class="s" x="370" y="167" text-anchor="middle" fill="#ece6d9">2 authorize — allow / deny lists</text>
+  <rect class="inner" x="268" y="182" width="204" height="26" rx="4"/>
+  <text class="s" x="370" y="199" text-anchor="middle" fill="#ece6d9">3 scope — injected row filter</text>
+  <rect class="inner" x="268" y="214" width="204" height="26" rx="4" stroke="#d59a45"/>
+  <text class="s" x="370" y="231" text-anchor="middle" fill="#ece6d9">4 gates — limits · lists · approvals</text>
+  <rect class="inner" x="268" y="246" width="204" height="26" rx="4"/>
+  <text class="s" x="370" y="263" text-anchor="middle" fill="#ece6d9">5 kill switch check</text>
+  <rect class="inner" x="268" y="278" width="204" height="26" rx="4"/>
+  <text class="s" x="370" y="295" text-anchor="middle" fill="#ece6d9">6 stage effect / run read</text>
+  <rect class="inner" x="268" y="310" width="204" height="26" rx="4"/>
+  <text class="s" x="370" y="327" text-anchor="middle" fill="#ece6d9">7 audit — every attempt</text>
+
+  <text class="s" x="370" y="368" text-anchor="middle">deny/hold → structured refusal to the</text>
+  <text class="s" x="370" y="381" text-anchor="middle">agent: reason code + retry class (v0.6)</text>
+
+  <!-- YOUR CODE (registered functions) -->
+  <rect class="box" x="250" y="452" width="240" height="98" rx="6"/>
+  <text class="b" x="370" y="476" text-anchor="middle">YOUR CODE (registered)</text>
+  <text class="s" x="370" y="494" text-anchor="middle">precondition checks — pass/fail/hold</text>
+  <text class="s" x="370" y="508" text-anchor="middle">content hooks — pass/block</text>
+  <text class="s" x="370" y="522" text-anchor="middle">scope predicates — row filters</text>
+  <text class="s" x="370" y="538" text-anchor="middle">declared by NAME in the registry</text>
+  <line class="flow" x1="370" y1="452" x2="370" y2="398" marker-end="url(#a)"/>
+  <text class="s" x="385" y="428">gates call them</text>
+
+  <!-- OUTBOX -->
+  <rect class="box" x="540" y="90" width="170" height="108" rx="6"/>
+  <text class="t" x="625" y="116" text-anchor="middle">OUTBOX</text>
+  <text class="s" x="625" y="134" text-anchor="middle">staged effects (durable)</text>
+  <text class="s" x="625" y="148" text-anchor="middle">held rows await release</text>
+  <text class="s" x="625" y="162" text-anchor="middle">decision TTL stamped</text>
+  <text class="s" x="625" y="176" text-anchor="middle">in-memory or Postgres</text>
+  <line class="flowb" x1="490" y1="144" x2="538" y2="144" marker-end="url(#ab)"/>
+  <text class="s" x="514" y="134" text-anchor="middle">stage</text>
+
+  <!-- OPERATOR -->
+  <rect class="box" x="540" y="14" width="170" height="52" rx="6"/>
+  <text class="t" x="625" y="36" text-anchor="middle">OPERATOR</text>
+  <text class="s" x="625" y="52" text-anchor="middle">approve / reject · kill</text>
+  <line class="flow" x1="625" y1="66" x2="625" y2="88" marker-end="url(#a)"/>
+
+  <!-- WORKER -->
+  <rect class="box" x="540" y="240" width="170" height="96" rx="6"/>
+  <text class="t" x="625" y="264" text-anchor="middle">DISPATCH WORKER</text>
+  <text class="s" x="625" y="282" text-anchor="middle">claims one row at a time</text>
+  <text class="s" x="625" y="296" text-anchor="middle">recheck: kill → TTL →</text>
+  <text class="s" x="625" y="310" text-anchor="middle">volatile gates → send</text>
+  <text class="s" x="625" y="324" text-anchor="middle">exactly-once (idempotent)</text>
+  <line class="flow" x1="625" y1="198" x2="625" y2="238" marker-end="url(#a)"/>
+
+  <!-- CONNECTORS + SYSTEMS -->
+  <rect class="box" x="770" y="240" width="200" height="96" rx="6"/>
+  <text class="t" x="870" y="264" text-anchor="middle">CONNECTORS</text>
+  <text class="s" x="870" y="282" text-anchor="middle">your adapters: sql · http</text>
+  <text class="s" x="870" y="296" text-anchor="middle">· email · in-memory</text>
+  <text class="s" x="870" y="310" text-anchor="middle">execute + apply scope;</text>
+  <text class="s" x="870" y="324" text-anchor="middle">hold no policy logic</text>
+  <line class="flowb" x1="710" y1="288" x2="768" y2="288" marker-end="url(#ab)"/>
+
+  <rect class="box" x="770" y="90" width="200" height="70" rx="6"/>
+  <text class="t" x="870" y="118" text-anchor="middle">YOUR SYSTEMS</text>
+  <text class="s" x="870" y="136" text-anchor="middle">database · email · payments</text>
+  <text class="s" x="870" y="150" text-anchor="middle">only reachable through here</text>
+  <line class="flowb" x1="870" y1="238" x2="870" y2="162" marker-end="url(#ab)"/>
+
+  <!-- OBLIGATION REGISTRY (v0.6) -->
+  <rect class="box" x="770" y="404" width="200" height="120" rx="6" stroke="#d59a45"/>
+  <text class="b" x="870" y="428" text-anchor="middle">OBLIGATION REGISTRY</text>
+  <text class="s" x="870" y="444" text-anchor="middle">v0.6 — the system of record</text>
+  <text class="s" x="870" y="458" text-anchor="middle">requireMatch queries (open</text>
+  <text class="s" x="870" y="472" text-anchor="middle">orders, prescriptions ...)</text>
+  <text class="s" x="870" y="492" text-anchor="middle">reserve @ stage · consume</text>
+  <text class="s" x="870" y="506" text-anchor="middle">@ settle · release @ cancel</text>
+  <path class="flowb" d="M490 230 h30 v240 h248" marker-end="url(#ab)"/>
+  <text class="s" x="560" y="460">query + reserve</text>
+  <path class="flow" d="M660 336 v100 h108" marker-end="url(#a)"/>
+  <text class="s" x="680" y="420">consume / release</text>
+
+  <!-- AUDIT -->
+  <rect class="box" x="24" y="572" width="946" height="34" rx="6"/>
+  <text class="s" x="497" y="593" text-anchor="middle" fill="#ece6d9">AUDIT LOG (append-only) — every attempt: allow · hold · deny · halt · settle, each with its reason; effects add result refs, matches add obligation refs + consumption</text>
+</svg>
