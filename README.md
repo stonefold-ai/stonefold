@@ -47,7 +47,7 @@ Three design choices make it work:
 
 Here is the whole machine on one page — the agent's single entry point on the left, the deterministic pipeline in the middle, your systems and the humans in charge around it:
 
-<a href="guide/architecture.svg"><img src="guide/architecture.svg" alt="How the pieces fit: the agent's only path is a typed submit_intent over HTTP into the deterministic gateway (resolve, authorize, scope, gates, kill, stage, audit); gates call your registered checks/hooks/predicates; allowed effects stage in the outbox and a dispatch worker sends them through your connectors, with the operator holding approvals and the kill switch; v0.6 adds the obligation registry the gateway queries, reserves, consumes and releases; everything lands in the append-only audit log" width="100%"></a>
+<a href="guide/architecture.svg"><img src="guide/architecture.svg" alt="How the pieces fit: the agent's only path is a typed submit_intent over HTTP into the deterministic gateway (resolve, authorize, scope, gates, kill, stage, audit); gates call your registered checks/hooks/predicates; allowed effects stage in the outbox and a dispatch worker sends them through your connectors, with the operator holding approvals and the kill switch; v0.6 adds the obligation registry the gateway queries, reserves, consumes and releases; everything lands in the append-only audit log" width="1080"></a>
 
 <sub>Click the diagram to open it full size. The [developer's guide](guide/README.md) walks through every box in it, one tutorial at a time.</sub>
 
