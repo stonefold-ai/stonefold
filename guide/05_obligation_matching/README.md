@@ -108,7 +108,8 @@ Your agent reads two fields off every refusal:
 ```
 deny  code=outside-tolerance class=retryable   -> fix the intent, resubmit
 deny  code=no-match          class=terminal    -> stop; nothing to fix
-hold                                            -> a human owns it; wait
+deny  code=...               class=escalate    -> stop; surface to YOUR human
+hold                                            -> a gateway human owns it; wait
 ```
 
 `agent.py`'s `converge()` is the whole pattern in ten lines. Note what the
@@ -141,7 +142,9 @@ driver: one line, one payment, ever
    record can.
 2. **The refusal classes drove the loop.** `retryable` → the agent fixed its
    extraction and converged; `terminal` → it stopped. No prose parsing, no
-   flailing.
+   flailing. (The guide's `converge()` scripts the corrected amount; the same
+   loop with a live LLM actually re-extracting the invoice is the
+   Accounts-Payable demo — `demo/` + `docs/05-demo-spec.md`.)
 3. **The receipt is evidence.** The audit record for the settle carries
    `obligationRefs` (what entitled the payment) and `consumption` (the spend
    receipt) — reconciliation has both ends of the relation.

@@ -59,7 +59,8 @@ class GatewayTool:
         #   output     rows/receipt on an executed read/write (else null)
         #   ticket     the staged/held action's id (effects and holds)
         #   reasonCode machine-readable refusal code   (v0.6)
-        #   retryClass "retryable" | "terminal" | null (v0.6) — what to do next
+        #   retryClass "retryable" | "terminal" | "escalate" | null (v0.6) —
+        #              fix-and-resubmit | stop | hand to a human on your side
         # Your program acts on this response; that loop is yours, and ANY
         # program can drive it — an LLM, a cron job, a plain script.
         return self._call("POST", "/submit_intent", payload)  # type: ignore[no-any-return]
@@ -93,9 +94,16 @@ def run(base_url: str) -> list[dict[str, Any]]:
     while (payload := scripted_llm(step)) is not None:
         result = tool.submit_intent(payload)
         results.append(result)
-        print(f"agent: {payload['resource']}.{payload['action']:6s} -> "
-              f"{result['decision']}"
-              + (f" (code={result['reasonCode']})" if result.get("reasonCode") else ""))
+        note = f" (code={result['reasonCode']})" if result.get("reasonCode") else ""
+        # make the injection step visible in the output: identity-shaped keys
+        # the model wrote into DATA travelled as inert strings — the decision
+        # looks like any other allow, and the audit still names rep-7.
+        smuggled = [k for k in payload["data"] if k in ("actor", "role")]
+        if smuggled:
+            note += (f"   <- smuggled {', '.join(repr(k) for k in smuggled)}"
+                     " in data: inert strings, not identity")
+        print(f"agent: {payload['resource'] + '.' + payload['action']:<15s} -> "
+              f"{result['decision']}{note}")
         step += 1
     return results
 

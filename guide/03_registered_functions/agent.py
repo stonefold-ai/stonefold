@@ -46,14 +46,14 @@ def run(base_url: str) -> dict[str, dict[str, Any]]:
     results["read"] = tool.submit_intent(
         {"resource": "Note", "action": "read", "data": {}}
     )
-    print(f"agent: Note.read          -> {results['read']['decision']}"
+    print(f"agent: {'Note.read':<14s} -> {results['read']['decision']}"
           f"  rows={len(results['read']['output'] or [])} (of 2 in the table)")
 
     # content hook: a payload with a secret in it.
     results["blocked"] = tool.submit_intent(
         {"resource": "Note", "action": "create", "data": {"text": "the SECRET plan"}}
     )
-    print(f"agent: Note.create        -> {results['blocked']['decision']}"
+    print(f"agent: {'Note.create':<14s} -> {results['blocked']['decision']}"
           f"  rule={results['blocked']['rule']}")
 
     # precondition check, three verdicts against three world states:
@@ -64,7 +64,7 @@ def run(base_url: str) -> dict[str, dict[str, Any]]:
         results[order_id] = result
         extra = f"  code={result['reasonCode']}" if result.get("reasonCode") else ""
         extra += f" class={result['retryClass']}" if result.get("retryClass") else ""
-        print(f"agent: Order.ship {order_id}     -> {result['decision']}{extra}")
+        print(f"agent: {'Order.ship ' + order_id:<14s} -> {result['decision']}{extra}")
 
     return results
 

@@ -129,12 +129,16 @@ python guide/03_registered_functions/main.py
 Expected output (the agent's view, over the wire):
 
 ```
-agent: Note.read          -> allow  rows=1 (of 2 in the table)
-agent: Note.create        -> deny  rule=gate:contentCheck
-agent: Order.ship O1     -> allow
-agent: Order.ship O2     -> deny  code=gate:precondition class=terminal
-agent: Order.ship O3     -> hold  code=stock-uncertain class=escalate
+agent: Note.read      -> allow  rows=1 (of 2 in the table)
+agent: Note.create    -> deny  rule=gate:contentCheck
+agent: Order.ship O1  -> allow
+agent: Order.ship O2  -> deny  code=gate:precondition class=terminal
+agent: Order.ship O3  -> hold  code=stock-uncertain class=escalate
 ```
+
+(`class=escalate` is the third `retryClass` — introduced in example 02
+alongside `retryable` and `terminal`: stop and hand it to a human. Here the
+human is the declared resolver, `role:warehouse-lead`.)
 
 ## What to notice
 

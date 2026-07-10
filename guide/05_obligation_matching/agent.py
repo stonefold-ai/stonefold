@@ -7,6 +7,7 @@ what to do next without parsing prose:
 
     retryClass == "retryable"  -> the defect is in the intent; fix, resubmit
     retryClass == "terminal"   -> nothing you can fix; stop resubmitting
+    retryClass == "escalate"   -> stop; surface it to a human on YOUR side
     decision   == "hold"       -> a human owns it now; wait or move on
 
 Run against a live gateway:   python agent.py http://localhost:8099

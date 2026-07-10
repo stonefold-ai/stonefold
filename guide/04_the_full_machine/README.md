@@ -101,7 +101,8 @@ driver: kill halted s1; lift restored; s2 unaffected
 1. **There is a durable moment between "decided" and "done."** That gap —
    the staged row — is where approval, rejection, TTL expiry, and the kill
    switch all live. Inline execution would make every one of them a race.
-2. **Rejection is silence.** The $9,000 never produced a `success` record —
-   the driver asserts on its absence, over the audit API.
+2. **A rejected action executes nothing and leaves no success record.** The
+   $9,000 never produced one — the driver asserts on its *absence*, over the
+   audit API. (The rejection itself is audited, of course.)
 3. **The kill is scoped.** Session `s1` halted; `s2` kept working; lifting
    restored `s1`. Every one of those transitions is itself audited.

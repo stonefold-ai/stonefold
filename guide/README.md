@@ -2,6 +2,12 @@
 
 *You cloned the repo. Now what?*
 
+Stonefold is a deterministic gateway that stands between an AI agent and
+the systems it can act on: every attempted action is checked against a
+reviewed policy, staged, audited, and — where the policy says so — held for
+a human. This guide shows you, hands on, what that costs to adopt (one HTTP
+call in your agent) and what it buys.
+
 Five step-by-step tutorials, each in its own directory with its own README
 and complete files. Every example's `main.py` is executed by the test suite
 on every commit (`tests/test_guide_examples.py`), so the guide cannot drift
@@ -22,6 +28,11 @@ example keeps these roles in separate files, because they are separate jobs:
 | **Infra engineer** (platform) | `gateway_service.py`, `docker-compose.yml` | the HTTP service: env-driven stores, worker, `uvicorn gateway_service:app` |
 | **Operator** (on-call, approvers) | `operator_console.py` | approvals + kill, over plain HTTP admin endpoints |
 
+If you are one developer evaluating this on a laptop: you play all five
+roles. The split is about files and review boundaries, not headcount — it
+exists so that when a team does adopt this, each file already belongs to
+the right owner.
+
 The agent talks to the gateway **over the network** — a real port, a real
 HTTP call, two separate processes. Nothing agent-side ever runs inside the
 gateway (example 01 is the single exception: it opens the gateway's own
@@ -30,6 +41,8 @@ all).
 
 ## Setup
 
+You need Python 3.11+ and, from example 02 on, Docker.
+
 ```bash
 git clone --recurse-submodules https://github.com/stonefold-ai/stonefold
 cd stonefold
@@ -37,10 +50,17 @@ python -m venv .venv && . .venv/bin/activate     # Windows: .venv\Scripts\activa
 pip install -e ".[dev]"
 pytest -q -m "not integration"                   # verify: green
 
-# real infrastructure (used from example 02 on, required spirit from 04):
+# real infrastructure (optional from example 02 on, required from 04):
 docker compose -f guide/docker-compose.yml up -d
 export DATABASE_URL=postgresql://stonefold:stonefold@localhost:5433/stonefold
 export REDIS_URL=redis://localhost:6380/0
+```
+
+On Windows (PowerShell), the environment variables are set like this:
+
+```powershell
+$env:DATABASE_URL = "postgresql://stonefold:stonefold@localhost:5433/stonefold"
+$env:REDIS_URL = "redis://localhost:6380/0"
 ```
 
 Without the env vars every service falls back to in-memory stores and says
@@ -60,6 +80,25 @@ install from the checkout. The `spec/` submodule must be populated
 
 Read them in order the first time; each README states which files changed
 since the previous example and which role owns the change.
+
+## The vocabulary, up front
+
+Each term is explained where it first appears; this table is here so a
+skim survives contact with the prose. (The full glossary is
+`spec/docs/08-glossary.md`.)
+
+| Term | Meaning |
+|---|---|
+| **intent** | one attempted action, as JSON: resource, action, data |
+| **kind** | an action's category (`observe`, `record`, `effect`, `transition`, `assess`) — what policies reason about |
+| **gate** | one deterministic check in the pipeline (value limit, rate, approval, match, …) |
+| **decision** | the gateway's verdict on an intent: `allow`, `deny`, `hold`, or `halt` |
+| **hold** | the decision that parks an action for a named human; nothing executes meanwhile |
+| **staged / outbox** | an allowed effect is written to a durable table first; a worker dispatches it — the gap is where approval, TTL, and kill live |
+| **settle** | the dispatch worker's final write after the effect executed: outcome + audit, in one transaction |
+| **fail closed** | any dependency failure is treated as a deny/halt, never as a pass |
+| **`reasonCode` / `retryClass`** | machine-readable refusal feedback: which rule refused, and whether the agent should fix-and-resubmit (`retryable`), stop (`terminal`), or surface to a human on its side (`escalate`) |
+| **obligation** | an external record (e.g. a purchase order line) a payment must match and spend — v0.6, example 05 |
 
 ## Where to go next
 

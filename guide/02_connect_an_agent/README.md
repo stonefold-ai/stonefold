@@ -89,8 +89,10 @@ v0.6 feedback channel:
 ```
 
 `retryClass` tells your loop what to do: `retryable` — fix the intent and
-resubmit; `terminal` — stop, nothing to fix; a hold — wait, a human owns it.
-Example 05 runs a full convergence loop on this.
+resubmit; `terminal` — stop, nothing to fix; `escalate` — stop and hand it
+to a human (the class a `hold` usually carries — example 03 shows one).
+On a `hold` decision itself, the agent's move is to wait or move on; a human
+owns the ticket now. Example 05 runs a full convergence loop on this.
 
 ## Step 2 (infra engineer) — `gateway_service.py`, the service
 
@@ -113,6 +115,7 @@ Create `gateway_service.py`. It is an ordinary FastAPI service:
 # real infra (optional here, required from example 04):
 docker compose -f guide/docker-compose.yml up -d
 export DATABASE_URL=postgresql://stonefold:stonefold@localhost:5433/stonefold
+# Windows (PowerShell): $env:DATABASE_URL = "postgresql://stonefold:stonefold@localhost:5433/stonefold"
 
 # terminal 1 — the service:
 uvicorn --app-dir guide/02_connect_an_agent gateway_service:app --port 8099
@@ -144,10 +147,16 @@ Expected output:
 ```
 agent: got 1 tool (submit_intent), resources = ['Customer', 'Ticket']
 agent: Customer.read   -> allow
-agent: Ticket.create -> allow
-agent: Ticket.create -> allow
+agent: Ticket.create   -> allow
+agent: Ticket.create   -> allow   <- smuggled 'actor', 'role' in data: inert strings, not identity
 driver: 3 audit records, every one names actor rep-7
 ```
+
+The third line is the injected attack from step 1a — and yes, it is
+*allowed*: creating a ticket is within policy, so the intent goes through.
+What the injection did **not** do is change who acted. The smuggled
+`"actor": "admin"` landed in `data`, where it is an ordinary string; the
+audit (last line) names the transport identity, `rep-7`, for every record.
 
 ## What to notice
 
