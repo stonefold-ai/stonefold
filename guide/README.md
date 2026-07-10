@@ -13,7 +13,9 @@ and complete files. Every example's `main.py` is executed by the test suite
 on every commit (`tests/test_guide_examples.py`), so the guide cannot drift
 from the code it teaches.
 
-<img src="architecture.svg" alt="How the pieces fit: the agent's only path is a typed submit_intent over HTTP into the deterministic gateway (resolve, authorize, scope, gates, kill, stage, audit); gates call your registered checks/hooks/predicates; allowed effects stage in the outbox and a dispatch worker sends them through your connectors, with the operator holding approvals and the kill switch; v0.6 adds the obligation registry the gateway queries, reserves, consumes and releases; everything lands in the append-only audit log" width="900">
+<a href="architecture.svg"><img src="architecture.svg" alt="How the pieces fit: the agent's only path is a typed submit_intent over HTTP into the deterministic gateway (resolve, authorize, scope, gates, kill, stage, audit); gates call your registered checks/hooks/predicates; allowed effects stage in the outbox and a dispatch worker sends them through your connectors, with the operator holding approvals and the kill switch; v0.6 adds the obligation registry the gateway queries, reserves, consumes and releases; everything lands in the append-only audit log" width="100%"></a>
+
+<sub>Click the diagram to open it full size.</sub>
 
 ## Who builds what
 
