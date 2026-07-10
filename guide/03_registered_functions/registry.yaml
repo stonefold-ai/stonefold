@@ -1,0 +1,28 @@
+# THE REGISTRY — platform/policy team artifact.
+#
+# New here: the registry DECLARES the names of the domain functions the
+# gateway may call. The linter refuses any policy that references an
+# undeclared name, and the gateway refuses a check that behaves outside its
+# declaration (e.g. holds without declaring holdCapable).
+
+connectors: [in_memory]
+
+scopePredicates: [ownedBy]          # row filters (who sees which rows)
+contentHooks: [no.secrets]          # payload pass/block
+preconditionChecks:
+  - targetIsActive                  # plain two-valued check: pass/fail
+  - name: inventoryAvailable        # v0.6 object form: this check MAY hold,
+    holdCapable: true               # and declares every code it can emit
+    reasonCodes:                    # with its retry class (CS-029)
+      stock-uncertain: escalate
+
+resources:
+  Note:
+    connector: in_memory
+    actions:
+      read:   { kind: observe }
+      create: { kind: record }
+  Order:
+    connector: in_memory
+    actions:
+      ship: { kind: effect }

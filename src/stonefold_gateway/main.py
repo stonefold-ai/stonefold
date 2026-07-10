@@ -52,13 +52,19 @@ class SubmitBatchBody(BaseModel):
 
 
 def _render(result: Any) -> dict[str, Any]:
-    """One operation's result in the wire shape (shared by single and batch)."""
+    """One operation's result in the wire shape (shared by single and batch).
+
+    ``reasonCode``/``retryClass`` are the v0.6 (CS-029) convergence signal —
+    an HTTP agent needs them to tell fix-and-resubmit from give-up; the result
+    arriving here is already the redacted agent view (CS-030)."""
     return {
         "decision": result.decision.value,
         "rule": result.rule,
         "ticket": result.ticket,
         "output": result.output,
         "scopeApplied": list(result.scope_applied),
+        "reasonCode": result.reason_code,
+        "retryClass": result.retry_class.value if result.retry_class else None,
     }
 
 

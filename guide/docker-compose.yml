@@ -1,0 +1,30 @@
+# THE INFRASTRUCTURE — owned by the platform/infra engineer.
+#
+# Two containers are the gateway's entire durable substrate:
+#   Postgres — the outbox (staged effects, SELECT ... FOR UPDATE claims),
+#              the append-only audit_log, and kill orders
+#   Redis    — sliding-window rate/quota counters
+#
+#   docker compose -f guide/docker-compose.yml up -d
+#
+# Then point the gateway services at them:
+#   DATABASE_URL = postgresql://stonefold:stonefold@localhost:5433/stonefold
+#   REDIS_URL    = redis://localhost:6380/0
+#
+# (Host ports 5433/6380 avoid colliding with anything you already run.
+# Without these env vars every guide service falls back to in-memory stores
+# and prints a notice — fine for a laptop, not a deployment.)
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: stonefold
+      POSTGRES_PASSWORD: stonefold
+      POSTGRES_DB: stonefold
+    ports:
+      - "5433:5432"
+  redis:
+    image: redis:7
+    ports:
+      - "6380:6379"

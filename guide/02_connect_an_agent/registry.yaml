@@ -1,0 +1,13 @@
+# THE REGISTRY — platform/policy team artifact (see 01 for the full story).
+connectors: [in_memory]
+
+resources:
+  Customer:
+    connector: in_memory
+    actions:
+      read: { kind: observe }
+  Ticket:
+    connector: in_memory
+    actions:
+      read:   { kind: observe }
+      create: { kind: record }

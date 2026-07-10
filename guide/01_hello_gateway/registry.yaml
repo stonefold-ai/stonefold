@@ -1,0 +1,20 @@
+# THE REGISTRY — owned by the platform/policy team, NOT by developers' code.
+#
+# This file is the complete catalogue of what exists: every resource, every
+# action, and each action's kind. An action this file does not declare is not
+# merely forbidden — it is unsayable; the gateway refuses it before any
+# policy runs. In production this file lives in a reviewed repository and is
+# loaded by the gateway service at startup, exactly like this example does.
+#
+# (This is the reference loader's compact dialect. The spec also defines a
+# richer authoring format with a generator that drafts it from SQL DDL,
+# OpenAPI, or an MCP tool list — spec/docs/06-registry-domain-model.md.)
+
+connectors: [in_memory]      # the adapters the gateway may execute through
+
+resources:
+  Note:
+    connector: in_memory     # which adapter serves this resource
+    actions:
+      read:   { kind: observe }   # looking at data
+      create: { kind: record }    # writing internal data

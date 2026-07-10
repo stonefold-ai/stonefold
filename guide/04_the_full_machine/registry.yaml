@@ -1,0 +1,14 @@
+# THE REGISTRY — platform/policy team artifact.
+#
+# New here: an action of kind EFFECT — something that changes the outside
+# world (money moves). Effects are never executed inline: the gateway stages
+# them in the durable outbox and a dispatch worker sends them, which is what
+# makes human approval and the kill switch real.
+
+connectors: [in_memory]
+
+resources:
+  Payment:
+    connector: in_memory
+    actions:
+      pay: { kind: effect }

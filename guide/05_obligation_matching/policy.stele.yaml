@@ -1,0 +1,24 @@
+# THE POLICY — the v0.6 rule no earlier gate could express: a payment must
+# CORRESPOND to an open purchase order, within tolerance, and paying it
+# SPENDS the order line. The match rule sits here, in the reviewed file —
+# not buried in check code.
+
+apiVersion: stele/v0.1
+agent: ap-agent
+
+allow:
+  - effect: [pay]
+
+gates:
+  pay:
+    requireMatch:
+      registry: erp.purchase_orders
+      match:
+        - "obligation.vendorId == data.vendorId"
+        - "obligation.state == 'open'"
+        - "obligation.line.state == 'unconsumed'"
+        - { field: obligation.line.amount, matches: data.amount, within: "10%" }
+      consume: obligation.line       # one line pays one invoice, ever
+      onNoMatch: deny                # or: hold -> a human queue
+      onAmbiguous: hold              # several matches: NEVER auto-pick
+      resolvers: role:ap-clerk       # who owns an ambiguous hold

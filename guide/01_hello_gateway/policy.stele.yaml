@@ -1,0 +1,14 @@
+# THE POLICY — written in Stele by whoever owns the rules (security,
+# compliance, the team lead). It is a declarative artifact a reviewer signs;
+# nobody writes Python here.
+#
+# The gateway's ground state is DEFAULT DENY: with no policy, or for anything
+# a policy does not list, the answer is no. This is the simplest policy that
+# allows anything at all: one agent, one permission.
+
+apiVersion: stele/v0.1
+agent: hello-agent           # the policy binds to ONE agent identity
+
+allow:
+  - observe: [Note]          # may READ notes — and nothing else.
+                             # 'create' is not listed, so it stays denied.

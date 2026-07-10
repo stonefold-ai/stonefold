@@ -1,0 +1,8 @@
+# THE POLICY — the reviewed rulebook (see 01). This agent may look at
+# customers and tickets and open tickets; everything else stays denied.
+apiVersion: stele/v0.1
+agent: support-agent
+
+allow:
+  - observe: [Customer, Ticket]
+  - record:  [Ticket]

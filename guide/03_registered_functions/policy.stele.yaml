@@ -1,0 +1,22 @@
+# THE POLICY — the rulebook now USES the declared names. Still no Python:
+# the policy author writes which gate applies where; the implementations are
+# the function developer's job (functions.py).
+
+apiVersion: stele/v0.1
+agent: ops-agent
+
+allow:
+  - observe: [Note]
+  - record:  [Note]
+  - effect:  [ship]
+
+scope:
+  Note: ownedBy(actor)            # reads return only the actor's own rows
+
+gates:
+  Note.create:
+    contentCheck: no.secrets      # every created note passes the hook
+  ship:
+    precondition:
+      checks: [targetIsActive, inventoryAvailable]
+      resolvers: role:warehouse-lead   # who releases a hold this gate raises

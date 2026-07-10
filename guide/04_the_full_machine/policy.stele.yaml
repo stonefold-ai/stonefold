@@ -1,0 +1,17 @@
+# THE POLICY — the rulebook for money. Read it the way a reviewer would:
+# payments are capped, frequent payees are rate-limited, and anything over
+# $1,000 waits for a named human role. Nobody can code around this file.
+
+apiVersion: stele/v0.1
+agent: payments-agent
+
+allow:
+  - effect: [pay]
+
+gates:
+  pay:
+    valueLimit: { field: data.amount, max: 50000 }
+    rate:       { limit: 5/hour, per: data.payeeId }   # Redis-backed in production
+    requireApproval:
+      when: "data.amount > 1000"
+      approvers: role:payments-manager
