@@ -8,7 +8,7 @@ reviewed policy, staged, audited, and — where the policy says so — held for
 a human. This guide shows you, hands on, what that costs to adopt (one HTTP
 call in your agent) and what it buys.
 
-Five step-by-step tutorials, each in its own directory with its own README
+Six step-by-step tutorials, each in its own directory with its own README
 and complete files. Every example's `main.py` is executed by the test suite
 on every commit (`tests/test_guide_examples.py`), so the guide cannot drift
 from the code it teaches.
@@ -87,6 +87,7 @@ install from the checkout. The `spec/` submodule must be populated
 | [03 — Registered functions](03_registered_functions/README.md) | the code the gateway calls: scope predicates, content hooks, precondition checks (incl. the v0.6 three-valued *hold*) |
 | [04 — The full machine](04_the_full_machine/README.md) | Postgres outbox + Redis counters, the dispatch worker, approvals and the kill switch over the operator API |
 | [05 — Obligation matching](05_obligation_matching/README.md) | v0.6: the ERP adapter, `requireMatch`, reserve→consume→release, and the agent loop that converges on `retryClass` |
+| [06 — Keep your tools](06_keep_your_tools/README.md) | interception mode: your existing agent, unchanged — a reviewed mapping table translates its old tool calls into declared actions; unmapped tools are denied |
 
 Read them in order the first time; each README states which files changed
 since the previous example and which role owns the change.

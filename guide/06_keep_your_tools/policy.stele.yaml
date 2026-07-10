@@ -1,0 +1,12 @@
+# THE POLICY — the reviewed rulebook (see 01). Written against the DECLARED
+# vocabulary, not against tool names: it doesn't know or care that the agent
+# says "lookup_customer" on the wire. Rename the tool tomorrow and this file
+# does not change.
+apiVersion: stele/v0.1
+agent: support-agent
+
+allow:
+  - observe: [Customer]
+  - record:  [Ticket]
+# Customer.export is declared in the registry but not allowed here ->
+# a mapped tool call that reaches it is refused by default-deny.

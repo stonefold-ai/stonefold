@@ -1,0 +1,16 @@
+# THE REGISTRY — platform/policy team artifact (see 01 for the full story).
+# Note there is nothing interception-specific here: the vocabulary is the
+# same one a SIF-native agent would use. The mapping file translates INTO it.
+connectors: [in_memory]
+
+resources:
+  Customer:
+    connector: in_memory
+    actions:
+      read:   { kind: observe }
+      export: { kind: effect }    # declared, so it CAN be reasoned about —
+                                  # the policy below still never allows it
+  Ticket:
+    connector: in_memory
+    actions:
+      create: { kind: record }

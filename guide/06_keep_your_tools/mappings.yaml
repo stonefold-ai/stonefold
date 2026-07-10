@@ -1,0 +1,27 @@
+# THE MAPPING — the star of this example. A declared, reviewed table that
+# gives each of the agent's EXISTING tools a meaning in the registry's
+# vocabulary. At runtime the gateway does a lookup here, not interpretation:
+# tool name -> declared resource.action, argument keys -> declared data keys.
+# No inference, no LLM — the meaning of every tool call is signed in advance.
+#
+# Owned by the platform/policy team, like the registry. An LLM is a fine
+# way to DRAFT this file (hand it your tools/list JSON and the registry);
+# a human reviews and signs what it drafted. Authoring can be assisted —
+# enforcement stays a table lookup.
+#
+# What is NOT in this table is the point: the agent also has a `run_sql`
+# tool. It has no entry, so every call to it is denied and audited.
+
+mappings:
+  - tool: lookup_customer          # the agent's old tool name, verbatim
+    resource: Customer
+    action: read
+
+  - tool: open_ticket
+    resource: Ticket
+    action: create
+    argMap: { customer: customerId }   # old arg name -> declared data key
+
+  - tool: export_crm               # mapped, so policy can judge it —
+    resource: Customer             # and the policy says no (default-deny)
+    action: export

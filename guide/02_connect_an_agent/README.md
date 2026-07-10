@@ -166,6 +166,7 @@ audit (last line) names the transport identity, `rep-7`, for every record.
    enum in the tool schema, generated from the registry.
 3. **Identity is not the model's to claim.** The smuggled `"actor": "admin"`
    landed as data; the audit names the transport identity.
-4. **Already on MCP?** You don't have to touch your agent at all:
-   `MCPProxy` (in `stonefold_gateway.transport`) maps each existing tool
+4. **Already on MCP, or attached to your existing tools?** You don't have
+   to touch your agent at all: interception mode maps each existing tool
    call to a declared action and enforces it; unmapped tools are denied.
+   Example [06](../06_keep_your_tools/README.md) runs exactly that.

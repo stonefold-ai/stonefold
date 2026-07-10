@@ -160,7 +160,7 @@ git submodule update --init
 
 ### Building on it: the developer's guide
 
-If you want to put the gateway in front of **your own** agent, the step-by-step path is **[`guide/`](guide/README.md)**: five tutorials, each a directory with its own README and complete files **split by role** — the one HTTP call that lives in your agent (no Stonefold imports), the YAML the policy author signs, the functions the domain team writes, and the `uvicorn` service the platform runs, with real Postgres/Redis via `guide/docker-compose.yml` (in-memory fallback for laptops). Every tutorial's `main.py` runs the real service on a real port and is executed by the test suite on every commit, so the guide can never drift from the code.
+If you want to put the gateway in front of **your own** agent, the step-by-step path is **[`guide/`](guide/README.md)**: six tutorials, each a directory with its own README and complete files **split by role** — the one HTTP call that lives in your agent (no Stonefold imports), the YAML the policy author signs, the functions the domain team writes, and the `uvicorn` service the platform runs, with real Postgres/Redis via `guide/docker-compose.yml` (in-memory fallback for laptops). Every tutorial's `main.py` runs the real service on a real port and is executed by the test suite on every commit, so the guide can never drift from the code.
 
 ## How this relates to existing policy tools
 
@@ -180,7 +180,7 @@ The full version of this argument — the PDP/PEP category error, the four-verdi
 
 ## Learn more
 
-- **[The developer's guide](guide/README.md)** — from a clean checkout to a running gateway with your agent behind it: five role-separated, test-guarded tutorials covering setup + real infra, the one HTTP call in your agent, the functions you write, staged effects with approvals and kill, and v0.6 obligation matching.
+- **[The developer's guide](guide/README.md)** — from a clean checkout to a running gateway with your agent behind it: six role-separated, test-guarded tutorials covering setup + real infra, the one HTTP call in your agent, the functions you write, staged effects with approvals and kill, v0.6 obligation matching, and interception mode for the tools your agent already has.
 - **[SIF — the intent format](https://github.com/stonefold-ai/spec/blob/main/docs/00-RFC-sif-intent-format.md)** — the five action kinds and the shape the agent emits; the layer everything else builds on.
 - **[Stele — the policy language](https://github.com/stonefold-ai/spec/blob/main/docs/01-RFC-agent-control-policy.md)** — the rulebook language, with worked examples across five domains.
 - **[Implementation design](docs/02-implementation-design.md)** — how the gateway executes it, including the stop button in full.

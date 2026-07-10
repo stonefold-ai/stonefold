@@ -47,5 +47,5 @@ def test_guide_example_runs(example: Path) -> None:
     _run(example)
 
 
-def test_the_guide_ships_all_five_tutorials() -> None:
-    assert [p.name[:2] for p in EXAMPLES] == ["01", "02", "03", "04", "05"]
+def test_the_guide_ships_all_six_tutorials() -> None:
+    assert [p.name[:2] for p in EXAMPLES] == ["01", "02", "03", "04", "05", "06"]
