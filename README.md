@@ -181,6 +181,7 @@ The full version of this argument — the PDP/PEP category error, the four-verdi
 ## Learn more
 
 - **[The developer's guide](guide/README.md)** — from a clean checkout to a running gateway with your agent behind it: six role-separated, test-guarded tutorials covering setup + real infra, the one HTTP call in your agent, the functions you write, staged effects with approvals and kill, v0.6 obligation matching, and interception mode for the tools your agent already has.
+- **[Why not just tools?](docs/21-why-not-just-tools.md)** — the five-minute case for the whole gateway, written for a reader whose tools already work: when plain tools are the right call, where they stop being enough, and an honest account of what SIF costs and buys.
 - **[SIF — the intent format](https://github.com/stonefold-ai/spec/blob/main/docs/00-RFC-sif-intent-format.md)** — the five action kinds and the shape the agent emits; the layer everything else builds on.
 - **[Stele — the policy language](https://github.com/stonefold-ai/spec/blob/main/docs/01-RFC-agent-control-policy.md)** — the rulebook language, with worked examples across five domains.
 - **[Implementation design](docs/02-implementation-design.md)** — how the gateway executes it, including the stop button in full.
