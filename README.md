@@ -45,6 +45,12 @@ Three design choices make it work:
 
 3. **Every attempt is written down, automatically** — what was asked, what was allowed or refused, and why. So you can always answer "what did your AI do, and who let it?" — which today is nearly impossible to answer.
 
+Here is the whole machine on one page — the agent's single entry point on the left, the deterministic pipeline in the middle, your systems and the humans in charge around it:
+
+<a href="guide/architecture.svg"><img src="guide/architecture.svg" alt="How the pieces fit: the agent's only path is a typed submit_intent over HTTP into the deterministic gateway (resolve, authorize, scope, gates, kill, stage, audit); gates call your registered checks/hooks/predicates; allowed effects stage in the outbox and a dispatch worker sends them through your connectors, with the operator holding approvals and the kill switch; v0.6 adds the obligation registry the gateway queries, reserves, consumes and releases; everything lands in the append-only audit log" width="100%"></a>
+
+<sub>Click the diagram to open it full size. The [developer's guide](guide/README.md) walks through every box in it, one tutorial at a time.</sub>
+
 **How the stop button works, mechanically:** because every consequential action has to pause at the checkpoint before it actually happens, stopping is just flipping a flag the checkpoint checks at that last moment. Flip it, and everything that hasn't already gone out the door is halted. (The honest limit: it can stop anything not-yet-done and, where possible, cancel things mid-flight — but it can't un-send an email that already left. Nothing can. What it *can* do is stop the next 999 and prove exactly what happened.)
 
 ## The same thing in a hospital
