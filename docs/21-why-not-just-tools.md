@@ -149,6 +149,25 @@ and colleagues, and DeepMind's CaMeL, both conclude that once an agent has inges
 untrusted input, its ability to express actions must be structurally constrained,
 because nothing at the model level reliably filters the input.
 
+The fair follow-up is: if those patterns exist, why not just use them? Where one fits,
+do. A fixed workflow built as strict plan-then-execute has addressed the problem for
+that workflow, and a gateway adds little there. But notice how the patterns win:
+action-selector removes the feedback loop entirely, plan-then-execute freezes the plan
+before any untrusted data is read, and the dual-LLM pattern quarantines untrusted
+content away from the model that acts. Each buys its protection by giving up part of
+the agentic loop, and the agent most people are actually trying to deploy, one that
+reads the invoice and acts on what it read, is the part being given up. The gateway
+sits at a different point in that trade: the loop stays intact, and enforcement bounds
+it from below. That is honestly a weaker guarantee than plan-then-execute where
+plan-then-execute applies — an injection can still steer the next intent; the steering
+is just confined to the declared vocabulary, decided by the same gates, and on the
+record — and a workable one where it doesn't apply at all. The two compose: restructure
+the application where a pattern fits, and let the gateway bound whatever loop remains.
+A pattern also lives in application code, implemented per team, with nothing that fails
+loudly when a refactor quietly breaks the quarantine; and it ends at prevention, so
+approval holds, the kill switch, spend counters, and audit are outside its scope either
+way.
+
 There's also a payoff unrelated to safety: constraining what the agent can express
 makes it more reliable. Enum-injected names mean the model can't hallucinate a
 plausible-but-wrong tool or field, and structured errors ("Patient has no field
