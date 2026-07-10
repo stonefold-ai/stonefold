@@ -25,7 +25,7 @@ example keeps these roles in separate files, because they are separate jobs:
 | Role | Owns | Writes |
 |---|---|---|
 | **Agent developer** (probably you) | `agent.py` | one HTTP call: `POST /submit_intent` with the platform-set identity headers. **No Stonefold imports.** Any program can make this call — an LLM loop, a cron job, a script. |
-| **Policy author** (security / compliance) | `registry.yaml`, `policy.stele.yaml` | declarative YAML, reviewed and signed. **Never Python.** |
+| **Policy author** (security / compliance) | `registry.yaml`, `policy.stele.yaml` | declarative YAML, reviewed and signed. **Never code.** |
 | **Function developer** (domain team) | `functions.py`, `erp_adapter.py` | small deterministic functions the gateway calls by declared name |
 | **Infra engineer** (platform) | `gateway_service.py`, `docker-compose.yml` | the HTTP service: env-driven stores, worker, `uvicorn gateway_service:app` |
 | **Operator** (on-call, approvers) | `operator_console.py` | approvals + kill, over plain HTTP admin endpoints |
@@ -34,6 +34,14 @@ If you are one developer evaluating this on a laptop: you play all five
 roles. The split is about files and review boundaries, not headcount — it
 exists so that when a team does adopt this, each file already belongs to
 the right owner.
+
+None of it ties you to Python. The agent is any program, in any language,
+that can make an HTTP request; the policy and registry are YAML. Python
+appears in the other seats only because this guide runs the **reference**
+gateway, which happens to be written in Python — the spec is
+language-neutral, and a gateway implemented in any other language presents
+the same HTTP surface and proves it with the conformance kit
+(`spec/docs/12-conformance-tck.md`).
 
 The agent talks to the gateway **over the network** — a real port, a real
 HTTP call, two separate processes. Nothing agent-side ever runs inside the

@@ -16,7 +16,7 @@ a policy, and one `enforce()` call — and you watch default-deny work.
 | File | Role | In production |
 |---|---|---|
 | `registry.yaml` | platform / policy team | a reviewed artifact in its own repo; the catalogue of everything that *exists* |
-| `policy.stele.yaml` | policy author (security / compliance) | a reviewed, signed rulebook — **no Python, ever** |
+| `policy.stele.yaml` | policy author (security / compliance) | a reviewed, signed rulebook — **no code, ever** |
 | `main.py` | infra engineer | the gateway service's startup wiring (example 02 shows it as a real service) |
 
 ---

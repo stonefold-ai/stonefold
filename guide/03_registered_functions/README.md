@@ -13,7 +13,7 @@ infra service. Four files, four owners:
 | File | Role | What changes vs example 02 |
 |---|---|---|
 | `registry.yaml` | platform / policy team | now DECLARES the function names (and each check's hold capability + reason codes) |
-| `policy.stele.yaml` | policy author | now USES the names in `scope:` and `gates:` — still zero Python |
+| `policy.stele.yaml` | policy author | now USES the names in `scope:` and `gates:` — still zero code |
 | **`functions.py`** | **function developer — the new file** | the three implementations; no gateway wiring |
 | `gateway_service.py` | infra engineer | registers the implementations + resolves target facts per request |
 | `agent.py` | agent developer | **unchanged shape** — the agent never knows these functions exist |
