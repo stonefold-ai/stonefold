@@ -12,8 +12,11 @@ help:
 	@echo "make logs  - tail the gateway log"
 	@echo "make down  - stop everything and remove volumes"
 
+# build the agent image explicitly: it sits behind the "tools" profile, so a
+# plain `up --build` never rebuilds it and `run` would reuse a stale image
 up:
-	$(COMPOSE) up -d --build
+	$(COMPOSE) --profile tools build
+	$(COMPOSE) up -d
 	@echo "Gateway + UI:  http://localhost:8088"
 
 seed:

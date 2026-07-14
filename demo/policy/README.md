@@ -7,9 +7,9 @@ The gateway loads, directly:
 
 | File | What it is |
 |---|---|
-| [`../../examples/payments-ops.stele.yaml`](../../examples/payments-ops.stele.yaml) | the policy (allow/deny, scope, gates) |
-| [`../../registry/stonefold-registry.yaml`](../../registry/stonefold-registry.yaml) | the model registry (resources, actions, scope predicates, named sets like `sanctioned-list`) |
-| [`../../schema/stele.schema.json`](../../schema/stele.schema.json) | the JSON Schema the policy validates against |
+| [`../../spec/examples/payments-ops.stele.yaml`](../../spec/examples/payments-ops.stele.yaml) | the policy (allow/deny, scope, gates) |
+| [`../../spec/registry/stonefold-registry.yaml`](../../spec/registry/stonefold-registry.yaml) | the model registry (resources, actions, scope predicates, named sets like `sanctioned-list`) |
+| [`../../spec/schema/stele.schema.json`](../../spec/schema/stele.schema.json) | the JSON Schema the policy validates against |
 
 These are a single source of truth (no copies here), so **editing the policy and
 restarting the gateway changes the demo's behaviour with no code change** — e.g.:

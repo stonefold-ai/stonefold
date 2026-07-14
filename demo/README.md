@@ -1,7 +1,7 @@
 # Accounts-Payable Demo — the Stonefold Gateway in the path
 
 A **real AI agent** doing accounts-payable work behind the **real Stonefold gateway**,
-enforcing the **unmodified** [`examples/payments-ops.stele.yaml`](../examples/payments-ops.stele.yaml).
+enforcing the **unmodified** [`spec/examples/payments-ops.stele.yaml`](../spec/examples/payments-ops.stele.yaml).
 The bank and ledger are faked (no real money, all data fictional); the agent and
 the enforcement are real.
 
@@ -59,7 +59,8 @@ make down                     # stop everything, remove volumes
 `make` not installed? Use the `docker compose` equivalents (run from `demo/`):
 
 ```bash
-docker compose up -d --build
+docker compose --profile tools build   # the agent image is profile-gated; build it too
+docker compose up -d
 docker compose exec -T postgres psql -U stonefold -d stonefold < seed/ledger_seed.sql
 docker compose run --rm agent python -m stonefold_ap_demo.agent_cli --scenario inbox
 docker compose run --rm agent python -m stonefold_ap_demo            # walkthrough
