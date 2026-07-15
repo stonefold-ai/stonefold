@@ -120,5 +120,5 @@ skim survives contact with the prose. (The full glossary is
   clinical, legal, support, defence) that load and lint clean.
 - **`docs/05-demo-spec.md` + `demo/`** — the full real-LLM demo with UI,
   approvals inbox, live trace, and kill switch.
-- **`docs/12-conformance-tck.md`** — certify a gateway you wrote yourself,
-  in any language, against the same spec.
+- **`spec/docs/12-conformance-tck.md`** — certify a gateway you wrote
+  yourself, in any language, against the same spec.
