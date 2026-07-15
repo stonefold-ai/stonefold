@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -142,7 +142,7 @@ def _flag_set(ctx: GateContext) -> bool:
     return bool(ctx.env.resource.get("flag"))
 
 
-def _hold_on_marker(ctx: GateContext) -> "bool | CheckResult":
+def _hold_on_marker(ctx: GateContext) -> bool | CheckResult:
     """docs/12 §3: HOLD with code ``tck-queue`` iff the resolved TARGET's
     ``hold`` field is truthy; RAISE iff its ``crash`` field is truthy (the
     outage a check must never turn into a hold); else pass. World-driven, like
@@ -155,7 +155,7 @@ def _hold_on_marker(ctx: GateContext) -> "bool | CheckResult":
     return True
 
 
-def _codeless_hold(ctx: GateContext) -> "bool | CheckResult":
+def _codeless_hold(ctx: GateContext) -> bool | CheckResult:
     """docs/12 §3: a CODE-LESS hold iff the target's ``badhold`` field is
     truthy — the implementation error the gateway must resolve fail-closed
     (CS-026 rule 2); else pass."""
@@ -243,7 +243,13 @@ class ReferenceDriver:
         return ALL_CAPABILITIES
 
     def load(self, registry_yaml: str, policy_yaml: str) -> LoadResult:
-        registry = load_registry(authoring_to_compact(yaml.safe_load(registry_yaml)))
+        try:
+            registry = load_registry(authoring_to_compact(yaml.safe_load(registry_yaml)))
+        except Exception as exc:
+            # an invalid registry declaration (e.g. holdCapable with no
+            # reasonCodes, §13 rule 18) refuses the load — ok=False, like a
+            # policy lint ERROR, never a crash out of the driver contract.
+            return LoadResult(ok=False, errors=[str(exc)])
         schema = json.loads(_SCHEMA.read_text(encoding="utf-8"))
         try:
             policy = load_policy(yaml.safe_load(policy_yaml), registry, schema=schema)
@@ -519,8 +525,12 @@ class ReferenceDriver:
 
     # --- internals -----------------------------------------------------------
     def _worker_clock(self) -> datetime:
-        # the TCK's pinned clock; a wall clock only if a check forgot to pin it
-        return self._now or datetime.now(timezone.utc)
+        # the TCK's pinned clock. This driver advertises CAP_CLOCK, so every
+        # check pins it in setup(); failing loud here beats silently running
+        # a time-based gate on wall time.
+        assert self._now is not None, "TCK clock not pinned (set_clock) before dispatch"
+        return self._now
+
     def _env_factory(self, raw: RawCall) -> RequestEnv:
         """Resolve the target row (by ``data.id``) so gates can read
         ``resource.*``; thread the injected clock, sink, and ambient context."""

@@ -309,6 +309,36 @@ allow:
   - observe: '*'
 """
 
+# A9 (§13 rule 18, CS-038): a check declared hold-capable with NO reasonCodes
+# is a REGISTRY load error — every hold it returned would be code-less and
+# resolve fail (CS-026 rule 2), so the declaration itself is refused. The
+# minimal policy alongside is valid, isolating the refusal to the registry.
+REGISTRY_INVALID_HOLD_NO_CODES = """\
+apiVersion: registry/v1.0
+domain: tck
+
+connectors:
+  tck-data: { type: sql }
+
+preconditionChecks:
+  - name: tck.badDecl
+    holdCapable: true
+
+entities:
+  Widget:
+    dataSource: tck-data
+    properties:
+      id: { type: string }
+"""
+
+POLICY_MINIMAL_OBSERVE = """\
+apiVersion: stele/v0.1
+agent: tck-agent
+defaults: { failureMode: closed, audit: full }
+allow:
+  - observe: [Widget]
+"""
+
 # --- v0.6 variants ---------------------------------------------------------
 # J1–J5 (CS-026/027/028): a hold-capable check gated with a resolver, composed
 # with an approval tier above $1000 so J3 can prove BOTH contracts bind.
@@ -327,6 +357,24 @@ gates:
     requireApproval:
       when: "data.amount > 1000"
       approvers: role:tck-approver
+"""
+
+# J7 (CS-027): the same hold-capable check gated with NO resolvers. The TCK
+# runs with NO deployment default resolver role (REQUIRED config, docs/12 §2),
+# so a hold from this gate has no resolvable release contract and MUST be
+# refused fail-closed (``hold-unresolvable``) — never staged. Loading this
+# policy is legal (rule 18's second half is a WARN naming the fallback).
+POLICY_HOLD_NO_RESOLVER = """\
+apiVersion: stele/v0.1
+agent: tck-agent
+defaults: { failureMode: closed, audit: full }
+killable: true
+allow:
+  - effect: [pay]
+gates:
+  pay:
+    precondition:
+      checks: [tck.holdOnMarker]
 """
 
 # L1–L5 / M1–M4 / K2–K3 (CS-032–CS-036): the payment must correspond to

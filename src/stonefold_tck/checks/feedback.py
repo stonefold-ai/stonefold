@@ -33,19 +33,19 @@ _SENTINEL_AMOUNT = 87650.0
 def k1_codes_and_classes(driver: ConformanceDriver) -> None:
     setup(driver)
     over_limit = expect_decision(submit(driver, pay(20000)), "deny", "over the value limit")
-    expect(bool(over_limit.reason_code), "a deny must carry a reason code (CS-029)")
+    expect(bool(over_limit.reason_code), "the deny carries no reason code (CS-029)")
     expect(
         over_limit.retry_class == "retryable",
-        f"a valueLimit deny is fixable in the intent — expected class 'retryable', "
-        f"got {over_limit.retry_class!r}",
+        f"the valueLimit deny is classed {over_limit.retry_class!r} instead of "
+        f"the normative 'retryable' — the defect is in the intent (CS-029)",
     )
     sanctioned = expect_decision(
         submit(driver, pay(500, country="XX")), "deny", "sanctioned destination"
     )
     expect(
         sanctioned.retry_class == "terminal",
-        f"a denylist deny is not the agent's to fix — expected class 'terminal', "
-        f"got {sanctioned.retry_class!r}",
+        f"the denylist deny is classed {sanctioned.retry_class!r} instead of "
+        f"the normative 'terminal' — nothing here is the agent's to fix (CS-029)",
     )
 
 
@@ -70,7 +70,7 @@ def k2_no_record_side_leak(driver: ConformanceDriver) -> None:
         )),
         "deny", "outside tolerance",
     )
-    expect(bool(result.reason_code), "the deny must still carry its code")
+    expect(bool(result.reason_code), "the redacted deny lost its reason code")
     expect(
         "87650" not in result.agent_view,
         "the record-side amount the intent was compared against leaked into "

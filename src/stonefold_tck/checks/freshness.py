@@ -11,6 +11,8 @@ connector appearing in the audit record (B5's second clause) — the TCK's
 normalized audit shape does not carry ``scopeApplied``; both reassertion forms
 are covered through their shared observable (the effect does not land and the
 settle reason is ``scope-lost``).
+
+Failure messages state the violation observed, not the expectation.
 """
 
 from __future__ import annotations
@@ -18,7 +20,15 @@ from __future__ import annotations
 from datetime import timedelta
 
 from stonefold_tck.checks import PROFILE_FRESHNESS, check, expect
-from stonefold_tck.checks._util import T0, expect_decision, expect_ticket, pay, setup, submit
+from stonefold_tck.checks._util import (
+    T0,
+    effects_of,
+    expect_decision,
+    expect_ticket,
+    pay,
+    setup,
+    submit,
+)
 from stonefold_tck.driver import (
     CAP_APPROVALS,
     CAP_AUDIT,
@@ -33,13 +43,9 @@ from stonefold_tck.driver import (
 _TTL_CAPS = (CAP_STAGING, CAP_CLOCK, CAP_AUDIT, CAP_FRESHNESS)
 
 
-def _pay_effects(driver: ConformanceDriver) -> int:
-    return sum(1 for e in driver.effects() if e.get("action") == "pay")
-
-
 def _last_audit(driver: ConformanceDriver) -> AuditEntry:
     entries = driver.audit()
-    expect(len(entries) > 0, "expected at least one audit record")
+    expect(len(entries) > 0, "no audit record was written")
     return entries[-1]
 
 
@@ -53,12 +59,13 @@ def d5_expired_decision(driver: ConformanceDriver) -> None:
 
     driver.set_clock(T0 + timedelta(hours=1))  # past the irreversible TTL
     driver.dispatch_once()
-    expect(_pay_effects(driver) == 0, "an expired decision must never dispatch")
+    expect(effects_of(driver, "pay") == 0, "an expired decision dispatched")
     last = _last_audit(driver)
     expect(last.decision == "deny" and last.outcome == "cancelled",
-           f"the stale cancel must be audited (deny/cancelled), got {last.decision}/{last.outcome}")
+           f"the stale cancel was not audited deny/cancelled, got {last.decision}/{last.outcome}")
     expect(last.reason == "stale-decision",
-           f"settle reason must be 'stale-decision' (RFC §12), got {last.reason!r}")
+           f"the settle reason is {last.reason!r} instead of the normative "
+           f"'stale-decision' (RFC §12)")
 
 
 @check("D5b", "a late approval does not resurrect an expired decision",
@@ -74,11 +81,12 @@ def d5_late_approval(driver: ConformanceDriver) -> None:
     # Refusing the late approval outright is also conformant; if it is
     # accepted, the TTL must still cancel the row at claim.
     driver.dispatch_once()
-    expect(_pay_effects(driver) == 0,
-           "an approval after expiry must not release the effect — re-submit and re-decide")
+    expect(effects_of(driver, "pay") == 0,
+           "an approval after expiry released the effect — the intent must be "
+           "re-submitted and re-decided")
     if approved:
         expect(_last_audit(driver).reason == "stale-decision",
-               "the late-approved row must settle 'stale-decision'")
+               "the late-approved row did not settle 'stale-decision'")
 
 
 @check("D6", "a volatile gate (denylist) is re-validated inside the dispatch claim",
@@ -91,12 +99,14 @@ def d6_volatile_revalidation(driver: ConformanceDriver) -> None:
     # the sanctions update lands between decision and dispatch
     driver.update_named_set("tck-blocked-countries", ["XX", "SK"])
     driver.dispatch_once()
-    expect(_pay_effects(driver) == 0, "a dispatch-time denylist hit must never partially dispatch")
+    expect(effects_of(driver, "pay") == 0,
+           "a dispatch-time denylist hit still (partially) dispatched")
     last = _last_audit(driver)
     expect(last.decision == "deny" and last.outcome == "cancelled",
-           f"the stale-guard cancel must be audited, got {last.decision}/{last.outcome}")
+           f"the stale-guard cancel was not audited, got {last.decision}/{last.outcome}")
     expect(last.reason == "stale-guard:denylist",
-           f"settle reason must be 'stale-guard:denylist' (RFC §12), got {last.reason!r}")
+           f"the settle reason is {last.reason!r} instead of the normative "
+           f"'stale-guard:denylist' (RFC §12)")
 
     again = submit(driver, pay(100, country="SK"))
     expect_decision(again, "deny", "a fresh submission after the set update")
@@ -112,8 +122,9 @@ def d6_counters_not_rerun(driver: ConformanceDriver) -> None:
     expect_decision(submit(driver, pay(100, payee="PYX")), "allow", "second pay")
     driver.set_clock(T0 + timedelta(minutes=10))  # within every TTL
     driver.dispatch_once()
-    expect(_pay_effects(driver) == 2,
-           "both staged pays must dispatch — re-running the rate counter double-counts")
+    expect(effects_of(driver, "pay") == 2,
+           "a staged pay was cancelled — re-running the rate counter at "
+           "dispatch double-counts")
 
 
 @check("D6c", "an approval grant is not re-requested at dispatch",
@@ -122,11 +133,12 @@ def d6_approval_not_rerequested(driver: ConformanceDriver) -> None:
     setup(driver)
     r = submit(driver, pay(2000))
     ticket = expect_ticket(expect_decision(r, "hold", "held pay"), "held pay")
-    expect(driver.approve(ticket, "carol"), "approval accepted")
+    expect(driver.approve(ticket, "carol"), "the approval was refused")
     driver.set_clock(T0 + timedelta(minutes=10))  # within the 30-minute TTL
     driver.dispatch_once()
-    expect(_pay_effects(driver) == 1,
-           "the grant IS the release — within the TTL the approved effect must dispatch")
+    expect(effects_of(driver, "pay") == 1,
+           "the approved effect did not dispatch within its TTL — the grant "
+           "IS the release")
 
 
 @check("B4", "a target reassigned after the decision never receives the effect (scope no-race)",
@@ -139,10 +151,11 @@ def b4_scope_no_race(driver: ConformanceDriver) -> None:
     # the race: P1 moves to another tenant before dispatch
     driver.seed("Payment", [{"id": "P1", "tenant": "t2"}, {"id": "P2", "tenant": "t2"}])
     driver.dispatch_once()
-    expect(_pay_effects(driver) == 0,
-           "the effect must not land on un-authorized state (RFC §6.3)")
+    expect(effects_of(driver, "pay") == 0,
+           "the effect landed on un-authorized state (RFC §6.3)")
     last = _last_audit(driver)
     expect(last.decision == "deny" and last.outcome == "failure",
-           f"the scope failure must be audited, got {last.decision}/{last.outcome}")
+           f"the scope failure was not audited, got {last.decision}/{last.outcome}")
     expect(last.reason == "scope-lost",
-           f"settle reason must be 'scope-lost' (RFC §6.3), got {last.reason!r}")
+           f"the settle reason is {last.reason!r} instead of the normative "
+           f"'scope-lost' (RFC §6.3)")

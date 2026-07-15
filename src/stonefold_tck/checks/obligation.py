@@ -1,4 +1,4 @@
-"""L1–L5 (profile ``match``) and M1–M4 (profile ``consume``) — obligation
+"""L1–L5 (profile ``match``) and M1–M5 (profile ``consume``) — obligation
 matching and the reservation lifecycle (v0.6 CS-032–CS-036).
 
 An intent must correspond to exactly one open obligation, read back from the
@@ -13,7 +13,14 @@ from __future__ import annotations
 from typing import Any
 
 from stonefold_tck.checks import PROFILE_CONSUME, PROFILE_MATCH, check, expect
-from stonefold_tck.checks._util import expect_decision, expect_ticket, setup, submit
+from stonefold_tck.checks._util import (
+    SESSION,
+    effects_of,
+    expect_decision,
+    expect_ticket,
+    setup,
+    submit,
+)
 from stonefold_tck.driver import (
     CAP_AUDIT,
     CAP_FEEDBACK,
@@ -48,7 +55,7 @@ def _setup(driver: ConformanceDriver, records: dict[str, dict[str, Any]]) -> Non
 
 
 def _pay_effects(driver: ConformanceDriver) -> int:
-    return sum(1 for e in driver.effects() if e.get("action") == "pay")
+    return effects_of(driver, "pay")
 
 
 # ==========================================================================
@@ -65,7 +72,7 @@ def l1_exactly_one_passes(driver: ConformanceDriver) -> None:
     result = expect_decision(submit(driver, _pay(820.0)), "allow", "one open line, within 10%")
     expect_ticket(result, "the staged payment")
     driver.dispatch_once()
-    expect(_pay_effects(driver) == 1, "the matched payment must dispatch")
+    expect(_pay_effects(driver) == 1, "the matched payment did not dispatch")
 
 
 @check(
@@ -81,13 +88,13 @@ def l2_zero_is_no_match(driver: ConformanceDriver) -> None:
     )
     expect(
         result.reason_code == "no-match",
-        f"the zero-candidate refusal code is normative: expected 'no-match', "
-        f"got {result.reason_code!r}",
+        f"the zero-candidate refusal carries {result.reason_code!r} instead of "
+        f"the normative 'no-match'",
     )
-    closed = expect_decision(
+    still_open = expect_decision(
         submit(driver, _pay(800.0), session="tck-s2"), "allow", "the open line still matches"
     )
-    expect(closed.ticket is not None, "the open line should still be reservable")
+    expect(still_open.ticket is not None, "the still-open line did not stage a ticket")
 
 
 @check(
@@ -150,15 +157,15 @@ def l5_outage_fails_closed(driver: ConformanceDriver) -> None:
 def m1_reserved_with_staging(driver: ConformanceDriver) -> None:
     _setup(driver, {"ORD-1": _order(800.0)})
     expect_decision(submit(driver, _pay(800.0)), "allow", "first intent (staged)")
-    expect(_pay_effects(driver) == 0, "nothing has dispatched yet")
+    expect(_pay_effects(driver) == 0, "an effect left before the dispatch step")
     second = expect_decision(
         submit(driver, _pay(800.0), session="tck-s2"), "deny",
         "the line is reserved by the FIRST intent's staged row",
     )
     expect(
         second.reason_code == "no-match",
-        f"the spoken-for line's refusal is normative: expected 'no-match', "
-        f"got {second.reason_code!r}",
+        f"the spoken-for line's refusal carries {second.reason_code!r} instead "
+        f"of the normative 'no-match'",
     )
 
 
@@ -172,13 +179,14 @@ def m2_consumed_at_settle(driver: ConformanceDriver) -> None:
     _setup(driver, {"ORD-1": _order(800.0)})
     expect_decision(submit(driver, _pay(800.0)), "allow", "matched payment")
     driver.dispatch_once()
-    expect(_pay_effects(driver) == 1, "the payment must dispatch")
+    expect(_pay_effects(driver) == 1, "the matched payment did not dispatch")
     resubmit = expect_decision(
         submit(driver, _pay(800.0), session="tck-s2"), "deny",
         "the SAME invoice resubmitted after its line was consumed",
     )
     expect(resubmit.reason_code == "no-match",
-           f"expected 'no-match' on the consumed line, got {resubmit.reason_code!r}")
+           f"the consumed line's refusal carries {resubmit.reason_code!r} "
+           f"instead of the normative 'no-match'")
 
 
 @check(
@@ -190,17 +198,17 @@ def m2_consumed_at_settle(driver: ConformanceDriver) -> None:
 def m3_cancel_releases(driver: ConformanceDriver) -> None:
     _setup(driver, {"ORD-1": _order(800.0)})
     expect_decision(submit(driver, _pay(800.0)), "allow", "first intent (staged)")
-    kill_id = driver.kill(scope="session", session_id="tck-s1")
+    kill_id = driver.kill(scope="session", session_id=SESSION)
     driver.dispatch_once()  # the claim cancels under the kill and releases the line
-    expect(_pay_effects(driver) == 0, "the killed payment must not dispatch")
+    expect(_pay_effects(driver) == 0, "the killed payment dispatched")
     driver.lift(kill_id)
     retry = expect_decision(
         submit(driver, _pay(800.0), session="tck-s2"), "allow",
         "the released line matches a fresh intent",
     )
-    expect(retry.ticket is not None, "the fresh intent should stage")
+    expect(retry.ticket is not None, "the fresh intent did not stage a ticket")
     driver.dispatch_once()
-    expect(_pay_effects(driver) == 1, "exactly the fresh intent dispatches")
+    expect(_pay_effects(driver) == 1, "the fresh intent did not dispatch exactly once")
 
 
 @check(
@@ -223,4 +231,38 @@ def m4_no_double_consume(driver: ConformanceDriver) -> None:
     expect_decision(
         submit(driver, _pay(800.0), session="tck-s2"), "deny",
         "a second distinct intent against the consumed line",
+    )
+
+
+@check(
+    "M5",
+    "a reservation lost to another intent cancels at claim — stale-guard:requireMatch",
+    PROFILE_CONSUME,
+    requires=[CAP_OBLIGATION, CAP_STAGING, CAP_AUDIT],
+)
+def m5_lost_reservation_cancels_at_claim(driver: ConformanceDriver) -> None:
+    # CS-035's dispatch-time liveness check, through its one black-box window:
+    # the adapter loses the reservation out-of-band (its own orphan-expiry TTL,
+    # RFC §12 — ``seed_obligations`` models it by clearing reservation state),
+    # a second intent legitimately re-reserves the freed line, and the FIRST
+    # intent's claim must then find its reservation gone and cancel with the
+    # normative ``stale-guard:requireMatch`` — never dispatch a payment whose
+    # obligation now belongs to someone else.
+    _setup(driver, {"ORD-1": _order(800.0)})
+    expect_decision(submit(driver, _pay(800.0)), "allow", "first intent (staged, reserved)")
+    driver.seed_obligations(REGISTRY, {"ORD-1": _order(800.0)})  # the adapter forgot
+    expect_decision(
+        submit(driver, _pay(800.0), session="tck-s2"), "allow",
+        "a second intent over the adapter-freed line",
+    )
+    driver.dispatch_once()
+    expect(
+        _pay_effects(driver) == 1,
+        "one obligation line paid twice — exactly one of the two intents may dispatch",
+    )
+    reasons = [r.reason for r in driver.audit()]
+    expect(
+        any(r == "stale-guard:requireMatch" for r in reasons),
+        f"the losing intent's cancel lacks the normative 'stale-guard:requireMatch' "
+        f"reason (CS-035), got {reasons[-4:]}",
     )

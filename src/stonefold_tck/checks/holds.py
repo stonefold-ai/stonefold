@@ -1,9 +1,11 @@
-"""J1–J5 — the hold substrate (v0.6 CS-026/027/028; profile ``hold-precondition``).
+"""J1–J7 — the hold substrate (v0.6 CS-026/027/028/031; profile ``hold-precondition``).
 
 A hold-capable check's judgment-shaped ambiguity suspends the intent for a
-human; a code-less hold and a check outage both resolve FAIL (a hold must be
-worth a human's attention); composed holds bind every contract; held rows
-expire actively, on the injected clock that anchored the staging TTL.
+human; a code-less hold, a check outage, and a hold with no resolvable release
+contract all resolve FAIL (a hold must be worth — and reachable by — a human's
+attention); composed holds bind every contract; held rows expire actively, on
+the injected clock that anchored the staging TTL; duplicate holds collapse
+into one queue item while distinct questions stay distinct.
 
 The ``tck.holdOnMarker``/``tck.codelessHold`` checks read the resolved
 TARGET's fields (docs/12 §3) — so the TCK moves the WORLD (re-seeding the
@@ -29,7 +31,7 @@ from stonefold_tck.driver import (
     ConformanceDriver,
     Operation,
 )
-from stonefold_tck.fixtures import POLICY_HOLD
+from stonefold_tck.fixtures import POLICY_HOLD, POLICY_HOLD_NO_RESOLVER
 
 
 def _pay(amount: float, *, target: str) -> Operation:
@@ -63,11 +65,16 @@ def j1_hold_stages_with_code(driver: ConformanceDriver) -> None:
     expect_ticket(result, "the held intent")
     expect(
         result.reason_code == "tck-queue",
-        f"the hold must carry the check's declared reason code 'tck-queue', "
-        f"got {result.reason_code!r}",
+        f"the hold lost the check's declared reason code 'tck-queue' "
+        f"(got {result.reason_code!r})",
+    )
+    expect(
+        result.retry_class == "escalate",
+        f"the hold lost its declared retry class — the registry declares "
+        f"tck-queue: escalate (CS-029), got {result.retry_class!r}",
     )
     driver.dispatch_once()
-    expect(len(driver.effects()) == 0, "a held effect must not dispatch")
+    expect(len(driver.effects()) == 0, "a held effect dispatched")
 
 
 @check(
@@ -112,7 +119,7 @@ def j3_multi_hold_requires_all_contracts(driver: ConformanceDriver) -> None:
            "the resolver's release was refused")
     driver.dispatch_once()
     expect(len(driver.effects()) == 1,
-           "both contracts satisfied — the effect must dispatch exactly once")
+           "both contracts were satisfied but the effect did not dispatch exactly once")
 
     # inverse order on a fresh intent: resolver first, then still held.
     second = expect_decision(
@@ -128,7 +135,8 @@ def j3_multi_hold_requires_all_contracts(driver: ConformanceDriver) -> None:
            "the resolver alone released a row the approval also held (CS-027 bypass)")
     expect(driver.approve(ticket2, "tck-approver-1"), "the approver's credit was refused")
     driver.dispatch_once()
-    expect(len(driver.effects()) == 2, "both contracts satisfied — dispatched")
+    expect(len(driver.effects()) == 2,
+           "both contracts were satisfied but the second effect did not dispatch")
 
 
 @check(
@@ -141,7 +149,7 @@ def j4_expiry_on_the_injected_clock(driver: ConformanceDriver) -> None:
     setup(driver, policy=POLICY_HOLD, seed_world=False)
     _seed_targets(driver, PQ={"hold": True})
     result = expect_decision(submit(driver, _pay(500, target="PQ")), "hold", "held intent")
-    expect_ticket(result, "the held intent")
+    ticket = expect_ticket(result, "the held intent")
 
     # pay is irreversible ⇒ the REQUIRED TCK staging TTL is 30 minutes. One
     # minute short of the deadline nothing expires — this boundary is what
@@ -155,10 +163,15 @@ def j4_expiry_on_the_injected_clock(driver: ConformanceDriver) -> None:
     reasons = [r.reason for r in driver.audit()]
     expect(
         any(r == "expired-hold:precondition" for r in reasons),
-        f"expected an 'expired-hold:precondition' settle record, got {reasons[-3:]}",
+        f"the expiry settle lacks the 'expired-hold:precondition' reason "
+        f"(CS-028), got {reasons[-3:]}",
     )
+    # a late release must not resurrect the expired row (refusing the release
+    # outright is also conformant — either way nothing may dispatch).
+    driver.resolve(ticket, "tck-resolver-1", gate="precondition")
     driver.dispatch_once()
-    expect(len(driver.effects()) == 0, "an expired hold must never dispatch")
+    expect(len(driver.effects()) == 0,
+           "a release AFTER expiry resurrected the hold (CS-028: expired is settled)")
 
 
 @check(
@@ -208,6 +221,32 @@ def j6_duplicate_holds_collapse(driver: ConformanceDriver) -> None:
         "(CS-040: distinct questions never collapse)",
     )
     holds = [r for r in driver.audit() if r.decision == "hold"]
-    expect(len(holds) >= 3, "each attempt must still leave its own audit record")
+    expect(len(holds) >= 3,
+           "a deduped attempt went unaudited (CS-031: every attempt writes a record)")
     driver.dispatch_once()
-    expect(len(driver.effects()) == 0, "a deduped hold must not dispatch anything")
+    expect(len(driver.effects()) == 0, "a deduped hold dispatched an effect")
+
+
+@check(
+    "J7",
+    "a hold with no resolvable release contract refuses fail-closed, never stages",
+    PROFILE_HOLD,
+    requires=[CAP_HOLD, CAP_AUDIT],
+)
+def j7_unresolvable_hold_refuses(driver: ConformanceDriver) -> None:
+    # CS-027: the gate names no ``resolvers:`` and the REQUIRED TCK config has
+    # no deployment default resolver role (docs/12 §2) — so this hold's release
+    # contract is unsatisfiable. Staging it would park the intent where no one
+    # could ever release it; the gateway must refuse at decision time instead.
+    setup(driver, policy=POLICY_HOLD_NO_RESOLVER, seed_world=False)
+    _seed_targets(driver, PQ={"hold": True})
+    result = expect_decision(submit(driver, _pay(500, target="PQ")), "deny",
+                             "a hold with no resolvable contract (CS-027)")
+    expect(result.ticket is None,
+           "the unresolvable hold was staged (it must be refused, never parked)")
+    reasons = [r.reason for r in driver.audit()]
+    expect(
+        any(r == "hold-unresolvable" for r in reasons),
+        f"the refusal lacks the normative 'hold-unresolvable' reason (CS-027), "
+        f"got {reasons[-3:]}",
+    )

@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from stonefold_tck.checks import PROFILE_CORE, check, expect
 from stonefold_tck.checks._util import (
-    ALICE,
     email,
     expect_decision,
     pay,
@@ -56,7 +55,8 @@ def c1_value_limit(driver: ConformanceDriver) -> None:
     setup(driver)
     expect_decision(submit(driver, pay(10001)), "deny", "amount above valueLimit max")
     r = submit(driver, pay(500))
-    expect(r.decision in ("allow", "hold"), f"amount within limit must not be denied (got {r.decision})")
+    expect(r.decision in ("allow", "hold"),
+           f"an amount within the limit was denied (got {r.decision})")
     expect_decision(r, "allow", "amount 500 needs no approval")
 
 

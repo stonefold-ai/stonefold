@@ -3,8 +3,8 @@
 An implementation-independent, black-box test suite any gateway runs to prove
 conformance to the Stele RFC (docs/01). The implementer writes ONE adapter — a
 ``ConformanceDriver`` — and runs ``run_conformance`` over it; the report states
-which conformance profiles (core, lint, scope, staging, kill, audit) the
-implementation certifies.
+which conformance profiles (``stonefold_tck.checks.ALL_PROFILES``, docs/12 §4)
+the implementation certifies.
 
 The kit core imports nothing from the reference gateway; the reference's own
 adapter lives in ``stonefold_tck.adapters.reference`` as the worked example (and as

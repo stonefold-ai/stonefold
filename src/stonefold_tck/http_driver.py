@@ -17,7 +17,7 @@ Wire protocol (all JSON; camelCase keys):
 | GET    | /tck/capabilities               | → {implementation, capabilities: [str]} |
 | POST   | /tck/load                       | {registryYaml, policyYaml} → {ok, errors, warnings} |
 | POST   | /tck/clock                      | {now: ISO-8601} → {} |
-| POST   | /tck/seed                       | {resource, rows: [obj]} → {} |
+| POST   | /tck/seed                       | {resource, rows: [obj]} → {} (replaces the resource's prior rows) |
 | POST   | /tck/submit                     | {actor: {id, roles, claims}, sessionId, op: {resource, action?, data, target?, sink?, context}} → {decision, ticket?, rows?, reason, reasonCode?, retryClass?, agentView?} |
 | POST   | /tck/approve                    | {ticket, approverId} → {accepted: bool} |
 | POST   | /tck/reject                     | {ticket, approverId} → {accepted: bool} |
@@ -32,7 +32,7 @@ Wire protocol (all JSON; camelCase keys):
 | GET    | /tck/audit                      | → {records: [{decision, resource, action, outcome, reason?}]} |
 | POST   | /tck/inject-dispatch-failure    | {action} → {} |
 | POST   | /tck/update-set                 | {name, values: [str]} → {} |
-| POST   | /tck/submit-batch               | {actor, sessionId, ops: [op]} → {decision, failingIndex?, results: [{decision, ticket?, rows?, reason}]} |
+| POST   | /tck/submit-batch               | {actor, sessionId, ops: [op]} → {decision, failingIndex?, results: [per-op /tck/submit responses]} |
 | GET    | /tck/connector-digest/{name}    | → {digest: "sha256:<hex>"} |
 | POST   | /tck/tamper-connector           | {name} → {} |
 

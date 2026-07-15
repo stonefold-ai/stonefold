@@ -6,12 +6,14 @@ consequence: after any sequence of operations, the set of executed effects and
 the set of success-outcome audit records must agree exactly, and every refusal
 must have left a record. Crash-consistency remains an implementation-internal
 test (the reference keeps one over real Postgres).
+
+Failure messages state the violation observed, not the expectation.
 """
 
 from __future__ import annotations
 
 from stonefold_tck.checks import PROFILE_AUDIT, check, expect
-from stonefold_tck.checks._util import SESSION, expect_decision, pay, setup, submit
+from stonefold_tck.checks._util import SESSION, effects_of, expect_decision, pay, setup, submit
 from stonefold_tck.driver import CAP_AUDIT, CAP_KILL, CAP_STAGING, ConformanceDriver
 
 
@@ -28,10 +30,12 @@ def f1_every_outcome_recorded(driver: ConformanceDriver) -> None:
     entries = list(driver.audit())
     decisions = {e.decision for e in entries}
     for wanted in ("allow", "hold", "deny", "halt"):
-        expect(wanted in decisions, f"a {wanted!r} decision must be audited")
+        expect(wanted in decisions, f"no {wanted!r} decision was audited")
     for e in entries:
         if e.action == "pay":
-            expect(e.resource == "Payment", "audit records carry the attempted resource/action")
+            expect(e.resource == "Payment",
+                   f"an audit record for 'pay' lost the attempted resource "
+                   f"(got {e.resource!r})")
 
 
 @check("F2c", "executed effects and success-audit records agree exactly", PROFILE_AUDIT,
@@ -43,13 +47,14 @@ def f2_effects_evidence_consistency(driver: ConformanceDriver) -> None:
     expect_decision(submit(driver, pay(10001, payee="PY3")), "deny", "refused pay")
     driver.dispatch_once()
 
-    executed = sum(1 for e in driver.effects() if e.get("action") == "pay")
+    executed = effects_of(driver, "pay")
     settled_ok = sum(
         1 for a in driver.audit() if a.action == "pay" and a.outcome == "success"
     )
-    expect(executed == 2, f"exactly the two allowed pays executed (got {executed})")
+    expect(executed == 2, f"the two allowed pays did not execute exactly (got {executed})")
     expect(
         settled_ok == executed,
-        f"success-audit records ({settled_ok}) must equal executed effects ({executed}) — "
-        "no effect without a record, no record without an effect (CS-006's observable face)",
+        f"success-audit records ({settled_ok}) diverge from executed effects "
+        f"({executed}) — no effect without a record, no record without an "
+        f"effect (CS-006's observable face)",
     )

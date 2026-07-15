@@ -26,6 +26,11 @@ Translate each scenario into an automated test **before** implementing the featu
 - When the gateway loads it
 - Then startup fails (or the policy is rejected) and each violation (§13.5 error, §13.6 warn, §13.4 warn) is reported. The gateway does **not** fall back to a permissive default.
 
+**A4b — a policy naming an undeclared action refuses to load, deny included (v0.4, CS-016; RFC §13.1)**
+- Given a policy whose `deny` names an action the registry does not declare
+- When the gateway loads it
+- Then the linter reports an ERROR and the policy does not load (a deny of an undeclared name is almost always a typo that would otherwise silently arm itself as a no-op).
+
 **A5 — all valid examples load**
 - Given every other `examples/*.stele.yaml`
 - When loaded and validated against `schema/stele.schema.json`
@@ -41,10 +46,20 @@ Translate each scenario into an automated test **before** implementing the featu
 - When the policy is linted
 - Then a WARN is reported (the grant applies on every resource that declares the name); the `{ Entity: [names] }` map form lints clean.
 
+**A7b — a `'*'` grant loads but reports a warning (RFC §13.6)**
+- Given a policy with `allow: observe: '*'`
+- When the policy is linted
+- Then it loads (a `'*'` grant is legal) and a WARN is surfaced — an unbounded grant must never pass silently.
+
 **A8 — dualAuthorization quorum below two is rejected (v0.3, CS-014; RFC §13 rule 13)**
 - Given a policy gate `dualAuthorization: { quorum: 1, approvers: role:treasury }`
 - When the gateway loads it
 - Then the linter reports an ERROR and the policy does not load.
+
+**A9 — a hold-capable check declared without reasonCodes is rejected (v0.6, CS-038; RFC §13 rule 18)**
+- Given a registry declaring a precondition check `holdCapable: true` with no `reasonCodes`
+- When the registry+policy pair is loaded
+- Then the load is refused — every hold such a check returned would be code-less and resolve fail (RFC §7.6 rule 2), so the declaration itself is the error.
 
 ---
 
@@ -175,6 +190,10 @@ Translate each scenario into an automated test **before** implementing the featu
 - Given the kill store is down and an irreversible effect is attempted
 - Then the effect is denied/halted (fail closed), not dispatched.
 
+**E6 — an action-class kill halts that action and nothing else**
+- Given an active `KillOrder(ACTION_CLASS pay)`
+- When the agent attempts `pay` → `HALT`; when it attempts an unrelated action (e.g. `sendEmail`) → decided normally — the kill's blast radius is exactly its declared scope.
+
 ---
 
 ## F. Audit & failure mode (M6)
@@ -265,7 +284,7 @@ Real LLM agent (API key; a scripted fake-LLM mode for CI/no-key); rulebook is th
 
 ---
 
-## J. The hold substrate (v0.6 CS-026/027/028 — RFC §7.6, §12)
+## J. The hold substrate (v0.6 CS-026/027/028/031 — RFC §7.6, §12)
 
 **J1 — judgment-shaped ambiguity holds, with its reason code**
 - Given a hold-capable check whose source reads ambiguous for the target
@@ -286,6 +305,14 @@ Real LLM agent (API key; a scripted fake-LLM mode for CI/no-key); rulebook is th
 **J5 — outages fail, never hold**
 - Given a hold-capable check whose source is unreachable (the check raises)
 - When submitted → the intent is **denied** under `failureMode`; a registry blip never becomes a human interruption.
+
+**J6 — duplicate holds collapse; distinct questions do not (CS-031, identity sharpened by CS-040)**
+- Given a hold already open for a question, and the same question asked again within the dedupe window
+- When the second intent is submitted → it holds with the **same** ticket (one queue item, attempt counted, each attempt still audited); a hold over a **different** target (different gate evidence — a distinct question) gets its **own** ticket. Over-collapsing loses a question; ten resubmissions of the same one are one queue item.
+
+**J7 — a hold with no resolvable release contract refuses fail-closed (CS-027)**
+- Given a hold-capable check gated with no `resolvers:` and no deployment default resolver role
+- When the check resolves hold → the intent is **denied** at decision time, audited `hold-unresolvable` — never staged as a row no one could ever release.
 
 ---
 
@@ -321,3 +348,4 @@ Real LLM agent (API key; a scripted fake-LLM mode for CI/no-key); rulebook is th
 **M2 — consumed with the settle**: after dispatch, the same invoice resubmitted refuses `no-match`.
 **M3 — released on cancellation**: a killed staged payment never dispatches and its line matches a fresh intent, which dispatches exactly once.
 **M4 — retries never double-consume**: repeated worker passes dispatch one effect and settle one success; the line is spent exactly once.
+**M5 — a reservation lost to another intent cancels at claim**: the adapter forgets the reservation out-of-band (orphan-expiry TTL, F5.2), a second intent legitimately re-reserves the freed line, and the first intent's dispatch claim finds its reservation gone — it settles `CANCELLED`/`stale-guard:requireMatch`; exactly one payment leaves, never two against one line.

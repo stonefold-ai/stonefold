@@ -6,14 +6,16 @@ check splices it into the fixture registry, and ``tamper_connector`` simulates
 the supply-chain replacement the pin defends against. The dispatch-time
 mismatch settle reason ``connector-digest-mismatch`` is normative for a driver
 claiming this capability (like the v0.4 freshness reasons).
+
+Failure messages state the violation observed, not the expectation.
 """
 
 from __future__ import annotations
 
 from stonefold_tck.checks import PROFILE_DIGEST, check, expect
-from stonefold_tck.checks._util import pay, setup, submit
+from stonefold_tck.checks._util import effects_of, pay, setup, submit
 from stonefold_tck.driver import CAP_AUDIT, CAP_DIGEST, CAP_STAGING, ConformanceDriver
-from stonefold_tck.fixtures import TCK_REGISTRY
+from stonefold_tck.fixtures import TCK_POLICY, TCK_REGISTRY
 
 _UNPINNED = "tck-effects: { type: method }"
 DIGEST_MISMATCH_REASON = "connector-digest-mismatch"
@@ -32,13 +34,11 @@ def _pinned_registry(digest: str) -> str:
        requires=[CAP_DIGEST])
 def i1_load_time_mismatch_refuses(driver: ConformanceDriver) -> None:
     garbage = "sha256:" + "0" * 64
-    from stonefold_tck.fixtures import TCK_POLICY
-
     result = driver.load(_pinned_registry(garbage), TCK_POLICY)
     expect(
         not result.ok,
-        "a registry pinning a digest the loaded connector does not match MUST "
-        "refuse to load (fail closed, RFC §10)",
+        "a registry pinning a digest the loaded connector does not match "
+        "still loaded (must fail closed, RFC §10)",
     )
 
 
@@ -49,17 +49,17 @@ def i2_dispatch_time_mismatch_cancels(driver: ConformanceDriver) -> None:
     setup(driver, registry=_pinned_registry(driver.connector_digest("tck-effects")))
     r = submit(driver, pay(500))
     expect(r.decision == "allow" and r.ticket is not None,
-           "a correctly pinned connector decides and stages normally")
+           "a correctly pinned connector did not decide and stage normally")
     driver.tamper_connector("tck-effects")
     driver.dispatch_once()
     expect(
-        all(e.get("action") != "pay" for e in driver.effects()),
-        "the effect must NOT leave through a connector that no longer matches its pin",
+        effects_of(driver, "pay") == 0,
+        "an effect left through a connector that no longer matches its pin",
     )
     reasons = [a.reason for a in driver.audit()]
     expect(
         any(DIGEST_MISMATCH_REASON in reason for reason in reasons),
-        f"the cancellation is audited with reason {DIGEST_MISMATCH_REASON!r}",
+        f"the cancellation lacks the normative {DIGEST_MISMATCH_REASON!r} reason",
     )
 
 
@@ -69,9 +69,9 @@ def i3_matching_pin_dispatches(driver: ConformanceDriver) -> None:
     setup(driver)
     setup(driver, registry=_pinned_registry(driver.connector_digest("tck-effects")))
     r = submit(driver, pay(500))
-    expect(r.decision == "allow", "small pay through the pinned connector")
+    expect(r.decision == "allow", "a small pay through the pinned connector was refused")
     driver.dispatch_once()
     expect(
-        sum(1 for e in driver.effects() if e.get("action") == "pay") == 1,
-        "an untampered pinned connector dispatches exactly once",
+        effects_of(driver, "pay") == 1,
+        "the untampered pinned connector did not dispatch exactly once",
     )

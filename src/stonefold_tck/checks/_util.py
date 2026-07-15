@@ -75,6 +75,11 @@ def expect_ticket(result: SubmitResult, what: str) -> str:
     return result.ticket
 
 
+def effects_of(driver: ConformanceDriver, action: str) -> int:
+    """How many effects carrying ``action`` have actually left the gateway."""
+    return sum(1 for e in driver.effects() if e.get("action") == action)
+
+
 def pay(amount: float, *, payee: str = "PY1", country: str = "SK", target: str = "P1") -> Operation:
     return Operation(
         resource="Payment",

@@ -54,7 +54,9 @@ CAP_DIGEST = "digest-pinning"
 # contract (a resolver identity, distinct from ``approve``'s credit-everything
 # form); ``sweep_holds`` steps the expiry sweep like ``dispatch_once``. The
 # settle/decision reasons ``expired-hold:<gate>`` and ``hold-unresolvable`` are
-# normative for drivers claiming this.
+# normative for drivers claiming this. REQUIRED TCK config (like the freshness
+# TTLs): NO deployment default resolver role is configured — a gate that names
+# no ``resolvers:`` therefore has an unsatisfiable release contract (J7).
 CAP_HOLD = "hold-precondition"
 # v0.6 CS-029/030: deny/hold results carry a machine-readable ``reason_code``
 # and ``retry_class``, and ``agent_view`` renders EXACTLY what the agent
@@ -162,7 +164,12 @@ class Operation:
     (the driver resolves it below the model — the TCK never passes internal
     row objects); ``sink`` is the requested disclosure destination; ``context``
     is ambient state (e.g. ``breakGlass``) supplied by the *session*, not the
-    agent (invariant 3)."""
+    agent (invariant 3).
+
+    ``action`` may name the entity's IMPLICIT actions (docs/06 §4: declaring
+    an entity makes it readable/writable): ``read`` is the implicit observe,
+    ``create`` the implicit record, and ``None`` is shorthand for ``read`` —
+    the fixture registry does not declare these, so the driver must map them."""
 
     resource: str
     action: str | None = None
@@ -198,7 +205,10 @@ class ConformanceDriver(Protocol):
         ...
 
     def seed(self, resource: str, rows: Sequence[Mapping[str, Any]]) -> None:
-        """Load rows into the store behind the entity's connector."""
+        """Load rows into the store behind the entity's connector, REPLACING
+        any rows previously seeded for that resource — re-seeding is how the
+        TCK moves the world (B4's tenant reassignment, J3's resolved question).
+        An appending driver fails those checks."""
         ...
 
     def submit(
