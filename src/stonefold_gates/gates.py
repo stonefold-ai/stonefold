@@ -6,8 +6,15 @@ the four counter gates (``rate``/``quota``/``quantityCap``/``spendLimit``) read 
 (v0.6 CS-032) queries a declared obligation registry. A *dependency* failure
 (missing field, store down, hook timeout, registry unreachable) is turned into
 **fail-closed FAIL** here — never a raised exception and never a silent pass
-(CLAUDE.md, design §10/§12). ``failureMode: open`` flips the content-hook and
-registry-outage cases to pass — except under the irreversible floor (RFC §10).
+(CLAUDE.md, design §10/§12).
+
+``failureMode: open`` (RFC §10) flips the dependency-failure cases to pass, at
+two deliberately different strictnesses: the obligation-registry outage
+additionally applies the **irreversible floor** (``should_fail_closed``) because
+§7.16 semantics 4 mandates it, like the kill store (CS-007); the content-hook
+and named-check crash paths honour ``open`` plainly, because there §10 alone
+governs and the §13.5 linter refuses an open-mode policy with an irreversible
+effect unless explicitly acknowledged — the floor lives in the linter, not here.
 """
 
 from __future__ import annotations
@@ -156,6 +163,8 @@ def _run_checks(gate: str, names: list[Any], gctx: GateContext) -> GateResult:
         try:
             result = _run_named_check(name, gctx)
         except Exception as exc:  # crash ⇒ dependency failure, NEVER a hold (I5)
+            # plain §10 ``open`` — no irreversible floor here by design: the
+            # §13.5 linter refuses open-mode + irreversible (module docstring).
             if gctx.failure_mode is FailureMode.OPEN:
                 continue
             return failed(gate, f"fail-closed: {name} errored: {exc}", source=name)
@@ -227,6 +236,8 @@ def content_check(cfg: Any, gctx: GateContext) -> GateResult:
             clean = gctx.hooks.run(str(name), gctx.resolved.data)
         except HookError as exc:
             # timeout/error ⇒ apply failureMode (design §12). C7: closed ⇒ block.
+            # Plain §10 ``open`` — no irreversible floor here by design: the
+            # §13.5 linter refuses open-mode + irreversible (module docstring).
             if gctx.failure_mode is FailureMode.OPEN:
                 continue
             return failed("contentCheck", f"fail-closed: {exc}")
