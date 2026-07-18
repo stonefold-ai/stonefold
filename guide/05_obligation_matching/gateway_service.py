@@ -46,6 +46,9 @@ import erp_adapter  # the function developer's file: the door to "the ERP"
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
 
+if not (REPO / "spec" / "schema").exists():  # a plain clone leaves the submodule empty
+    raise SystemExit("spec/ submodule is empty — run: git submodule update --init")
+
 
 def _load_yaml(name: str) -> dict[str, Any]:
     # The two YAML artifacts live NEXT TO this service on disk in the guide;

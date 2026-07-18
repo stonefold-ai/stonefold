@@ -46,7 +46,7 @@ Supporting docs (context, not normative): `docs/04-domains-and-use-cases.md`, `s
 - Public types/functions typed and docstring'd; a short note on which RFC sections the change implements.
 
 ## Build & run (pinned stack in docs/03)
-- `uv sync` (or `pip install -e ".[dev]"`) — set up the environment.
+- `uv sync` (or `pip install -e ".[dev,gateway,demo]"`) — set up the environment (the fast suite starts the real service, so the `gateway`/`demo` extras are required, not optional).
 - `docker compose up -d` — Postgres + Redis for local runs.
 - `uvicorn stonefold_gateway.main:app --reload` — start the gateway.
 - `pytest` — unit + integration (testcontainers spins up Postgres + Redis).

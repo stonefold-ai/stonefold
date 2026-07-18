@@ -57,7 +57,9 @@ You need Python 3.11+ and, from example 02 on, Docker.
 git clone --recurse-submodules https://github.com/stonefold-ai/stonefold
 cd stonefold
 python -m venv .venv && . .venv/bin/activate     # Windows: .venv\Scripts\activate
-pip install -e ".[dev]"
+pip install -e ".[dev,gateway,demo]"             # the guide starts the real service:
+                                                 # it needs the gateway extras, not
+                                                 # just the test tooling
 pytest -q -m "not integration"                   # verify: green
 
 # real infrastructure (optional from example 02 on, required from 04):

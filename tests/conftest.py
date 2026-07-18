@@ -22,6 +22,11 @@ EXAMPLES = PROJECT_ROOT / "spec" / "examples"
 REGISTRY_DIR = PROJECT_ROOT / "spec" / "registry"
 SCHEMA = PROJECT_ROOT / "spec" / "schema" / "stele.schema.json"
 
+if not SCHEMA.exists():  # a plain clone leaves the submodule empty
+    raise SystemExit(
+        "spec/ submodule is empty — run: git submodule update --init"
+    )
+
 
 def load_yaml(path: Path) -> dict[str, Any]:
     with path.open("r", encoding="utf-8") as fh:

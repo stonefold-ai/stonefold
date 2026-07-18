@@ -153,7 +153,9 @@ not fine:
 ```
 git clone --recurse-submodules https://github.com/stonefold-ai/stonefold.git
                                # the spec/ submodule carries the schemas + fixtures
-pip install -e ".[dev]"        # Python 3.11+
+pip install -e ".[dev,gateway,demo]"   # Python 3.11+; same extras CI installs —
+                               # the fast suite starts the real service, so the
+                               # test tooling alone is not enough
 docker compose up -d           # Postgres + Redis (integration tests / local runs)
 pytest -q -m "not integration" # fast suite
 pytest -q                      # full suite (testcontainers needs Docker running)

@@ -32,6 +32,9 @@ from stonefold_connectors import InMemoryConnector  # a table standing in for yo
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]  # .../stonefold
 
+if not (REPO / "spec" / "schema").exists():  # a plain clone leaves the submodule empty
+    raise SystemExit("spec/ submodule is empty — run: git submodule update --init")
+
 
 def load_yaml(name: str) -> dict[str, Any]:
     with (HERE / name).open("r", encoding="utf-8") as fh:
