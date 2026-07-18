@@ -1,0 +1,46 @@
+# CI — keeps the README/site claims mechanically true:
+#   - the fast suite (incl. every guide tutorial via tests/test_guide_examples.py)
+#     runs on every push and PR;
+#   - the integration suite (real Postgres + Redis via testcontainers) runs on
+#     the Docker-capable Linux runner;
+#   - mypy --strict guards the typed public surface.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  fast:
+    name: fast suite + mypy (py${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive # spec/ carries the schemas + fixtures
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - run: pytest -q -m "not integration"
+      - run: mypy --strict src
+
+  integration:
+    name: integration suite (testcontainers)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - run: pytest -q -m integration
