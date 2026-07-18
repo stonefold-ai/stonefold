@@ -27,7 +27,7 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
           cache: pip
-      - run: pip install -e ".[dev]"
+      - run: pip install -e ".[dev,gateway,demo]"
       - run: pytest -q -m "not integration"
       - run: mypy --strict src
 
@@ -42,5 +42,5 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - run: pip install -e ".[dev]"
+      - run: pip install -e ".[dev,gateway,demo]"
       - run: pytest -q -m integration
