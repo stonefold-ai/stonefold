@@ -30,7 +30,7 @@ from stonefold_core import (
 from stonefold_connectors import InMemoryConnector  # a table standing in for your DB
 
 HERE = Path(__file__).resolve().parent
-REPO = HERE.parents[2]  # .../stonefold
+REPO = HERE.parents[1]  # .../stonefold
 
 
 def load_yaml(name: str) -> dict[str, Any]:

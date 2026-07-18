@@ -41,7 +41,7 @@ from stonefold_store import InMemoryOutboxStore
 import functions  # the function developer's file
 
 HERE = Path(__file__).resolve().parent
-REPO = HERE.parents[2]
+REPO = HERE.parents[1]
 
 
 def _load_yaml(name: str) -> dict[str, Any]:
