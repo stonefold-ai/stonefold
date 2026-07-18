@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """stonefold_core — the pure trust kernel of the Stonefold Gateway.
 
 No I/O, no LLM, no framework imports (CLAUDE.md coding conventions; ADR docs/03).

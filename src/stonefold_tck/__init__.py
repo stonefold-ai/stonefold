@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """stonefold_tck — the Stonefold conformance test kit (docs/12).
 
 An implementation-independent, black-box test suite any gateway runs to prove

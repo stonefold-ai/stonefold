@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The trial runner (docs/15 §5): ≥5 repetitions per cell, each an independent run.
 
 One ``Trial`` records, for a (model, rung, scenario, rep): whether the attack was

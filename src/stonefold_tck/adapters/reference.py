@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The reference implementation's TCK driver — the worked example (docs/12).
 
 This is what an implementer writes: ~200 lines of test-only glue between the

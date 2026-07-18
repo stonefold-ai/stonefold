@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The adversarial demo (M-DEMO). Run with ``python -m stonefold_demo`` (or ``make demo``).
 
 Makes the product's core claim visible and attackable: the *same* prompt-injected

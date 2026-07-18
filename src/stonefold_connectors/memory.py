@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """In-memory connector (design §5). Test double + the default for resources with
 no external system. Applies the injected scope as a row filter / membership test;
 holds no policy logic (CLAUDE.md)."""

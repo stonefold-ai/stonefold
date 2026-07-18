@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Assemble the full Stonefold enforcement stack over ``examples/payments-ops.stele.yaml``.
 
 This is the *real product* wiring — registry → compiled policy → gate engine →

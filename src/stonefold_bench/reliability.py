@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Track R — the reliability experiment runner (docs/15 §1, Track R).
 
 Does the action surface stay *usable* as it grows? For each tool-count N in the sweep,

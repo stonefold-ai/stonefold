@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Run the same intents two ways: straight to the systems vs. through the gateway.
 
 The contrast *is* the product. Unprotected, the agent's tools just fire: reads are

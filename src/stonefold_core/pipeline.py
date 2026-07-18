@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The enforcement pipeline (RFC §12, design §3).
 
 This is the spine: one ``enforce`` call per attempted action, always ending in an

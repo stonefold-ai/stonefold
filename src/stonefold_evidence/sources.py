@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Read audit records from a store — **read-only** (no writes, no enforcement path).
 
 Two sources: a JSONL export (one ``AuditRecord`` per line, as ``model_dump(mode="json")``)

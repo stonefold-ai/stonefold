@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Structured output I/O for both tracks (docs/15 §5).
 
 Three formats, one contract:

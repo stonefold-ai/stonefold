@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """stonefold_evidence — the audit evidence-pack exporter (implementation-plan Workstream G3).
 
 Turns the gateway's audit log into a human-readable report (Markdown, PDF-ready) whose

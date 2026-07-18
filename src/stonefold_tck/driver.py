@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The TCK driver contract — the ONE interface an implementation adapts.
 
 The TCK never imports a gateway; it talks to a ``ConformanceDriver`` the

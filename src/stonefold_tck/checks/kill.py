@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """KILL profile — kill-switch semantics, in the TCK's *serialized* form.
 
 Black-box note (docs/12 §5): the RFC's no-race guarantee (§9, CS-004) is a

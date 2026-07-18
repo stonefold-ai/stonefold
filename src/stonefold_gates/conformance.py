@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Conformance kit for registered functions (docs/06 §6).
 
 Precondition checks, content hooks, and scope predicates are the hand-written,

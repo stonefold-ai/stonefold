@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """stonefold_gateway — the application layer: transports (SIF-native tool + MCP proxy),
 the kill control plane, the thin admin console, and the dispatch worker (M4–M6).
 

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Fictional ledger seed for the Accounts-Payable demo.
 
 All data is invented; no real funds, IBANs, PII, or vendors. The single source of

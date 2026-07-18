@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The demo scenarios, shared by the tests and ``make demo``.
 
 Each drives the *real* agent loop (``run_agent``) and the *real* gateway

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Postgres ``OutboxStore`` (design §9, §8.4; invariants 4–6).
 
 The ``pending_actions`` table is the durable substrate. ``claim_next_pending``

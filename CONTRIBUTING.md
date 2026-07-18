@@ -91,8 +91,9 @@ honest status:
   designed extension point of the whole system and probably the highest-leverage
   contribution here. New connectors implement the existing `Connector` protocol; MCP
   mappers follow `spec/docs/17-interception-mapping.md`.
-- **Testing infrastructure.** Fuzzing setups, property-based tests, and CI (none exists
-  yet — a minimal pipeline running the fast suite would be immediately useful).
+- **Testing infrastructure.** Fuzzing setups and property-based tests. CI exists
+  (`.github/workflows/ci.yml`: fast suite + mypy on 3.11/3.12, integration suite via
+  testcontainers) — hardening and speeding it up is welcome.
 - **Deployment.** What exists today is the demo's docker-compose stack, which is a demo,
   not production packaging. Wanted: hardened Compose, Kubernetes manifests/Helm, cloud
   recipes, a single-binary local mode. One hard boundary: the enforcement guarantees must
@@ -188,8 +189,18 @@ The kit's core (`src/stonefold_tck/`) imports nothing from the reference impleme
 
 ## License
 
-Apache-2.0. By contributing you agree your contribution is licensed under the same terms
-(Apache-2.0 §5).
+Apache-2.0. By contributing you agree that:
+
+- your contribution is licensed under Apache-2.0 (§5);
+- you certify the [Developer Certificate of Origin](https://developercertificate.org/)
+  and sign each commit with `Signed-off-by` (`git commit -s`);
+- you grant the maintainer the right to distribute future versions of the project,
+  including your contribution, under other license terms.
+
+That last point keeps the project's licensing options open (for example, offering a
+commercially licensed edition later) without needing to track down every past
+contributor. It does not change the terms of anything already released: every version
+published under Apache-2.0 stays Apache-2.0 forever.
 
 ## What to expect from the maintainer
 

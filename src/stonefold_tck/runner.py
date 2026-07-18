@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Run the check catalogue against a driver and report conformance.
 
 Certification rule (docs/12 §4): a profile is **certified** only when every one

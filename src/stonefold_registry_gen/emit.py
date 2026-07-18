@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Render a draft registry to reviewed-format YAML and validate it.
 
 The emitted text is hand-rendered (PyYAML cannot emit comments, and the

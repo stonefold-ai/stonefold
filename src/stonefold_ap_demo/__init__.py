@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Accounts-Payable demo for the Stonefold Gateway (docs/05-demo-spec.md, acceptance §G).
 
 A **real-LLM** AI accounts-payable assistant that reads invoices and pays vendors,

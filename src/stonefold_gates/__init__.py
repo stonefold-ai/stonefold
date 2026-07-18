@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """stonefold_gates — the fourteen deterministic gates and the gate engine (M2, RFC §7).
 
 Depends on ``stonefold_core`` (value model, condition engine, the ``GateEngine`` seam)

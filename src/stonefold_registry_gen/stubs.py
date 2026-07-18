@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Handler-stub generation (implementation-plan Workstream G1).
 
 The registry generator solved the blank-page problem for the *declaration*; the real

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The thin admin control plane (plan M6 task 4, DoD).
 
 Three operator surfaces over the durable stores — all read/transition the same

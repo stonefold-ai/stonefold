@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Audit sink protocol and the in-memory implementation (RFC §11, design §11).
 
 Every evaluated action — allowed, held, denied, or halted — produces exactly one

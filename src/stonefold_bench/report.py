@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Render the matrix as Markdown (docs/15 §3). The report is *simultaneously* the
 benchmark result, the positioning artifact, and the honest disclosure of where SIF
 is overkill — so it prints the A1 row, the S2≈S3 ties, and the token cost in one

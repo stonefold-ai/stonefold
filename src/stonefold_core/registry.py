@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The model registry (design §2, RFC §2/§12 step 1).
 
 The registry is the declared catalogue of resources and actions the gateway

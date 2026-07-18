@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The Accounts-Payable assistant: a real-LLM tool-use loop + its tool backends.
 
 The agent has exactly two tools:

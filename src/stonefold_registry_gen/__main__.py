@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """CLI: draft a registry (and its handler stubs) from what an integrator has.
 
 Usage (from the repo checkout)::

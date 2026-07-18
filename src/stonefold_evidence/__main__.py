@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """CLI: export an audit evidence pack (implementation-plan Workstream G3).
 
     python -m stonefold_evidence --jsonl audit.jsonl --policy examples/payments-ops.stele.yaml -o pack.md

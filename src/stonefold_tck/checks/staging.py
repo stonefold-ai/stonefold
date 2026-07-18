@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """STAGING profile — the outbox, approvals, dual-authorization (RFC §4.4, §7.8/7.9).
 
 Failure messages state the violation observed, not the expectation.

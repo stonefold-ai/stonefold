@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The condition expression language (RFC §8, design §10).
 
 A *small, frozen* boolean language used by gate ``when:`` clauses. This module

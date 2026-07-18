@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """FRESHNESS profile — v0.4 timing guarantees (RFC §12 CS-017, §6.3 CS-018).
 
 A driver claiming ``CAP_FRESHNESS`` MUST run with the REQUIRED TCK freshness

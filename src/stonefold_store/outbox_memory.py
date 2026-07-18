@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """In-memory ``OutboxStore`` (design §9) — the test double and single-process
 default. Implements the same lifecycle and approval semantics as the Postgres
 store so the D1–D4 unit tests and the Postgres integration tests agree.

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Track-S orchestrator: drive the security matrix over models × rungs × attacks
 (docs/15 §3/§5). Pure orchestration — file I/O belongs to the caller (``__main__``),
 which subscribes via the callbacks.

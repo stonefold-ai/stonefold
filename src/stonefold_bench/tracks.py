@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Track R — the reliability sweep (docs/15 §1, Track R).
 
 Axis: tool count N ∈ {1, 10, 30, 70, 100}. The **MCP** condition exposes N tools; the

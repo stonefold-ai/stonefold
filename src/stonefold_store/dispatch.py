@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The dispatch worker (design §9, §8.4, §8.5).
 
 Polls the outbox for ``PENDING`` rows, runs the locked ``PENDING → DISPATCHING``

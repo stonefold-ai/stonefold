@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The TCK check framework and the assembled check catalogue.
 
 A check is a small function over the driver, tagged with a scenario id (from

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """stonefold_connectors — the concrete connector adapters (M3, design §5).
 
 Connectors only **execute** an action and apply the **injected scope filter**;

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """SQL connector (design §5) — the canonical "scope injected below the model".
 
 The agent's intent is translated to SQL; the connector then **appends** the

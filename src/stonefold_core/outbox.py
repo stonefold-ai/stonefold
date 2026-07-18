@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The outbox seam — staged effects, approvals, and the kill substrate (RFC §4.4,
 design §7/§9).
 

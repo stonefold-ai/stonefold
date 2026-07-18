@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The demo scenarios (G1/G2/G3), as structured results.
 
 Each returns data the narration prints and the tests assert on — the demo and its

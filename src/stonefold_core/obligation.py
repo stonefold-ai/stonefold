@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Obligation registries — the systems of record ``requireMatch`` matches
 against (RFC §7.16 / CS-032, docs/06 §5b / CS-034).
 

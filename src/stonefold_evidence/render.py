@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Render an evidence pack to Markdown (PDF-ready).
 
 Each section is keyed to the control it evidences (docs/14). Every regulatory label

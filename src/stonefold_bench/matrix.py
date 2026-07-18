@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Aggregate raw trials into the deliverable matrix (docs/15 §3).
 
 The matrix is attack class × defense rung, each cell carrying **ASR-executed** (the

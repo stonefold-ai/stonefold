@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Draft model for generated registries.
 
 ``stonefold_registry_gen`` is an AUTHORING-TIME tool (docs/06 §9): it drafts a

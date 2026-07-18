@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Shared setup for TCK checks: actors, clock, default world seeding."""
 
 from __future__ import annotations

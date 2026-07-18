@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The language-neutral driver binding: the TCK over HTTP/JSON.
 
 A gateway written in ANY language certifies by exposing the small, TEST-ONLY

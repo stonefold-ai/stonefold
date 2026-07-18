@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The server-side principal directory (invariant 3; RFC §6.3).
 
 Identity — *who* the agent acts for — is resolved here from the authenticated

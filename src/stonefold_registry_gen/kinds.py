@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Verb → kind heuristics for the registry generator.
 
 These are DRAFTING heuristics, not policy: every guess is surfaced to the

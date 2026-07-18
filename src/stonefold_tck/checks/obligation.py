@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """L1–L5 (profile ``match``) and M1–M5 (profile ``consume``) — obligation
 matching and the reservation lifecycle (v0.6 CS-032–CS-036).
 

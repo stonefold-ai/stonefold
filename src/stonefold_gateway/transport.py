@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Transports and the single chokepoint (design §0, §1; RFC §3).
 
 The most important implementation fact (design §0) is that **the gateway is the

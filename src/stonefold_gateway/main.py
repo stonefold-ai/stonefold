@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The gateway application factory (plan M6, design §0/§1).
 
 ``create_app`` wires the one chokepoint behind FastAPI: the SIF-native

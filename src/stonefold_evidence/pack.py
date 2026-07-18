@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Build an evidence pack from audit records (read-only).
 
 Aggregates the audit log into per-control evidence, one bucket per docs/14 row. No

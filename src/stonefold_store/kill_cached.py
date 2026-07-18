@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """A cached, multi-instance ``KillStore`` (design §8.2, §8.9; review note).
 
 Each gateway instance keeps the kill orders **hot** in memory so the chokepoint

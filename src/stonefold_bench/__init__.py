@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """stonefold_bench — the benchmark harness for docs/15. Two experiments, each runnable in
 isolation from the console (``python -m stonefold_bench --track r|s ...``):
 

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """In-memory reference obligation-registry adapter (docs/06 §5b, v0.6
 CS-034/CS-035).
 

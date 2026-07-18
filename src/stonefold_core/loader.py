@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Policy loading: raw mapping → validated, compiled, ready-to-run policy.
 
 Pipeline (RFC §13, design §4): merge ``extends`` fragments → JSON-Schema

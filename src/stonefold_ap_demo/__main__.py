@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Guided CLI walkthrough of the (simple) Accounts-Payable demo (``make demo``).
 
 Self-contained: runs the *real* agent loop and the *real* gateway over the

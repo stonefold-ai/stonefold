@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Stock precondition-check factories — the common shapes, pre-written.
 
 Registered functions are the hand-written part of the trust surface (docs/06

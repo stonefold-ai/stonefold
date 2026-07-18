@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The control mapping the evidence pack is organised by — the docs/14 rows, re-encoded
 as data so each report section can be keyed to a control.
 

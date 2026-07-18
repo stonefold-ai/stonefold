@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Sliding-window counters for the store-backed gates (design §6).
 
 Four gates need state across calls: ``rate``, ``quota``, ``quantityCap`` (count

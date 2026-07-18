@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Typed dependency results and the fail-closed resolution (RFC §10, design §12).
 
 A *dependency failure* is concretely the registry, a scope resolver, a

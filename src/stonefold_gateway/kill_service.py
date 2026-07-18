@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The operator-facing kill service (design §8.6–§8.7, RFC §9).
 
 Issuing or lifting a kill is itself an **audited operator action** (who/when/scope,

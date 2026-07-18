@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Scope injection — enforcement *below the model* (RFC §6.3, design §5).
 
 The agent's intent carries **no** scope; the gateway derives a named, registered

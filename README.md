@@ -77,7 +77,7 @@ And the judgment call: when the AI proposes identifying a track as hostile, that
 
 Companies are stuck: AI agents are capable enough to do real work, but most firms **can't safely deploy them on anything that matters** because they can't control or prove what the AI does. Industry data backs this up — Gartner expects [over 40% of agentic-AI projects to be cancelled by 2027](https://www.gartner.com/en/newsroom/press-releases/2025-06-25-gartner-predicts-over-40-percent-of-agentic-ai-projects-will-be-canceled-by-end-of-2027), mainly over cost, unclear value, and **inadequate controls**, and MIT found [95% of corporate AI pilots deliver no return](https://fortune.com/2025/08/18/mit-report-95-percent-generative-ai-pilots-at-companies-failing-cfo/). The blocker isn't smarter AI — it's trust and control. This is the layer that provides them. It works **on top of** any AI model (Stonefold doesn't build or train the model), so it rides the whole industry's progress instead of competing with it, and it's aimed at the regulated, high-stakes settings where being unable to control the agent is a dealbreaker — finance, healthcare, critical operations.
 
-For EU deployers there is a harder-edged version of "why it matters": the AI Act's high-risk obligations — automatic logging of what the system did, and human oversight including the ability to interrupt it — are *mechanical* requirements, and they describe this gateway's feature list almost line by line (transactional audit, approval holds, the stop button with its no-race guarantee). The mapping, obligation by obligation, is [`docs/14-eu-ai-act-mapping.md`](docs/14-eu-ai-act-mapping.md).
+For EU deployers there is a harder-edged version of "why it matters": the AI Act's high-risk obligations — automatic logging of what the system did, and human oversight including the ability to interrupt it — are *mechanical* requirements, and they describe this gateway's feature list almost line by line (transactional audit, approval holds, the stop button with its no-race guarantee). The mapping, obligation by obligation, is [`docs/14-eu-ai-act-mapping.md`](docs/14-eu-ai-act-mapping.md) — a mapping of mechanisms to obligations, not a compliance claim; deploying compliantly remains the deployer's work.
 
 One honest caveat worth stating plainly: this **bounds what the AI is able to do, and proves it — it does not make the AI's choices correct.** A permitted-but-wrong action is still possible. It's containment, not omniscience. That's exactly why the human-approval steps and the audit trail matter.
 
@@ -92,7 +92,7 @@ The short rule: Stonefold earns its keep wherever an agent's action can **move m
 | **Customer-facing ops** (CRM, support, e-commerce) | support agents, refunds, account changes | per-customer scoping below the model, recipient allowlists, content scanning, refund rate caps — prompt injection contained |
 | **Cloud / DevOps / MSPs** | agents holding infra credentials | environment allowlists, change windows, approval on destructive verbs, the kill-switch, and the no-tool-bypasses-the-gateway coverage check |
 | **Legal** | matter assistants, filings, docketing | privilege boundaries as scope, filing workflows as declared transitions, evidence of authority |
-| **Defence & critical infrastructure** | operator decision-support | emission control, ROE standing rules, dual-auth with positive ID — humans stay in command, provably |
+| **Defence & critical infrastructure** | operator decision-support | emission control, ROE standing rules, dual-auth with positive ID — humans stay in command, on the record |
 
 There's a second customer orthogonal to all of these: **platform and vertical-SaaS vendors who embed a gateway** in their own product — for them the spec, the registry generator, and the conformance TCK (certify your own implementation, any language) are the deliverables.
 
@@ -199,4 +199,5 @@ The full version of this argument — the PDP/PEP category error, the four-verdi
 
 ## License
 
-[Apache License 2.0](LICENSE).
+[Apache License 2.0](LICENSE). Provided as is, without warranty of any kind; see the
+LICENSE for the full disclaimer.

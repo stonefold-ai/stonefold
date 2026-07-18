@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The in-flight connector-call registry (design §8.5).
 
 After a row moves to ``DISPATCHING`` the worker hands the effect to a connector;

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Frozen vocabulary enums.
 
 Implements RFC §3 (action kinds), §5 (governance attribute value sets) and the

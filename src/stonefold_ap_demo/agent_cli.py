@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Drive the AP agent against the **live** docker-compose gateway (the agent runner).
 
 The agent reads its inbox and submits a payment intent per invoice through the

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The demo agent — a deterministic script, **not** an LLM.
 
 CLAUDE.md forbids a model in the enforcement path, and a reproducible demo wants a

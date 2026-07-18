@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The fake ledger + the money-moving connector (design §5; CLAUDE.md).
 
 ``LedgerConnector`` is the only thing that touches the "bank". It executes

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """J1–J7 — the hold substrate (v0.6 CS-026/027/028/031; profile ``hold-precondition``).
 
 A hold-capable check's judgment-shaped ambiguity suspends the intent for a

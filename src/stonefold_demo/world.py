@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The simulated systems the demo agent acts on (M-DEMO).
 
 A tiny, in-memory "company": a customer table (the scope column is ``owner_id``),

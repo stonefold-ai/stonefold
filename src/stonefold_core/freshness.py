@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Decision freshness (v0.4 CS-017, changeset docs/RFC-changeset-v0.3-to-v0.4.md).
 
 A staged effect's decision is only valid for a bounded time: every staged row

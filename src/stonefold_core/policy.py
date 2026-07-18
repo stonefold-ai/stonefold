@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The typed policy document model (RFC §6 top-level keys).
 
 This is the *parsed* policy — one step before the compiled matcher (see

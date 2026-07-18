@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """A scripted, no-key "vulnerable agent" that drives the same tool loop a real
 LLM does (acceptance §G CI path; ``--provider fake``).
 

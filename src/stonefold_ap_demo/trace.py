@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """A tiny, framework-free trace bus (intent → decision → effect) for the UI.
 
 The gateway publishes one event per enforced intent and one per dispatched

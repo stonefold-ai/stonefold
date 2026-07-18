@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """OpenAPI-spec and MCP-tool-list → draft registry actions.
 
 Both importers share the same shape: derive a verb + entity from what the

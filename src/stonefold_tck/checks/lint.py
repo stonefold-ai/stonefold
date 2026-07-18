@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """LINT profile — load-time validation refuses bad policies (RFC §13).
 
 The gateway must refuse to run an invalid policy rather than degrade to a

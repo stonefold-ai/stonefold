@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """stonefold_registry_gen — draft a registry from what the integrator already has.
 
 Authoring-time only (docs/06 §9): SQL DDL, an OpenAPI spec, or an MCP tool

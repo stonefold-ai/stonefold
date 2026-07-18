@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The structural seam between the pure pipeline and the gate layer (RFC §7,
 §12 step 4; design §6).
 

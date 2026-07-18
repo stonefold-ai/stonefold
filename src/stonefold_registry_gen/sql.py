@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """SQL DDL → draft registry entities.
 
 Parses ``CREATE TABLE`` statements from a DDL text (a small, paren-balanced

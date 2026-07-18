@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Pinned model configuration + token metering (docs/15 §4.5, §5).
 
 Reuses the demo's provider-neutral LLM seam (``stonefold_ap_demo.llm``): the *same* agent

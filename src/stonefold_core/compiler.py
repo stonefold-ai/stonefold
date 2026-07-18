@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Policy compilation: allow/deny → an indexed matcher (design §4, RFC §6.2).
 
 At load the policy is compiled once into ``KindMatcher`` structures so that

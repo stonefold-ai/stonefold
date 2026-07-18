@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Realism extensions for Track R (docs/15 pilot record → "what this pilot is not").
 
 The 2026-07-02 pilot showed tool COUNT alone doesn't break selection on current

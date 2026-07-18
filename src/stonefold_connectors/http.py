@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """HTTP/REST connector (design §5). The scope predicate becomes a **mandatory
 query parameter** the connector injects server-side — the agent never supplies it.
 

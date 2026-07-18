@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The gate engine (RFC §7/§12 step 4, design §6).
 
 Evaluates every gate that matches an action, combined with **AND**, in

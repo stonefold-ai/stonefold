@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Assemble the full Stonefold enforcement stack over an example policy (M-DEMO).
 
 This is the same wiring a real deployment uses: registry → compiled policy →

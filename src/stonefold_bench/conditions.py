@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Track S — the defense ablation ladder S0→S3 (docs/15 §1).
 
 Every rung is realized over the *same* payments domain (the AP demo, docs/05) so only

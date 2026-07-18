@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Postgres ``AuditSink`` (RFC §11, design §11) — the durable, append-only record.
 
 The ``audit_log`` table (shared with the outbox's settle writes, see

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """stonefold_store — the stateful backing stores for gates (design §6, §13).
 
 The deterministic gate logic lives in ``stonefold_gates``; the *counters* those gates

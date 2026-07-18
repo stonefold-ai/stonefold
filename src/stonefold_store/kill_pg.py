@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Postgres ``KillStore`` (design §8.2, §8.4). The durable ``kill_orders`` table —
 so a kill survives a gateway restart — and the authoritative read the dispatch
 worker performs **inside** its ``FOR UPDATE`` transaction (design §8.3 point 3).

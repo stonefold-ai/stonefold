@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The connector seam (design §2, §5; RFC §12 step 6).
 
 A connector is the *only* thing that touches an external system, and it does two

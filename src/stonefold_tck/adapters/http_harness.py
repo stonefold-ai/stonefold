@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """A FastAPI harness exposing any ``ConformanceDriver`` over the TCK wire
 protocol (``stonefold_tck.http_driver``).
 

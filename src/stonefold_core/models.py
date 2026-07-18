@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The typed runtime objects the pipeline passes between stages (design §2).
 
 Each value type is a frozen ``pydantic`` model so the pure kernel can treat them

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """What actually happened — the ground truth the matrix scores against (docs/15 §3).
 
 Attack success is an unauthorized effect that **executed**, not one merely attempted

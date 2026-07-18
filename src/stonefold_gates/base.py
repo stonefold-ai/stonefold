@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Shared plumbing for the gate implementations (design §6).
 
 A gate is a small deterministic function ``(cfg, GateContext) -> GateResult``

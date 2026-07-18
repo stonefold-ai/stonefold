@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """In-memory ``KillStore`` (design §8.2) — the single-instance default and the
 test double. Holds the kill orders in a dict and a monotonic ``epoch`` that
 advances on every mutation (issue or lift) so a cached wrapper can self-heal.

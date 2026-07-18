@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """AUDIT profile — every outcome recorded; effects and evidence agree (RFC §11).
 
 Black-box note: transactionality itself (CS-006, the audit write sharing the

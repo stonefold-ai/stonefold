@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """CORE profile — authorization precedence (A) and deterministic gates (C).
 
 Scenario ids follow ``tests/acceptance-scenarios.md``.

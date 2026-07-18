@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Email connector (design §5) — a representative ``effect``. A stub that records
 the message to an in-memory outbox and returns a receipt. Effects are *staged*
 via the outbox in M4; here the connector only models the send for non-staged use.

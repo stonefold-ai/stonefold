@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Redis-backed sliding-window counters (design §6, §13).
 
 Each counter key is a Redis **sorted set** whose members are unique event ids

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Console runner for the benchmark harness (docs/15 §5). Two tracks, each runnable
 in isolation:
 

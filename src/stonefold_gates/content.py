@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The ``contentCheck`` hook SPI and a sample ``dlp.basic`` hook (design §6).
 
 ``contentCheck`` is the only gate that calls out synchronously, so it is the

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Reason-code retry classification (RFC §11, v0.6 CS-029).
 
 One home for the normative classes: which built-in gate refusals are

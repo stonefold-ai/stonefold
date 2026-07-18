@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The fifteen deterministic gates (RFC §7, design §6).
 
 Each is ``(cfg, GateContext) -> GateResult``. Stateless gates compute in-memory;

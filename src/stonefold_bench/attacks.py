@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The A1–A7 attack taxonomy, structured by the lowest rung that should stop each
 (docs/15 §2). Every attack carries the rung it *should* first die at, a prompt that
 injects it, and a ``landed`` predicate — a payment-shaped test reused for both the

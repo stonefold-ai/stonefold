@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The semantic linter (RFC §13) — the rule-1..18 validation checks.
 
 A policy that produces any ERROR-severity finding MUST NOT load: the gateway

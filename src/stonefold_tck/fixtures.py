@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The TCK fixture pack: one registry, a base policy, and per-check variants.
 
 The registry is in the **authoring format** (docs/06, `schema/registry.schema.json`)

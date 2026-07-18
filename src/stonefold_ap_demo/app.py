@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The demo gateway HTTP/WebSocket service (docs/05 components: Stonefold Gateway + UI).
 
 Wraps an ``APBundle`` in FastAPI: the SIF-native ``submit_intent`` tool (identity
