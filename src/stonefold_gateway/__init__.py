@@ -18,14 +18,18 @@ from stonefold_gateway.identity import (
     TransportCredential,
 )
 from stonefold_gateway.kill_service import KillService
+from stonefold_gateway.mcp_search import score, search, search_response
 from stonefold_gateway.transport import (
     CoverageError,
     Gateway,
+    InvalidIntentError,
     MCPProxy,
     SifNativeTransport,
     ToolMapping,
     interception_coverage_check,
+    mcp_tool_schemas,
     submit_intent_schema,
+    validate_intent_data,
 )
 
 __all__ = [
@@ -37,6 +41,14 @@ __all__ = [
     "interception_coverage_check",
     "CoverageError",
     "KillService",
+    # the MCP surface (design §1.2): the typed tools, and retrieval over them
+    "mcp_tool_schemas",
+    "score",
+    "search",
+    "search_response",
+    # declared shape, shared by every transport
+    "InvalidIntentError",
+    "validate_intent_data",
     # identity seam (CS-021)
     "IdentityProvider",
     "SessionIdentityProvider",

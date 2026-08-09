@@ -41,6 +41,38 @@ class UnknownActionError(Exception):
     """
 
 
+class PropertyDef(BaseModel):
+    """One field of an action's ``data``.
+
+    Mirrors ``registry.schema.json#/$defs/property``, which the schema has
+    always allowed under an action's ``data`` and the compact ``resources:``
+    dialect could not express. Without it a generated tool schema can only
+    declare ``data`` as a bare object, and an agent holding that schema cannot
+    construct a single valid intent — it has to be told the field names out of
+    band, which defeats the point of declaring them.
+
+    ``derived`` is accepted and ignored here: it is an authoring hint in the
+    ``entities:`` dialect, and a registry that is valid against the schema must
+    load.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    type: str = "string"
+    values: tuple[str, ...] = ()
+    required: bool = False
+    label: str = ""
+    derived: str = ""
+
+    def json_schema(self) -> dict[str, Any]:
+        node: dict[str, Any] = {"type": self.type}
+        if self.values:
+            node["enum"] = list(self.values)
+        if self.label:
+            node["description"] = self.label
+        return node
+
+
 class ActionDef(BaseModel):
     """A declared action: its kind, governance attributes, and (for a
     transition) its legal from-states (RFC §3–§5, §4.5)."""
@@ -48,6 +80,12 @@ class ActionDef(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     kind: Kind
+    # What the action does, in one line, for a human reading the registry and
+    # for the tool description an agent selects from. The registry could
+    # describe an action's *fields* (``PropertyDef.label``) but not the action
+    # itself; where two actions are confusable, this is the only thing that
+    # tells them apart. Optional, so existing registries load unchanged.
+    label: str = ""
     reversibility: Reversibility = Reversibility.REVERSIBLE
     emission: Emission = Emission.NONE
     operativeForce: OperativeForce = OperativeForce.NONE
@@ -60,6 +98,29 @@ class ActionDef(BaseModel):
     connector: str | None = None
     # Declared compensation for an irreversible effect (design §9).
     compensation: Compensation | None = None
+    # The shape of this action's ``data``. Three states, and the third is the
+    # one that is easy to get wrong: ``None`` is undeclared (nothing is
+    # checked), an empty map is *declared to take nothing* (so any field is an
+    # error), and a populated map is the shape. Conflating the first two would
+    # leave "this action takes no arguments" inexpressible.
+    data: dict[str, PropertyDef] | None = None
+
+    def data_schema(self) -> dict[str, Any] | None:
+        """This action's ``data`` as JSON Schema, or None if it declares none."""
+        if self.data is None:
+            return None
+        if not self.data:
+            return {"type": "object", "properties": {}, "additionalProperties": False}
+        required = sorted(name for name, prop in self.data.items() if prop.required)
+        node: dict[str, Any] = {
+            "type": "object",
+            "properties": {
+                name: prop.json_schema() for name, prop in sorted(self.data.items())
+            },
+        }
+        if required:
+            node["required"] = required
+        return node
 
     def attributes(self) -> Attributes:
         return Attributes(
