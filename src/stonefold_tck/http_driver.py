@@ -80,6 +80,8 @@ def _submit_result(body: Mapping[str, Any]) -> SubmitResult:
         reason_code=str(body.get("reasonCode", "") or ""),
         retry_class=None if retry is None else str(retry),
         agent_view=str(body.get("agentView", "") or ""),
+        items=[dict(v) for v in (body.get("items") or [])],
+        applied=[str(i) for i in (body.get("applied") or [])],
     )
 
 

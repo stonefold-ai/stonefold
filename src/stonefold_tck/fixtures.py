@@ -56,6 +56,12 @@ preconditionChecks:
       tck-never: terminal
   # v0.6.1 (CS-041): the standard closure check. Named like any other, but the
   # gateway supplies it and §7.6 defines what it does.
+  # v0.6.1 (CS-043): refuses exactly the items in BLOCKED_ITEMS, so a mixed call
+  # has something to partition.
+  - name: tck.itemAllowed
+    holdCapable: false
+    reasonCodes:
+      tck-item-blocked: terminal
   - name: dispositionIsDeclared
     holdCapable: true
     reasonCodes:
@@ -148,6 +154,23 @@ entities:
         closure:
           dispositionField: disposition
           claimsCompletion: [resolved]
+
+  # v0.6.1 (CS-043): one action, N items, each independently governable. The
+  # `tck.flagSet` check reads the single item the fan-out hands it.
+  Queue:
+    dataSource: tck-data
+    properties:
+      id: { type: string }
+    actions:
+      closeMany:
+        kind: record
+        connector: tck-data
+        data:
+          itemIds: { type: array, required: true }
+        items:
+          field: itemIds
+          independent: true
+          maxItems: 100
 
   Email:
     dataSource: tck-data
@@ -447,3 +470,21 @@ gates:
     valueLimit: { field: data.amount, max: 1000 }
     spendLimit: "100000/day"
 """
+
+
+# O1–O4 (CS-043): per-item verdicts. `tck.itemAllowed` refuses exactly the items
+# named BLOCKED_ITEMS below, so a call mixing clean and blocked items must apply
+# the clean ones and refuse the rest.
+POLICY_PER_ITEM = """apiVersion: stele/v0.1
+agent: tck-agent
+defaults: { failureMode: closed, audit: full }
+killable: true
+allow:
+  - record: [closeMany]
+gates:
+  closeMany:
+    precondition: [tck.itemAllowed]
+"""
+
+#: The items ``tck.itemAllowed`` refuses (docs/12 §3 fixture semantics).
+BLOCKED_ITEMS = ("Q-BLOCKED", "Q-ALSO-BLOCKED")

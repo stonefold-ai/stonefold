@@ -174,7 +174,37 @@ def lint(policy: Policy, registry: InMemoryRegistry) -> LintReport:
     _check_consume_none_irreversible(policy, registry, report)
     _check_per_item_threshold_without_aggregate(policy, registry, report)
     _check_closure_declaration(policy, registry, report)
+    _check_item_declaration(policy, registry, report)
     return report
+
+
+def _check_item_declaration(
+    policy: Policy, registry: InMemoryRegistry, report: LintReport
+) -> None:
+    """§13.21 (CS-043) — the item-bearing declaration's two checkable mistakes.
+
+    A misspelled ``field`` is silent at runtime: the call simply never fans out,
+    so the gate the author thought they had written does not exist. And an
+    unbounded fan-out turns one call into as many gate evaluations as the actor
+    cares to ask for, which is a denial-of-service the policy could have bounded.
+    """
+    for resource, action, adef in _allowed_action_defs(policy, registry):
+        declared = adef.items
+        if declared is None:
+            continue
+        if adef.data is not None and declared.field not in adef.data:
+            report.add(
+                "13.21", Severity.ERROR,
+                f"{resource}.{action}: items.field {declared.field!r} is not a "
+                f"declared data field — the action would never fan out, so any "
+                f"per-item gate on it is inert",
+            )
+        if declared.independent and declared.maxItems is None:
+            report.add(
+                "13.21", Severity.WARN,
+                f"{resource}.{action}: fans out per item with no maxItems — one "
+                f"call becomes as many gate evaluations as the actor sends",
+            )
 
 
 # Aggregate gates that bound total spend/rate/volume over a window, as opposed

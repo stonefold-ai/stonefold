@@ -96,6 +96,35 @@ class ClosureDef(BaseModel):
     claimsCompletion: tuple[str, ...] = ()
 
 
+class ItemsDef(BaseModel):
+    """An action that carries a list of items in one field (CS-043, docs/06 §5d).
+
+    ``markManyReviewed(itemIds)``, ``payBatch(payments)`` — one action, N targets.
+    Without this declaration the gateway can only allow or refuse the whole call,
+    and refusing it is an outage rather than a control: the legitimate items go
+    down with the one that should not have been there.
+
+    ``independent`` is the judgment call and it is a **safety property**, not an
+    optimisation. It asserts that applying a subset is meaningful — that item 3
+    does not depend on item 7. True of a worklist and of a payment run; false of
+    both legs of a transfer, where applying one leg is worse than applying
+    neither. Default ``False``, so an action that declares items without it keeps
+    the all-or-nothing behaviour.
+
+    ``key`` names the field identifying an item when items are objects rather
+    than scalars, so a refusal can say *which* one. ``maxItems`` refuses a call
+    larger than the deployment will evaluate — refusing on size is honest where
+    silently evaluating fifty thousand items is not.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    field: str
+    independent: bool = False
+    key: str = ""
+    maxItems: int | None = None
+
+
 class ActionDef(BaseModel):
     """A declared action: its kind, governance attributes, and (for a
     transition) its legal from-states (RFC §3–§5, §4.5)."""
@@ -130,6 +159,17 @@ class ActionDef(BaseModel):
     # CS-041: what closing this action means. Inert on its own — the standard
     # ``dispositionIsDeclared`` check is what reads it.
     closure: ClosureDef | None = None
+    # CS-043: the action carries N items in one field. Absent ⇒ the call is one
+    # unit, as before.
+    items: ItemsDef | None = None
+
+    def fans_out(self) -> bool:
+        """Whether this action is decided item by item (CS-043).
+
+        Both halves are required: a declaration that the items exist, and the
+        assertion that applying a subset of them is meaningful.
+        """
+        return self.items is not None and self.items.independent
 
     def disposition_vocabulary(self) -> tuple[str, ...]:
         """The declared dispositions, from the ``closure`` field's ``values``.
@@ -363,6 +403,7 @@ class InMemoryRegistry:
             connector_digest=self._data.connector_digests.get(connector_name),
             from_states=action.from_states,
             compensation=action.compensation,
+            items=action.items,
         )
 
     # --- registry introspection used by the linter (M1) and gates (M2) ---

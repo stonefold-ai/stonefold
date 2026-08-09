@@ -40,7 +40,7 @@ from stonefold_core.linter import PolicyError
 from stonefold_core.enums import Outcome
 from stonefold_core.models import RawCall, ResolvedAction
 from stonefold_core.scope import AttributeScope, ScopePredicate, ScopeRegistry, make_scope_resolver
-from stonefold_gates.base import CheckResult, GateContext, check_hold
+from stonefold_gates.base import CheckResult, GateContext, check_fail, check_hold
 from stonefold_gates.content import ContentHookRegistry
 from stonefold_gates.closure import AuditDecisionHistory
 from stonefold_gates.engine import DefaultGateEngine
@@ -89,7 +89,8 @@ def authoring_to_compact(authoring: Mapping[str, Any]) -> dict[str, Any]:
             # dialects and were previously dropped here, so an authoring-format
             # registry silently lost its field shapes (and, from v0.6.1, its
             # closure vocabulary — which the standard check reads).
-            for key in ("from", "compensation", "connector", "data", "label", "closure"):
+            for key in ("from", "compensation", "connector", "data", "label",
+                        "closure", "items"):
                 if adef.get(key) is not None:
                     compact[key] = adef[key]
             actions[aname] = compact
@@ -131,6 +132,27 @@ def authoring_to_compact(authoring: Mapping[str, Any]) -> dict[str, Any]:
 
 
 # --- the TCK's required registered-function semantics (docs/12 §3) ---------
+#: docs/12 §3: the items ``tck.itemAllowed`` refuses. Mirrors
+#: ``fixtures.BLOCKED_ITEMS``; inlined so the adapter does not import fixtures.
+_BLOCKED_ITEMS = ("Q-BLOCKED", "Q-ALSO-BLOCKED")
+
+
+def _item_allowed(gctx: GateContext) -> CheckResult:
+    """CS-043 fixture semantics: refuse exactly the blocked items.
+
+    Asserts the fan-out happened by reading a single item — a driver that hands
+    this check the whole list has not implemented CS-043, and the check says so
+    rather than passing quietly.
+    """
+    ids = gctx.resolved.data.get("itemIds") or []
+    if len(ids) != 1:
+        # A driver that hands this check the whole list has not implemented the
+        # fan-out. Say so by refusing rather than passing quietly.
+        return check_fail("tck-item-blocked")
+    return (check_fail("tck-item-blocked") if str(ids[0]) in _BLOCKED_ITEMS
+            else CheckResult(Outcome.PASS))
+
+
 def _tck_scope_registry() -> ScopeRegistry:
     return ScopeRegistry(
         {
@@ -287,6 +309,7 @@ class ReferenceDriver:
             hooks=ContentHookRegistry({"tck.rejectMarker": _reject_marker}),
             preconditions={
                 "tck.flagSet": _flag_set,
+                "tck.itemAllowed": _item_allowed,
                 "tck.holdOnMarker": _hold_on_marker,
                 "tck.codelessHold": _codeless_hold,
             },
@@ -395,6 +418,14 @@ class ReferenceDriver:
             reason_code=result.reason_code,
             retry_class=result.retry_class.value if result.retry_class else None,
             agent_view=json.dumps(result.model_dump(mode="json"), default=str),
+            # v0.6.1 CS-043: per-item verdicts, in submission order
+            items=[
+                {"item": v.item, "decision": v.decision.value, "reasonCode": v.reason_code,
+                 "retryClass": v.retry_class.value if v.retry_class else None,
+                 "ticket": v.ticket}
+                for v in result.items
+            ],
+            applied=list(result.applied),
         )
 
     @staticmethod

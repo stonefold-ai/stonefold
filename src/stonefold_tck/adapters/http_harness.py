@@ -27,6 +27,8 @@ def _submit_json(result: SubmitResult) -> dict[str, Any]:
         "reasonCode": result.reason_code,
         "retryClass": result.retry_class,
         "agentView": result.agent_view,
+        "items": [dict(v) for v in result.items],
+        "applied": list(result.applied),
     }
 
 

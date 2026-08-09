@@ -77,6 +77,12 @@ CAP_OBLIGATION = "obligation"
 # nothing else. The reason codes ``DISPOSITION_REQUIRED`` and
 # ``CLOSED_WITHOUT_THE_WORK`` are normative for drivers claiming it.
 CAP_CLOSURE = "closure"
+# v0.6.1 CS-043: item-bearing actions decided per item. A driver claiming this
+# MUST support an action declaring ``items: {field, independent}`` and MUST
+# report per-item verdicts (item, decision, reasonCode, retryClass, ticket) plus
+# the items that took effect. The envelope's decision is ALLOW only when every
+# item applied — a driver that returns ALLOW for a partial application fails O2.
+CAP_PER_ITEM = "per-item"
 
 ALL_CAPABILITIES = frozenset(
     {
@@ -95,6 +101,7 @@ ALL_CAPABILITIES = frozenset(
         CAP_FEEDBACK,
         CAP_OBLIGATION,
         CAP_CLOSURE,
+        CAP_PER_ITEM,
     }
 )
 
@@ -134,6 +141,11 @@ class SubmitResult:
     reason_code: str = ""
     retry_class: str | None = None
     agent_view: str = ""
+    # v0.6.1 CS-043 (``per-item`` capability): one verdict per item for an
+    # item-bearing action — (item, decision, reasonCode, retryClass, ticket) —
+    # and the items that took effect. Empty for every other action.
+    items: Sequence[Mapping[str, Any]] = ()
+    applied: Sequence[str] = ()
 
 
 @dataclass(frozen=True)

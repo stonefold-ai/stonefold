@@ -98,6 +98,10 @@ class ResolvedAction(BaseModel):
     # Empty for non-transitions. The built-in transition precondition (M2) uses
     # this; it is a MUST-hold check, not optional policy.
     from_states: tuple[str, ...] = ()
+    # CS-043: the action's declared item-bearing field, carried here so the
+    # pipeline can see it without a second registry lookup — the same reason
+    # ``from_states`` and ``compensation`` are copied. ``None`` ⇒ one unit.
+    items: Any | None = None
     # Declared compensation for an irreversible effect (auto-staged on dispatch
     # failure, design §9). ``None`` ⇒ no compensation declared.
     compensation: Compensation | None = None
@@ -154,6 +158,26 @@ class GateResult(BaseModel):
     fields: tuple[str, ...] = ()
 
 
+class ItemVerdict(BaseModel):
+    """One item's outcome inside an item-bearing action (CS-043).
+
+    Each item is decided on its own, so each carries its own reason code and
+    retry class: *that* item is retryable and *this* one is not is the whole
+    message, and a single code for the call cannot carry it.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    item: str
+    decision: Decision
+    rule: str = ""
+    reason_code: str = ""
+    retry_class: RetryClass | None = None
+    # The staged row for a held item — held items stage individually so a human
+    # can release one item rather than the whole call.
+    ticket: str | None = None
+
+
 class EvalResult(BaseModel):
     """The terminal verdict of one ``enforce`` call (design §2, §3)."""
 
@@ -177,6 +201,22 @@ class EvalResult(BaseModel):
     output: Any | None = None
     # Human-readable description of the scope applied below the model (RFC §11).
     scope_applied: tuple[str, ...] = ()
+    # CS-043: one verdict per item for an item-bearing action, and the items
+    # that actually took effect. Empty for every other action.
+    #
+    # ``decision`` above is the call's fate as a whole: ALLOW only when every
+    # item was applied, otherwise the most severe per-item outcome. So a verdict
+    # can read DENY while ``applied`` lists nine items — deliberately, because
+    # the alternative (ALLOW with the refusals buried in a list) is the mistake
+    # CS-029 exists to prevent: an actor that reads the decision field alone
+    # must not conclude the call succeeded.
+    items: tuple[ItemVerdict, ...] = ()
+    applied: tuple[str, ...] = ()
+
+    def partially_applied(self) -> bool:
+        """Some items took effect and some did not — the state an actor is most
+        likely to misread, so it is a question the result can answer directly."""
+        return bool(self.items) and bool(self.applied) and len(self.applied) < len(self.items)
 
 
 class BatchResult(BaseModel):

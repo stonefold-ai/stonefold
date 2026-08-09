@@ -30,6 +30,7 @@ PROFILE_FEEDBACK = "feedback"  # v0.6 CS-029/030: reason codes + retry classes, 
 PROFILE_MATCH = "match"  # v0.6 CS-032/033/036: requireMatch decision semantics
 PROFILE_CONSUME = "consume"  # v0.6 CS-035: reservation lifecycle
 PROFILE_CLOSURE = "closure"  # v0.6.1 CS-041: the standard closure check
+PROFILE_PER_ITEM = "per-item"  # v0.6.1 CS-043: per-item verdicts
 
 ALL_PROFILES = (
     PROFILE_CORE,
@@ -46,6 +47,7 @@ ALL_PROFILES = (
     PROFILE_MATCH,
     PROFILE_CONSUME,
     PROFILE_CLOSURE,
+    PROFILE_PER_ITEM,
 )
 
 
@@ -89,6 +91,7 @@ def all_checks() -> tuple[Check, ...]:
         batch,
         closure,
         core,
+        per_item,
         digest,
         feedback,
         freshness,

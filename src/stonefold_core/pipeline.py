@@ -24,7 +24,7 @@ does not refuse the batch).
 from __future__ import annotations
 
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any
 
@@ -44,6 +44,7 @@ from stonefold_core.models import (
     BatchResult,
     EvalResult,
     GateResult,
+    ItemVerdict,
     RawCall,
     ResolvedAction,
     Session,
@@ -137,6 +138,18 @@ def enforce(
     failure_mode = (
         policy.policy.defaults.failureMode if policy is not None else FailureMode.CLOSED
     )
+    # CS-043: an action declaring independent items is decided item by item.
+    # Only here, never inside ``enforce_batch``: a SIF batch applies atomically
+    # (CS-023), so an item-bearing action inside one stays a single unit.
+    items_def = _items_declaration(registry, call)
+    if items_def is not None:
+        return _enforce_per_item(
+            call, actor, session, items_def=items_def, registry=registry, audit=audit,
+            policy=policy, gates=gates, env=env, scopes=scopes, connectors=connectors,
+            outbox=outbox, kill=kill, freshness=freshness, obligations=obligations,
+            dedupe_window_s=dedupe_window_s, agent_name=agent_name,
+            failure_mode=failure_mode,
+        )
     decided = _decide(
         call, actor, session, registry=registry, policy=policy, gates=gates,
         env=env, scopes=scopes, connectors=connectors, kill=kill,
@@ -149,6 +162,213 @@ def enforce(
         dedupe_window_s=dedupe_window_s,
     )
     return _stamp_feedback(result, decided)
+
+
+# --- CS-043: item-bearing actions ----------------------------------------
+def _items_declaration(registry: Registry, call: RawCall) -> Any | None:
+    """The action's items declaration, or ``None`` if it is not item-bearing.
+
+    Resolution is an O(1) lookup and ``_decide`` resolves again per item; paying
+    it twice is cheaper than widening the ``Registry`` protocol every consumer
+    implements. An unknown name resolves to ``None`` here and reaches the normal
+    path, which is what turns it into the audited DENY (RFC §12 step 1).
+    """
+    try:
+        resolved = registry.resolve(call)
+    except UnknownActionError:
+        return None
+    declared = resolved.items
+    if declared is None or not getattr(declared, "independent", False):
+        return None
+    values = call.data.get(declared.field)
+    # A single value, or none at all, has nothing to fan out: the ordinary path
+    # decides it as one unit and says so in one record.
+    if not isinstance(values, (list, tuple)) or len(values) < 2:
+        return None
+    return declared
+
+
+def _item_key(value: Any, declared: Any) -> str:
+    """How a refusal names the item it refused.
+
+    Scalars name themselves. Objects need a declared ``key``, and without one the
+    position is all there is — which is why the linter warns about an item-bearing
+    action whose items are objects and whose key is undeclared.
+    """
+    key = getattr(declared, "key", "")
+    if key and isinstance(value, Mapping):
+        return str(value.get(key, ""))
+    return str(value)
+
+
+def _worst(decisions: Iterable[Decision]) -> Decision:
+    """The call's fate as a whole: ALLOW only if every item was applied.
+
+    The order is the refusal's finality for the actor: HALT means an operator
+    stopped it, DENY means it will not happen, HOLD means it might.
+    """
+    seen = set(decisions)
+    for decision in (Decision.HALT, Decision.DENY, Decision.HOLD):
+        if decision in seen:
+            return decision
+    return Decision.ALLOW
+
+
+def _enforce_per_item(
+    call: RawCall,
+    actor: Actor,
+    session: Session,
+    *,
+    items_def: Any,
+    registry: Registry,
+    audit: AuditSink,
+    policy: CompiledPolicy | None,
+    gates: GateEngine | None,
+    env: RequestEnv | None,
+    scopes: ScopeResolver | None,
+    connectors: ConnectorRegistry | None,
+    outbox: OutboxStore | None,
+    kill: KillStore | None,
+    freshness: FreshnessConfig | None,
+    obligations: Mapping[str, ObligationRegistry] | None,
+    dedupe_window_s: float | None,
+    agent_name: str,
+    failure_mode: FailureMode,
+) -> EvalResult:
+    """Decide an item-bearing action item by item (CS-043).
+
+    Where each part of the answer comes from, and why:
+
+    * **every gate runs per item**, which is the entire point — an aggregate gate
+      (``spendLimit``/``rate``/``quota``) now sees N increments and can cut the run
+      off at item seven, which is *these seven, not those thirteen*;
+    * **the applied items go through as one call**, because that is one transaction
+      in the managed system, and splitting it into N would misdescribe what
+      happened;
+    * **held items stage individually**, so a human releases one item rather than
+      the whole call;
+    * **refused items are each audited on their own**, because each is its own
+      decision with its own reason code, and that record is the only place the
+      refusal exists.
+    """
+    values = list(call.data[items_def.field])
+    ceiling = getattr(items_def, "maxItems", None)
+    if ceiling is not None and len(values) > ceiling:
+        # Refusing on size is honest; quietly evaluating fifty thousand items is
+        # not. One record, one reason, nothing applied.
+        return _terminal(
+            Decision.DENY, "items-over-ceiling", call, None, actor, session, audit,
+            agent_name,
+        )
+
+    decided = [
+        _decide(
+            RawCall(
+                resource=call.resource,
+                action=call.action,
+                data={**call.data, items_def.field: [value]},
+            ),
+            actor, session, registry=registry, policy=policy, gates=gates,
+            env=env, scopes=scopes, connectors=connectors, kill=kill,
+            agent_name=agent_name, failure_mode=failure_mode,
+        )
+        for value in values
+    ]
+
+    verdicts: list[ItemVerdict] = []
+    applied: list[str] = []
+    allowed: list[tuple[int, _Decided]] = []
+
+    for index, (value, d) in enumerate(zip(values, decided)):
+        name = _item_key(value, items_def)
+        if d.decision in (Decision.DENY, Decision.HALT):
+            refused = _terminal(
+                d.decision, d.rule, d.call, d.resolved, actor, session, audit,
+                agent_name, gate_results=d.gate_results,
+                scope_applied=d.scope_applied, outcome=d.outcome,
+            )
+            verdicts.append(ItemVerdict(
+                item=name, decision=refused.decision, rule=refused.rule,
+                reason_code=refused.reason_code, retry_class=refused.retry_class,
+            ))
+        elif d.decision is Decision.HOLD:
+            held = _stamp_feedback(_commit(
+                d, actor, session, audit=audit, connectors=connectors, outbox=outbox,
+                freshness=freshness, env=env, agent_name=agent_name,
+                failure_mode=failure_mode, obligations=obligations,
+                dedupe_window_s=dedupe_window_s,
+            ), d)
+            verdicts.append(ItemVerdict(
+                item=name, decision=held.decision, rule=held.rule,
+                reason_code=held.reason_code, retry_class=held.retry_class,
+                ticket=held.ticket,
+            ))
+        else:
+            allowed.append((index, d))
+            verdicts.append(ItemVerdict(item=name, decision=Decision.ALLOW, rule=d.rule))
+            applied.append(name)
+
+    merged: EvalResult | None = None
+    if allowed:
+        # One call for the allowed subset. The template is the first allowed
+        # item's verdict: the gates that ran are the same set for every item, and
+        # where a gate's *values* differed, that difference is recorded on the
+        # items it refused rather than here.
+        template = allowed[0][1]
+        subset = [values[i] for i, _ in allowed]
+        assert template.resolved is not None
+        merged_decided = replace(
+            template,
+            call=RawCall(
+                resource=call.resource,
+                action=call.action,
+                data={**call.data, items_def.field: subset},
+            ),
+            resolved=template.resolved.model_copy(
+                update={"data": {**template.resolved.data, items_def.field: subset}}
+            ),
+        )
+        merged = _stamp_feedback(_commit(
+            merged_decided, actor, session, audit=audit, connectors=connectors,
+            outbox=outbox, freshness=freshness, env=env, agent_name=agent_name,
+            failure_mode=failure_mode, obligations=obligations,
+            dedupe_window_s=dedupe_window_s,
+        ), template)
+        if merged.decision is not Decision.ALLOW:
+            # The commit phase refused what the decide phase allowed — a
+            # dispatch-time re-validation, a digest mismatch. Nothing was applied,
+            # so the items say that rather than keeping the decide-phase verdict.
+            applied = []
+            verdicts = [
+                ItemVerdict(
+                    item=v.item, decision=merged.decision, rule=merged.rule,
+                    reason_code=merged.reason_code, retry_class=merged.retry_class,
+                    ticket=merged.ticket,
+                ) if v.decision is Decision.ALLOW else v
+                for v in verdicts
+            ]
+
+    overall = _worst(v.decision for v in verdicts)
+    # The envelope carries the strongest thing that happened to the call, and the
+    # applied items by name. A reader of ``decision`` alone must not be able to
+    # conclude the whole call succeeded — CS-029's lesson, applied to a set.
+    worst = next((v for v in verdicts if v.decision is overall
+                  and v.decision is not Decision.ALLOW), None)
+    return EvalResult(
+        decision=overall,
+        rule=(worst.rule if worst is not None
+              else (merged.rule if merged is not None else "allow")),
+        gates=merged.gates if merged is not None else (),
+        reason_code=worst.reason_code if worst is not None else "",
+        retry_class=worst.retry_class if worst is not None else None,
+        feedback=(merged.feedback if merged is not None
+                  else decided[0].feedback),
+        ticket=merged.ticket if merged is not None else None,
+        output=merged.output if merged is not None else None,
+        scope_applied=merged.scope_applied if merged is not None else (),
+        items=tuple(verdicts),
+        applied=tuple(applied),
+    )
 
 
 def enforce_batch(
