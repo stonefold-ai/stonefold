@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Agent feedback visibility (spec §11, v0.3 CS-030).
+"""Agent feedback visibility (spec §11, v0.3 §?).
 
 What the *agent* receives on a deny/hold is a declared choice — ``code`` |
 ``code+fields`` (default) | ``code+evidence`` — applied by the TRANSPORT on the
@@ -23,7 +23,7 @@ DEFAULT_FEEDBACK = FeedbackLevel.CODE_FIELDS
 
 
 def parse_feedback(raw: object) -> FeedbackLevel:
-    """The ``feedback:`` gate-set key, defaulting per CS-030. Unknown values
+    """The ``feedback:`` gate-set key, defaulting per §?. Unknown values
     fall back to the DEFAULT (never to the leakier ``code+evidence``)."""
     try:
         return FeedbackLevel(str(raw))
@@ -42,13 +42,13 @@ def _redact_gate(g: GateResult) -> GateResult:
 
 
 def agent_view(result: EvalResult, level: FeedbackLevel | None = None) -> EvalResult:
-    """The agent-facing projection of a full ``EvalResult`` (CS-030).
+    """The agent-facing projection of a full ``EvalResult``.
 
     ``level`` defaults to the result's stamped policy level. ``code+evidence``
     is the identity; ``code+fields`` strips prose reasons and evidence from the
     gate trace; ``code`` strips the trace and the scope description entirely.
     The decision, rule, reason code, retry class, ticket, and connector output
-    always pass through — they are the loop's signal. So do CS-043's per-item
+    always pass through — they are the loop's signal. So do §?'s per-item
     verdicts: an item's identifier came from the intent, and its code and retry
     class are the same convergence signal one level down. Nothing record-side
     reaches them (a held item's evidence stays in the audit record).
@@ -67,7 +67,7 @@ def agent_view(result: EvalResult, level: FeedbackLevel | None = None) -> EvalRe
 
 
 def agent_view_batch(batch: BatchResult) -> BatchResult:
-    """Per-operation redaction of a batch verdict (CS-023 × CS-030)."""
+    """Per-operation redaction of a batch verdict (§? × §?)."""
     redacted = tuple(agent_view(r) for r in batch.results)
     if redacted == batch.results:
         return batch

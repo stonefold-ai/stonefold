@@ -1,4 +1,4 @@
-"""CS-020 — dispatch-time connector digest verification over **real Postgres**.
+"""§? — dispatch-time connector digest verification over **real Postgres**.
 
 The dispatch check is the one that guards a *staged* effect: the durable
 ``pending_actions`` row carries the pinned digest, and the worker refuses to

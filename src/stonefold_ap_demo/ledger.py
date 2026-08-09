@@ -255,7 +255,7 @@ class PostgresLedger:
 class LedgerConnector:
     """The single adapter to the fake bank. Satisfies ``stonefold_core.Connector``."""
 
-    # CS-018: a payment rail cannot carry the scope predicate into its own
+    # a payment rail cannot carry the scope predicate into its own
     # transaction — the residual window is declared, and the worker re-resolves
     # the source account under scope immediately before dispatch.
     scope_capability = ScopeCapability.window_declared("payment-rail call")
@@ -324,7 +324,7 @@ class LedgerConnector:
         return ConnectorResult(
             kind="receipt", receipt=stored, handle=idempotency_key,
             # the payment id is the downstream handle an operator/external tool uses
-            # to locate and (via refund) compensate this effect — record it (CS-009).
+            # to locate and (via refund) compensate this effect — record it.
             # (One element here; a fan-out connector would list every record it wrote,
             # e.g. the payment *and* its ledger entry.)
             result_refs=[str(stored["id"])] if stored.get("id") is not None else [],

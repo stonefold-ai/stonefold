@@ -1,4 +1,4 @@
-"""v0.2 CS-024 — classification ordering for ``disclosure`` (spec §7.12; registry §4).
+"""v0.2 §? — classification ordering for ``disclosure`` (spec §7.12; registry §4).
 
 ``disclosure.maxClassification`` compares by the classification set's DECLARED
 order: the built-in ``resultSensitivity`` values are ordered ``public < internal
@@ -76,7 +76,7 @@ def test_ceiling_from_actor_clearance_path() -> None:
     )
 
 
-# --- a domain's substituted, ordered labels (CS-024) --------------------------
+# --- a domain's substituted, ordered labels --------------------------
 def test_domain_declared_order_is_honoured() -> None:
     doc = _registry_doc(classifications=["green", "amber", "red"])
     doc["resources"]["Chart"]["actions"]["read"]["resultSensitivity"] = "amber"

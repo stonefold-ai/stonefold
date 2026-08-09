@@ -25,7 +25,7 @@ from stonefold_core.models import (
 
 
 def obligation_refs(gates: list[GateResult] | tuple[GateResult, ...]) -> dict[str, Any] | None:
-    """The CS-037 ``obligationRefs`` audit field, lifted from the
+    """The §? ``obligationRefs`` audit field, lifted from the
     ``requireMatch`` gate's trace evidence (registry, matched/candidate refs,
     candidate count). ``None`` when no ``requireMatch`` gate ran — the field is
     entitlement lineage, not a default."""
@@ -60,7 +60,7 @@ class InMemoryAuditSink:
         return [r for r in self.records if r.correlationId == correlation_id]
 
     def all_records(self) -> list[AuditRecord]:
-        """Every record, in write order (the CS-030 stats surface reads this)."""
+        """Every record, in write order (the §? stats surface reads this)."""
         return list(self.records)
 
 

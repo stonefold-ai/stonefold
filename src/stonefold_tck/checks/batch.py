@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""BATCH profile — atomic batch decision semantics (v0.2 CS-023; spec §12, SIF §5).
+"""BATCH profile — atomic batch decision semantics (v0.2; spec §12, SIF §5).
 
 Failure messages state the violation observed, not the expectation.
 """
@@ -51,16 +51,16 @@ def h1_deny_refuses_batch(driver: ConformanceDriver) -> None:
     driver.dispatch_once()
     expect(effects_of(driver, "pay") == 0,
            "an effect staged or dispatched from a refused batch")
-    # spec §12 (CS-023): every operation in the batch gets its own audit record —
+    # spec §12: every operation in the batch gets its own audit record —
     # the failing op with its own deny, the rest with outcome ``batch-refused``.
     entries = list(driver.audit())
     expect(
         any(e.decision == "deny" and e.action == "pay" for e in entries),
-        "the failing operation left no deny audit record of its own (CS-023)",
+        "the failing operation left no deny audit record of its own",
     )
     expect(
         any(e.outcome == "batch-refused" for e in entries),
-        "the non-failing operation left no 'batch-refused' audit record (CS-023)",
+        "the non-failing operation left no 'batch-refused' audit record",
     )
 
 
@@ -115,4 +115,4 @@ def h4_rejection_keeps_committed_ops(driver: ConformanceDriver) -> None:
     expect(effects_of(driver, "pay") == 0, "the rejected effect dispatched")
     expect(_widget_count(driver) == before + 1,
            "the rejection rolled back the committed record op — each operation "
-           "was independently authorized (CS-023)")
+           "was independently authorized")

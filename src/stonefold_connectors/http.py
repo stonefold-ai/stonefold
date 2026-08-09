@@ -21,7 +21,7 @@ Sender = Callable[[dict[str, Any]], list[dict[str, Any]]]
 
 
 class HttpConnector:
-    # CS-018: an HTTP call cannot carry the scope predicate into the upstream's
+    # an HTTP call cannot carry the scope predicate into the upstream's
     # transaction — the residual race window (one round-trip) is declared, so
     # the worker re-resolves the target pre-dispatch and the audit prices it.
     scope_capability = ScopeCapability.window_declared("http round-trip")

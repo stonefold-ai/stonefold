@@ -199,7 +199,7 @@ __all__ = [
     "FallbackAuditSink",
     "build_record",
     "obligation_refs",
-    # obligation registries (v0.3 CS-032/034/036)
+    # obligation registries (v0.3)
     "MISSING",
     "Capability",
     "ConsumeOutcome",
@@ -234,7 +234,7 @@ __all__ = [
     "AuthzResult",
     "KindMatcher",
     "MatchSpecificity",
-    # connector digest pinning (CS-020)
+    # connector digest pinning
     "DIGEST_MISMATCH",
     "DigestMismatch",
     "DigestMismatchError",
@@ -271,7 +271,7 @@ __all__ = [
     "UnknownTicketError",
     "cancellation_record",
     "hold_dedupe_key",
-    # decision freshness (v0.2 CS-017)
+    # decision freshness (v0.2)
     "FreshnessConfig",
     "DispatchRevalidator",
     "VOLATILE_GATES",
@@ -290,7 +290,7 @@ __all__ = [
     "ConnectorRegistry",
     "ConnectorResult",
     "Connectors",
-    # scope no-race (v0.2 CS-018)
+    # scope no-race (v0.2)
     "SCOPE_LOST",
     "ScopeCapability",
     "ScopeLostError",

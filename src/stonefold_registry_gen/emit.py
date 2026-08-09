@@ -89,7 +89,7 @@ def _entity_lines(entity: DraftEntity) -> list[str]:
 def emit_yaml(draft: DraftRegistry) -> str:
     """Render the draft as authoring-format YAML with TODO(review) markers."""
     lines: list[str] = [
-        "apiVersion: registry/v1.0",
+        "apiVersion: registry/v0.1",
         f"domain: {draft.domain}",
         _HEADER.format(source=draft.source).rstrip("\n"),
         "",

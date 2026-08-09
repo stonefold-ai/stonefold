@@ -191,7 +191,6 @@ The full version of this argument — the PDP/PEP category error, the four-verdi
 - **[Conformance TCK](https://github.com/stonefold-ai/spec/blob/main/docs/12-conformance-tck.md)** — certify a gateway in any language against the specification: one small driver adapter (Python protocol or fourteen JSON endpoints), one report, named profiles.
 - **[Who is this for](docs/13-who-is-this-for.md)** — the industries ranked by fit, each one's blocking risk mapped to the mechanisms that answer it, who buys, and where Stonefold is the wrong tool.
 - **[Incremental adoption](docs/16-incremental-adoption.md)** — the ramp from an existing MCP tool estate to full coverage: draft a registry → intercept → close the side doors entity by entity, with the honest coverage guarantee at each stage.
-- **Changelogs:** [v0.1 → v0.2](https://github.com/stonefold-ai/spec/blob/main/docs/changeset-v0.1-to-v0.2.md) · [v0.2 → v0.2](https://github.com/stonefold-ai/spec/blob/main/docs/changeset-v0.1-to-v0.2.md) · [v0.2 → v0.2](https://github.com/stonefold-ai/spec/blob/main/docs/changeset-v0.1-to-v0.2.md) (decision freshness + scope no-race) · [v0.2 → v0.2](https://github.com/stonefold-ai/spec/blob/main/docs/changeset-v0.1-to-v0.2.md) (trust boundary, digest pinning, identity seam, batch semantics, classification ordering) · [v0.2 → v0.3](https://github.com/stonefold-ai/spec/blob/main/docs/changeset-v0.2-to-v0.2.md) (obligation matching: the `requireMatch` gate, hold substrate, reason codes + feedback visibility, reservation lifecycle — all implemented, TCK-certified).
 
 ## License
 

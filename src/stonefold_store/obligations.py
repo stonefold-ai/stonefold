@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 """In-memory reference obligation-registry adapter (docs/06 §5b, v0.3
-CS-034/CS-035).
+§?).
 
 Implements the four-operation contract behind a declared obligation registry:
 ``query`` filters the held records by the gateway's typed selector;
@@ -15,7 +15,7 @@ Two behaviours a real adapter also owns, modelled here:
   to ``unconsumed`` on release), so a policy matching
   ``obligation.line.state == 'unconsumed'`` refuses a second intent at
   DECISION time — the resubmitted-invoice beat (spec §14.4).
-* **Reservation TTL** (CS-035 orphan recovery): reservations expire on the
+* **Reservation TTL** (§? orphan recovery): reservations expire on the
   ADAPTER's own clock — a gateway crash between reserve and staging-commit
   must not lock a real order line forever. Expiry is lazy (checked on every
   operation); an expired-but-unclaimed reservation MAY be re-acquired by the
@@ -107,7 +107,7 @@ class InMemoryObligationRegistry:
             self.set_field(ref, self._state_path, state)
 
     def _expire_lazily(self, ref: str) -> None:
-        """CS-035 orphan recovery: a reservation past the adapter's TTL is
+        """§? orphan recovery: a reservation past the adapter's TTL is
         void — the line frees for the next intent (and its state field reads
         ``unconsumed`` again)."""
         st = self._state.get(ref)
@@ -124,7 +124,7 @@ class InMemoryObligationRegistry:
             st.reserved_at = None
             self._mark(ref, "unconsumed")
 
-    # --- the four-operation adapter contract (CS-034) ---
+    # --- the four-operation adapter contract ---
     def query(self, selector: Selector) -> list[Obligation]:
         """Typed records matching every ``EqConstraint``. A record missing a
         constrained field never matches (it cannot satisfy the comparison).

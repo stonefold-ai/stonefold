@@ -94,13 +94,13 @@ class Gateway:
         # context only from the gateway's own stores — never the agent's identity
         # (invariant 3 stays intact: identity is the per-call ``actor`` argument).
         self._env_factory = env_factory
-        # Decision freshness (v0.2 CS-017), opt-in: with a config every staged
+        # Decision freshness (v0.2), opt-in: with a config every staged
         # effect gets a TTL stamped from the request env's clock.
         self._freshness = freshness
-        # v0.3 (CS-035): the obligation-registry adapters the commit phase
+        # v0.3: the obligation-registry adapters the commit phase
         # reserves/consumes from — the same map the gate engine matches against.
         self._obligations = obligations
-        # v0.3 (CS-031): the deployment's hold-dedupe window (seconds); ``None``
+        # v0.3: the deployment's hold-dedupe window (seconds); ``None``
         # disables collapsing — deployment configuration, like decision TTLs.
         self._dedupe_window_s = dedupe_window_s
         self._agent = policy.agent if policy is not None else agent
@@ -124,7 +124,7 @@ class Gateway:
     ) -> EvalResult:
         """The single enforcement entry point shared by both transports.
 
-        The returned result is the AGENT's view (CS-030): redacted to the
+        The returned result is the AGENT's view: redacted to the
         policy-declared feedback level. The audit record was written from the
         full result inside ``enforce`` — redact on return, never on write.
         """
@@ -157,7 +157,7 @@ class Gateway:
         actor: Actor,
         session: Session,
     ) -> BatchResult:
-        """Enforce a SIF batch atomically (spec §12, CS-023; SIF §5).
+        """Enforce a SIF batch atomically (spec §12, §?; SIF §5).
 
         Every operation is decided first; any DENY/HALT refuses the whole batch
         before anything commits or stages. Same identity rule as ``submit``:
@@ -323,7 +323,7 @@ class SifNativeTransport:
         self, operations: Sequence[Mapping[str, Any]], *, actor: Actor, session: Session
     ) -> BatchResult:
         """The SIF wire form ``{"operations": [...]}`` (SIF §5) — decided
-        atomically per spec §12 / CS-023."""
+        atomically per spec §12 / §?."""
         for index, op in enumerate(operations):
             try:
                 validate_intent_data(

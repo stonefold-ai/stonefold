@@ -1,4 +1,4 @@
-"""v0.3 CS-044 — a gate that names what it reads (spec §7.6, registry docs/06 §5e).
+"""v0.3 §? — a gate that names what it reads (spec §7.6, registry docs/06 §5e).
 
 Three failures, one primitive. A control reads content that ages; while the
 content is current nobody looks at the control. So:

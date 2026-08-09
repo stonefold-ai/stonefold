@@ -199,8 +199,7 @@ chain. (spec §9, §11; [`03`](03-architecture-decisions.md) → "Multi-effect &
 ## 8. Advanced edges (skip on a first read)
 
 Two timing subtleties, here only so they don't surprise you later. Both were
-documented-but-open boundaries through v0.2 and are **specified and built since v0.2**
-(CS-017 / CS-018):
+documented-but-open boundaries through v0.2 and are **specified and built since v0.2**:
 
 - **Decision freshness.** A verdict is computed at *decision time*; a staged effect
   dispatches later. v0.2 bounds that gap two ways: every staged effect carries a

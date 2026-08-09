@@ -80,7 +80,7 @@ def build_gateway(world: World, *, policy_path: Path = SUPPORT_POLICY) -> Gatewa
     outbox = InMemoryOutboxStore(audit=audit)
     kill = InMemoryKillStore()
     connectors = world.connectors()
-    # CS-020: verify any pinned connector digests before serving. A no-op unless
+    # verify any pinned connector digests before serving. A no-op unless
     # the registry declares digests; a mismatch fails closed here (refuses to come
     # up) under the policy's failureMode, audited.
     assert_connector_digests(
@@ -99,12 +99,12 @@ def build_gateway(world: World, *, policy_path: Path = SUPPORT_POLICY) -> Gatewa
         outbox=outbox,
         kill=kill,
         env=RequestEnv(now=DEMO_NOW),
-        freshness=FreshnessConfig(),  # v0.2 CS-017: staged effects carry a TTL
+        freshness=FreshnessConfig(),  # v0.2 staged effects carry a TTL
     )
     # v0.2 wiring: the worker's clock must be the same fixed instant the demo
     # decides at — a wall clock would see every DEMO_NOW-stamped TTL as long
-    # expired. It also re-runs volatile gates (CS-017) and re-asserts scope at
-    # dispatch (CS-018).
+    # expired. It also re-runs volatile gates and re-asserts scope at
+    # dispatch.
     worker = DispatchWorker(
         outbox, connectors, registry=registry, kill=kill,
         clock=lambda: DEMO_NOW,

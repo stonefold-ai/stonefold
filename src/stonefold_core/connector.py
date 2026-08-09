@@ -30,27 +30,27 @@ class ConnectorCancelled(Exception):
 
 
 # The settle reason for an effect refused because the scope predicate no longer
-# selects its target at dispatch/commit time (v0.2 CS-018, acceptance B4/B5).
+# selects its target at dispatch/commit time (v0.2; acceptance B4/B5).
 SCOPE_LOST = "scope-lost"
 
 
 class ScopeLostError(Exception):
     """Raised by a *transactional* connector when the scope predicate,
     re-asserted inside the effect's own transaction, no longer selects the
-    target (CS-018): the write affected zero rows and was **not** committed.
+    target: the write affected zero rows and was **not** committed.
     The dispatch worker settles the row ``FAILED`` with reason ``scope-lost`` —
     the effect lands on authorized state or not at all, never partially."""
 
 
 class ScopeReassertion(str, Enum):
-    """How a connector closes (or prices) the decide→commit scope race (CS-018)."""
+    """How a connector closes (or prices) the decide→commit scope race."""
 
     TRANSACTIONAL = "transactional"  # predicate carried into the effect's own tx
     WINDOW = "window"  # residual race window remains; declared, re-checked pre-dispatch
 
 
 class ScopeCapability(BaseModel):
-    """A connector's declared scope-reassertion capability (CS-018) — connector
+    """A connector's declared scope-reassertion capability — connector
     metadata, declared once per connector implementation (like the gateway's
     scope-predicate bindings, this lives in gateway code, not in policy syntax).
 
@@ -112,7 +112,7 @@ class ConnectorResult(BaseModel):
     query: str | None = None
     handle: str | None = None  # in-flight cancellation handle (M5)
     # The downstream identifier(s) of the created/changed record(s) (spec §11
-    # resultRefs, CS-009). A connector that creates records SHOULD set this so the
+    # resultRefs). A connector that creates records SHOULD set this so the
     # audit log is actionable; the dispatch worker falls back to ``[receipt["id"]]``
     # when empty. A *list* because one dispatch may fan out to several records.
     result_refs: list[str] = Field(default_factory=list)
@@ -121,7 +121,7 @@ class ConnectorResult(BaseModel):
 class Connector(Protocol):
     """Structural interface every adapter satisfies (design §2).
 
-    CS-018 adds two *additive* pieces alongside this protocol: a declared
+    §? adds two *additive* pieces alongside this protocol: a declared
     ``scope_capability`` attribute (read via ``scope_capability_of``) and, for
     transactional connectors, the ``TransactionalDispatch`` surface below."""
 
@@ -154,7 +154,7 @@ class Connector(Protocol):
 @runtime_checkable
 class TransactionalDispatch(Protocol):
     """The extra dispatch surface of a connector that declared
-    ``ScopeReassertion.TRANSACTIONAL`` (CS-018): dispatch with the scope
+    ``ScopeReassertion.TRANSACTIONAL``: dispatch with the scope
     predicate carried *into* the effect's own transaction. Zero rows selected
     by the re-asserted predicate ⇒ raise ``ScopeLostError`` (nothing committed).
     Additive: connectors that cannot do this simply don't implement it."""

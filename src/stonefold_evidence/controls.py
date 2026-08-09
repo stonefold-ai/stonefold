@@ -50,7 +50,7 @@ CONTROLS: tuple[Control, ...] = (
                   "write shares the DB transaction with the effect (no effect without a "
                   "record, no record without an effect); resultRefs link records to "
                   "downstream reality",
-        where="spec §11; CS-006",
+        where="spec §11; §?",
         artifact="the audit log itself: who asked, what was decided, which gate, who "
                  "approved, what executed",
         key="record_keeping",

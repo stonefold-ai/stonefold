@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The standard closure check (spec §7.6, v0.3 CS-041).
+"""The standard closure check (spec §7.6, v0.3 §?).
 
 **The failure this exists for.** A gate refuses the work — the payment is held,
 the mandate change denied — and the actor then closes the item as done. The
@@ -52,7 +52,7 @@ __all__ = [
     "standard_checks",
 ]
 
-#: Reason codes, both hold-shaped (CS-026). The registry declaration carries
+#: Reason codes, both hold-shaped. The registry declaration carries
 #: their retry classes: DISPOSITION_REQUIRED is retryable (resubmit with a
 #: disposition), CLOSED_WITHOUT_THE_WORK escalates (a human decides).
 DISPOSITION_REQUIRED = "DISPOSITION_REQUIRED"

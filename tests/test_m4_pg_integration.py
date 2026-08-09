@@ -124,7 +124,7 @@ def test_for_update_claims_each_row_once(container: PostgresContainer) -> None:
 
 
 def test_stale_decision_cancelled_inside_claim(container: PostgresContainer) -> None:
-    # v0.2 CS-017 (D5 over real Postgres): an expired row is cancelled inside the
+    # v0.2 §? (D5 over real Postgres): an expired row is cancelled inside the
     # FOR UPDATE claim transaction — with its audit record — and the scan moves on
     # to the next fresh row.
     from datetime import datetime, timedelta, timezone
@@ -173,7 +173,7 @@ def test_stale_decision_cancelled_inside_claim(container: PostgresContainer) -> 
 
 
 def test_b4_scope_lost_inside_the_effects_transaction(container: PostgresContainer) -> None:
-    # v0.2 CS-018 (B4 over real Postgres): the SQL connector ANDs the scope
+    # v0.2 §? (B4 over real Postgres): the SQL connector ANDs the scope
     # predicate into the effect's own UPDATE. A target reassigned to another
     # tenant between decision and dispatch ⇒ zero rows affected ⇒ FAILED
     # scope-lost, and the write commits against authorized state or not at all.
@@ -260,7 +260,7 @@ def test_approval_release_over_postgres(container: PostgresContainer) -> None:
 
 
 def test_multi_contract_release_over_postgres(container: PostgresContainer) -> None:
-    """v0.3 CS-027: a row held by TWO gates promotes only when both contracts
+    """v0.3 a row held by TWO gates promotes only when both contracts
     are satisfied — the JSONB round-trip preserves the contracts, and the
     shared ``apply_release`` runs under the row's FOR UPDATE lock."""
     conn = _connect(container)

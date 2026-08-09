@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""J1–J7 — the hold substrate (v0.3 CS-026/027/028/031; profile ``hold-precondition``).
+"""J1–J7 — the hold substrate (v0.3; profile ``hold-precondition``).
 
 A hold-capable check's judgment-shaped ambiguity suspends the intent for a
 human; a code-less hold, a check outage, and a hold with no resolvable release
@@ -72,7 +72,7 @@ def j1_hold_stages_with_code(driver: ConformanceDriver) -> None:
     expect(
         result.retry_class == "escalate",
         f"the hold lost its declared retry class — the registry declares "
-        f"tck-queue: escalate (CS-029), got {result.retry_class!r}",
+        f"tck-queue: escalate, got {result.retry_class!r}",
     )
     driver.dispatch_once()
     expect(len(driver.effects()) == 0, "a held effect dispatched")
@@ -88,7 +88,7 @@ def j2_codeless_hold_fails(driver: ConformanceDriver) -> None:
     setup(driver, policy=POLICY_HOLD, seed_world=False)
     _seed_targets(driver, PB={"badhold": True})
     expect_decision(submit(driver, _pay(500, target="PB")), "deny",
-                    "a code-less hold (CS-026 rule 2)")
+                    "a code-less hold (§? rule 2)")
 
 
 @check(
@@ -106,15 +106,15 @@ def j3_multi_hold_requires_all_contracts(driver: ConformanceDriver) -> None:
     ticket = expect_ticket(result, "the doubly-held intent")
 
     # the clerk resolves the question in the WORLD, so the released row's
-    # dispatch-time re-validation finds it answered (CS-017).
+    # dispatch-time re-validation finds it answered.
     _seed_targets(driver, PQ={"hold": False}, PR={"hold": True})
 
-    # the approval-bypass regression (CS-027): the approval alone must not
+    # the approval-bypass regression: the approval alone must not
     # promote a row the precondition also holds…
     expect(driver.approve(ticket, "tck-approver-1"), "the approver's credit was refused")
     driver.dispatch_once()
     expect(len(driver.effects()) == 0,
-           "approval alone released a row the precondition also held (CS-027 bypass)")
+           "approval alone released a row the precondition also held (§? bypass)")
     # …and the resolver's release satisfies ONLY the precondition contract.
     expect(driver.resolve(ticket, "tck-resolver-1", gate="precondition"),
            "the resolver's release was refused")
@@ -133,7 +133,7 @@ def j3_multi_hold_requires_all_contracts(driver: ConformanceDriver) -> None:
            "the resolver's release was refused")
     driver.dispatch_once()
     expect(len(driver.effects()) == 1,
-           "the resolver alone released a row the approval also held (CS-027 bypass)")
+           "the resolver alone released a row the approval also held (§? bypass)")
     expect(driver.approve(ticket2, "tck-approver-1"), "the approver's credit was refused")
     driver.dispatch_once()
     expect(len(driver.effects()) == 2,
@@ -165,14 +165,14 @@ def j4_expiry_on_the_injected_clock(driver: ConformanceDriver) -> None:
     expect(
         any(r == "expired-hold:precondition" for r in reasons),
         f"the expiry settle lacks the 'expired-hold:precondition' reason "
-        f"(CS-028), got {reasons[-3:]}",
+        f", got {reasons[-3:]}",
     )
     # a late release must not resurrect the expired row (refusing the release
     # outright is also conformant — either way nothing may dispatch).
     driver.resolve(ticket, "tck-resolver-1", gate="precondition")
     driver.dispatch_once()
     expect(len(driver.effects()) == 0,
-           "a release AFTER expiry resurrected the hold (CS-028: expired is settled)")
+           "a release AFTER expiry resurrected the hold (expired is settled)")
 
 
 @check(
@@ -185,7 +185,7 @@ def j5_outage_fails_never_holds(driver: ConformanceDriver) -> None:
     setup(driver, policy=POLICY_HOLD, seed_world=False)
     _seed_targets(driver, PX={"crash": True})
     expect_decision(submit(driver, _pay(500, target="PX")), "deny",
-                    "a crashing check (CS-026 rule 1)")
+                    "a crashing check (§? rule 1)")
 
 
 @check(
@@ -195,9 +195,9 @@ def j5_outage_fails_never_holds(driver: ConformanceDriver) -> None:
     requires=[CAP_HOLD, CAP_STAGING, CAP_AUDIT],
 )
 def j6_duplicate_holds_collapse(driver: ConformanceDriver) -> None:
-    # CS-031: the same question asked twice within the REQUIRED TCK dedupe
+    # the same question asked twice within the REQUIRED TCK dedupe
     # window (one hour) is one queue item — the agent gets the SAME ticket,
-    # and each attempt is still audited. CS-040 (v0.3) sharpens the
+    # and each attempt is still audited. §? (v0.3) sharpens the
     # identity: a DIFFERENT question (a different target here) must NOT
     # collapse — over-collapsing loses a question.
     setup(driver, policy=POLICY_HOLD, seed_world=False)
@@ -210,7 +210,7 @@ def j6_duplicate_holds_collapse(driver: ConformanceDriver) -> None:
     expect(
         second.ticket == ticket,
         f"the duplicate hold queued a second item ({second.ticket!r}) instead of "
-        f"collapsing into {ticket!r} (CS-031)",
+        f"collapsing into {ticket!r}",
     )
     distinct = expect_decision(
         submit(driver, _pay(500, target="PR"), session="tck-s3"), "hold",
@@ -219,11 +219,11 @@ def j6_duplicate_holds_collapse(driver: ConformanceDriver) -> None:
     expect(
         distinct.ticket is not None and distinct.ticket != ticket,
         "a hold over a different target collapsed into an unrelated queue item "
-        "(CS-040: distinct questions never collapse)",
+        "(distinct questions never collapse)",
     )
     holds = [r for r in driver.audit() if r.decision == "hold"]
     expect(len(holds) >= 3,
-           "a deduped attempt went unaudited (CS-031: every attempt writes a record)")
+           "a deduped attempt went unaudited (every attempt writes a record)")
     driver.dispatch_once()
     expect(len(driver.effects()) == 0, "a deduped hold dispatched an effect")
 
@@ -235,19 +235,19 @@ def j6_duplicate_holds_collapse(driver: ConformanceDriver) -> None:
     requires=[CAP_HOLD, CAP_AUDIT],
 )
 def j7_unresolvable_hold_refuses(driver: ConformanceDriver) -> None:
-    # CS-027: the gate names no ``resolvers:`` and the REQUIRED TCK config has
+    # the gate names no ``resolvers:`` and the REQUIRED TCK config has
     # no deployment default resolver role (docs/12 §2) — so this hold's release
     # contract is unsatisfiable. Staging it would park the intent where no one
     # could ever release it; the gateway must refuse at decision time instead.
     setup(driver, policy=POLICY_HOLD_NO_RESOLVER, seed_world=False)
     _seed_targets(driver, PQ={"hold": True})
     result = expect_decision(submit(driver, _pay(500, target="PQ")), "deny",
-                             "a hold with no resolvable contract (CS-027)")
+                             "a hold with no resolvable contract")
     expect(result.ticket is None,
            "the unresolvable hold was staged (it must be refused, never parked)")
     reasons = [r.reason for r in driver.audit()]
     expect(
         any(r == "hold-unresolvable" for r in reasons),
-        f"the refusal lacks the normative 'hold-unresolvable' reason (CS-027), "
+        f"the refusal lacks the normative 'hold-unresolvable' reason, "
         f"got {reasons[-3:]}",
     )

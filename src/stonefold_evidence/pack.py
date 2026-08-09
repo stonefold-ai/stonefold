@@ -76,7 +76,7 @@ def build_evidence_pack(
             facts.append("decisions: " + ", ".join(
                 f"{decisions.get(d, 0)} {d}" for d in ("allow", "hold", "deny", "halt")))
             facts.append(f"{len(executed)} executed effects, {len(with_refs)} carrying "
-                         "resultRefs (downstream traceability, spec §11 / CS-009).")
+                         "resultRefs (downstream traceability, spec §11).")
             facts.append("append-only, and for effects the record shares the effect's DB "
                          "transaction (no effect without a record).")
             sample = list(executed[:sample_size]) or list(records[:sample_size])

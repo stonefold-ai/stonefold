@@ -1,4 +1,4 @@
-"""v0.2 CS-018 — scope no-race (changeset docs/changeset-v0.1-to-v0.2.md).
+"""v0.2 — scope no-race (spec §6.3).
 
 Acceptance B4 (a transactional connector re-asserts the scope predicate inside
 the effect's own transaction; a target reassigned between decision and dispatch
@@ -192,7 +192,7 @@ def test_b5_declared_window_surfaces_in_audit_on_success() -> None:
 
 # --- opt-in and fail-closed edges ------------------------------------------
 def test_worker_without_scopes_preserves_v03_behaviour() -> None:
-    # CS-018 is opt-in wiring: a worker with no scope resolver dispatches exactly
+    # §? is opt-in wiring: a worker with no scope resolver dispatches exactly
     # as v0.2 did — the decide→dispatch race stays the documented boundary.
     h = harness(_pay_doc(), _pay_tables())
     result = h.enforce("Payment", "pay", {"id": "P-1", "amount": 100})

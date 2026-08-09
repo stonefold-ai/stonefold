@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Reason-code retry classification (spec §11, v0.3 CS-029).
+"""Reason-code retry classification (spec §11, v0.3 §?).
 
 One home for the normative classes: which built-in gate refusals are
 ``retryable``, which structural/settle reasons carry which class, and the
@@ -43,7 +43,7 @@ _EXACT: dict[str, RetryClass] = {
     "scope-denied": RetryClass.TERMINAL,
     "scope-unavailable": RetryClass.TERMINAL,
     "scope-lost": RetryClass.TERMINAL,
-    # v0.3 CS-035: the matched obligation was reserved/consumed by another
+    # v0.3 the matched obligation was reserved/consumed by another
     # intent between decision and staging — this line is spoken for; nothing
     # about resubmitting the same intent can fix it.
     "no-match": RetryClass.TERMINAL,
@@ -61,7 +61,7 @@ _PREFIXES: tuple[tuple[str, RetryClass], ...] = (
 
 
 def gate_class(gate: str) -> RetryClass:
-    """The default class for a built-in gate's refusal (spec §11, CS-029)."""
+    """The default class for a built-in gate's refusal (spec §11)."""
     return RetryClass.RETRYABLE if gate in RETRYABLE_GATES else RetryClass.TERMINAL
 
 
@@ -79,7 +79,7 @@ def rule_class(rule: str) -> RetryClass:
 def classify(
     decision: Decision, rule: str, gates: tuple[GateResult, ...]
 ) -> tuple[str, RetryClass | None]:
-    """The (reason code, retry class) an ``EvalResult`` carries (CS-029).
+    """The (reason code, retry class) an ``EvalResult`` carries.
 
     ALLOW carries neither. A gate-decided refusal (``rule == "gate:<name>"``)
     takes the deciding gate's code (falling back to the rule string) and its

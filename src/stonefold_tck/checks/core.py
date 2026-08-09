@@ -122,7 +122,7 @@ def c8_missing_path_fails_closed(driver: ConformanceDriver) -> None:
     setup(driver, policy=POLICY_MISSING_PATH)
     # the gate's `when` references resource.no_such_field — absent on the target.
     # Fail-closed means the gate DENIES; "condition false ⇒ gate not applicable ⇒
-    # allow" would be the dangerous wrong reading (spec §8, CS-005).
+    # allow" would be the dangerous wrong reading (spec §8).
     r = submit(driver, pay(5))
     expect_decision(r, "deny", "gate condition over a missing path")
 
@@ -138,7 +138,7 @@ def c9_precondition_check(driver: ConformanceDriver) -> None:
 @check("C10", "maxClassification compares by the declared order; unknown fails closed",
        PROFILE_CORE)
 def c10_classification_order(driver: ConformanceDriver) -> None:
-    # v0.2 CS-024: built-in order public < internal < confidential < restricted;
+    # v0.2 built-in order public < internal < confidential < restricted;
     # the ceiling resolves from the actor's clearance claim (session-supplied).
     setup(driver, policy=POLICY_CLASSIFICATION)
     sealed = Operation(resource="Sealed", action="readSealed", target="S1")

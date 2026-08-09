@@ -40,7 +40,7 @@ class InMemoryConnector:
         # effects recorded for visibility; real dispatch goes via ``dispatch``.
         self.effects: list[dict[str, Any]] = []
         self._dispatched: dict[str, ConnectorResult] = {}
-        # CS-018: this connector stands in for either connector class in tests —
+        # this connector stands in for either connector class in tests —
         # SQL-class (transactional, the default: single-process membership test
         # is atomic here) or, when overridden, a declared-window connector.
         self.scope_capability = scope_capability or ScopeCapability.transactional()
@@ -82,7 +82,7 @@ class InMemoryConnector:
         self, action: ResolvedAction, actor: Actor, idempotency_key: str,
         scope: ScopePredicate,
     ) -> ConnectorResult:
-        # CS-018 transactional form: the membership test and the effect are one
+        # §? transactional form: the membership test and the effect are one
         # atomic step here (single process) — the in-memory analogue of ANDing
         # the predicate into the effect's UPDATE.
         return self._dispatch(action, actor, idempotency_key, scope)

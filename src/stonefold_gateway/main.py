@@ -8,8 +8,7 @@ admin UI (``admin_api``). Every route ends in the *same* ``Gateway.submit`` →
 ``enforce`` call (design §0) — the transports cannot diverge. Retrieval changes
 what an agent is shown, never what it may do.
 
-Identity is resolved by the **``IdentityProvider`` seam** (CS-021,
-``stonefold_gateway.identity``) from the authenticated transport (the ``X-Actor-Id`` /
+Identity is resolved by the **``IdentityProvider`` seam** (``stonefold_gateway.identity``) from the authenticated transport (the ``X-Actor-Id`` /
 ``X-Session-Id`` headers by default), never from the request body (invariant 3: the
 agent cannot set its own scope). The body carries only ``resource``/``action``/
 ``data``. The default provider is the standalone built-in; a credential verifier
@@ -57,7 +56,7 @@ class SubmitIntentBody(BaseModel):
 
 class SubmitBatchBody(BaseModel):
     """The SIF wire form (SIF §5): ``{"operations": [...]}``. Decided atomically
-    per spec §12 / CS-023 — any DENY/HALT refuses the whole batch before anything
+    per spec §12 / §? — any DENY/HALT refuses the whole batch before anything
     commits or stages."""
 
     operations: list[SubmitIntentBody] = Field(min_length=1)
@@ -74,9 +73,9 @@ class McpCallBody(BaseModel):
 def _render(result: Any) -> dict[str, Any]:
     """One operation's result in the wire shape (shared by single and batch).
 
-    ``reasonCode``/``retryClass`` are the v0.3 (CS-029) convergence signal —
+    ``reasonCode``/``retryClass`` are the v0.3 convergence signal —
     an HTTP agent needs them to tell fix-and-resubmit from give-up; the result
-    arriving here is already the redacted agent view (CS-030)."""
+    arriving here is already the redacted agent view."""
     body: dict[str, Any] = {
         "decision": result.decision.value,
         "rule": result.rule,
@@ -87,10 +86,10 @@ def _render(result: Any) -> dict[str, Any]:
         "retryClass": result.retry_class.value if result.retry_class else None,
     }
     if result.items:
-        # CS-043: an item-bearing action answers per item. ``applied`` and the
+        # an item-bearing action answers per item. ``applied`` and the
         # note are what stop an actor reading the envelope alone — a `deny` here
         # can sit above nine items that did take effect, and silence about that
-        # would be the CS-029 mistake one level up.
+        # would be the §? mistake one level up.
         body["items"] = [
             {
                 "item": v.item,
@@ -139,7 +138,7 @@ def create_app(
             for tool in mcp_tools
         ],
     )
-    # CS-021: identity enters through the seam ahead of the pipeline. The default
+    # identity enters through the seam ahead of the pipeline. The default
     # is the standalone built-in (transport-authenticated ids verbatim) — so an
     # unconfigured gateway behaves exactly as before; a credential verifier plugs
     # into the same slot without touching the route.
@@ -157,7 +156,7 @@ def create_app(
         credential: str | None,
     ) -> Any:
         # identity from the authenticated transport via the seam, NOT the body
-        # (invariant 3, binding on every provider — CS-021). Shared by every
+        # (invariant 3, binding on every provider — §?). Shared by every
         # transport so none of them can resolve identity its own way.
         try:
             return identity_provider.identify(
@@ -234,7 +233,7 @@ def create_app(
         who = _identify(x_actor_id, x_session_id, x_correlation_id, authorization)
 
         if isinstance(body, SubmitBatchBody):
-            # SIF wire form (SIF §5): the batch is decided atomically (CS-023);
+            # SIF wire form (SIF §5): the batch is decided atomically;
             # a refusal's structured error names the failing operation (SIF §6).
             try:
                 batch = sif.submit_intent_batch(

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""K1–K3 — the agent feedback channel (v0.3 CS-029/030; profile ``feedback``).
+"""K1–K3 — the agent feedback channel (v0.3; profile ``feedback``).
 
 A deny/hold is a convergence signal: it carries a machine-readable code and a
 retry class. Visibility is a declared choice — the default ``code+fields``
@@ -34,11 +34,11 @@ _SENTINEL_AMOUNT = 87650.0
 def k1_codes_and_classes(driver: ConformanceDriver) -> None:
     setup(driver)
     over_limit = expect_decision(submit(driver, pay(20000)), "deny", "over the value limit")
-    expect(bool(over_limit.reason_code), "the deny carries no reason code (CS-029)")
+    expect(bool(over_limit.reason_code), "the deny carries no reason code")
     expect(
         over_limit.retry_class == "retryable",
         f"the valueLimit deny is classed {over_limit.retry_class!r} instead of "
-        f"the normative 'retryable' — the defect is in the intent (CS-029)",
+        f"the normative 'retryable' — the defect is in the intent",
     )
     sanctioned = expect_decision(
         submit(driver, pay(500, country="XX")), "deny", "sanctioned destination"
@@ -46,7 +46,7 @@ def k1_codes_and_classes(driver: ConformanceDriver) -> None:
     expect(
         sanctioned.retry_class == "terminal",
         f"the denylist deny is classed {sanctioned.retry_class!r} instead of "
-        f"the normative 'terminal' — nothing here is the agent's to fix (CS-029)",
+        f"the normative 'terminal' — nothing here is the agent's to fix",
     )
 
 
@@ -75,12 +75,12 @@ def k2_no_record_side_leak(driver: ConformanceDriver) -> None:
     expect(
         "87650" not in result.agent_view,
         "the record-side amount the intent was compared against leaked into "
-        "the agent-facing result (CS-030: code+fields never carries record-side values)",
+        "the agent-facing result (code+fields never carries record-side values)",
     )
     expect(
         "ORD-K2" not in result.agent_view,
         "the matched obligation's ref (record-side evidence) leaked into the "
-        "agent-facing result at the code+fields default (CS-030)",
+        "agent-facing result at the code+fields default",
     )
 
 
@@ -98,7 +98,7 @@ def k3_audit_unaffected(driver: ConformanceDriver) -> None:
     expect(
         "denylisted" not in result.agent_view.lower(),
         "the prose gate reason leaked into the agent-facing result at the "
-        "code+fields default (CS-030)",
+        "code+fields default",
     )
     denies = [r for r in driver.audit() if r.decision == "deny"]
     expect(bool(denies), "the refusal left no audit record")

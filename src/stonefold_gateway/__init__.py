@@ -48,7 +48,7 @@ __all__ = [
     # declared shape, shared by every transport
     "InvalidIntentError",
     "validate_intent_data",
-    # identity seam (CS-021)
+    # identity seam
     "IdentityProvider",
     "SessionIdentityProvider",
     "TransportCredential",

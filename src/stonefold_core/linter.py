@@ -26,7 +26,7 @@ from stonefold_core.registry import (
 _SENSITIVE_FLOOR = frozenset({"public", "internal"})
 
 # The extra read-only namespace legal ONLY inside requireMatch match/provenance
-# clauses (spec §8 note, v0.3 CS-036).
+# clauses (spec §8 note, v0.3 §?).
 _OBLIGATION_NS = frozenset({"obligation"})
 
 
@@ -182,7 +182,7 @@ def lint(policy: Policy, registry: InMemoryRegistry) -> LintReport:
 def _check_declared_reads(
     policy: Policy, registry: InMemoryRegistry, report: LintReport
 ) -> None:
-    """§13.22 (CS-044) — what a gate says it reads.
+    """§13.22 — what a gate says it reads.
 
     Three checks, and the second is the one that exists because of a near-miss:
     a gate that names a source and says nothing about the source being
@@ -227,7 +227,7 @@ def _check_declared_reads(
 def _check_item_declaration(
     policy: Policy, registry: InMemoryRegistry, report: LintReport
 ) -> None:
-    """§13.21 (CS-043) — the item-bearing declaration's two checkable mistakes.
+    """§13.21 — the item-bearing declaration's two checkable mistakes.
 
     A misspelled ``field`` is silent at runtime: the call simply never fans out,
     so the gate the author thought they had written does not exist. And an
@@ -261,7 +261,7 @@ _AGGREGATE_GATES = frozenset({"spendLimit", "rate", "quota"})
 def _check_per_item_threshold_without_aggregate(
     policy: Policy, registry: InMemoryRegistry, report: LintReport
 ) -> None:
-    """§13.19 (CS-042) — a per-request money threshold with no companion aggregate.
+    """§13.19 — a per-request money threshold with no companion aggregate.
 
     A gate that caps or approves a *single* request by its amount (a
     ``valueLimit``, or a ``requireApproval``/``dualAuthorization`` whose ``when``
@@ -299,7 +299,7 @@ def _check_per_item_threshold_without_aggregate(
 def _check_closure_declaration(
     policy: Policy, registry: InMemoryRegistry, report: LintReport
 ) -> None:
-    """§13.20 (CS-041) — the standard closure check and its declaration.
+    """§13.20 — the standard closure check and its declaration.
 
     Two directions, and both are mistakes a reviewer would otherwise only find
     by running the thing:
@@ -341,7 +341,7 @@ def _check_closure_declaration(
 def _check_hold_capable_resolvers(
     policy: Policy, registry: InMemoryRegistry, report: LintReport
 ) -> None:
-    """§13.18 (v0.3, CS-038) — a hold-capable check gated with no ``resolvers:``
+    """§13.18 (v0.3) — a hold-capable check gated with no ``resolvers:``
     ⇒ warn: its holds release under the deployment's default resolver role, and
     are refused ``hold-unresolvable`` if none is configured. (The other half of
     rule 18 — ``holdCapable`` without ``reasonCodes`` — is a registry load
@@ -399,7 +399,7 @@ def _clause_obligation_paths(clause: str) -> list[str]:
 def _check_require_match(
     policy: Policy, registry: InMemoryRegistry, report: LintReport
 ) -> None:
-    """§13.14 + §13.17 (v0.3, CS-038) — ``requireMatch`` typing: the registry
+    """§13.14 + §13.17 (v0.3) — ``requireMatch`` typing: the registry
     is declared; every ``obligation.*`` path in ``match``/``provenance``/
     ``consume`` exists in its declared schema; a tolerance clause applies to a
     numeric/money field; clause strings parse under the ``obligation``
@@ -513,7 +513,7 @@ def _matched_registry_connectors(
 def _check_creation_execution_separation(
     policy: Policy, registry: InMemoryRegistry, report: LintReport
 ) -> None:
-    """§13.15 (v0.3, CS-038) — the governed agent must not author its own
+    """§13.15 (v0.3) — the governed agent must not author its own
     obligations. ERROR where the overlap is statically visible: the policy
     allows a ``record``/``effect``/``transition`` on a resource backed by the
     same connector as an obligation registry it matches against. Otherwise
@@ -551,7 +551,7 @@ def _check_creation_execution_separation(
 def _check_consume_none_irreversible(
     policy: Policy, registry: InMemoryRegistry, report: LintReport
 ) -> None:
-    """§13.16 (v0.3, CS-038) — ``consume: none`` on an irreversible effect ⇒
+    """§13.16 (v0.3) — ``consume: none`` on an irreversible effect ⇒
     WARN: verification without consumption leaves the double-spend window open
     in the decide→dispatch gap."""
     for rname, aname, adef in _allowed_action_defs(policy, registry):
@@ -739,7 +739,7 @@ def _check_irreversible_unguarded(
     policy: Policy, registry: InMemoryRegistry, report: LintReport
 ) -> None:
     """§13.4 — irreversible allowed action with no approval/dual-auth/
-    precondition/requireMatch (rule 4 as amended by v0.3 CS-038: a matched
+    precondition/requireMatch (rule 4 as amended by v0.3 a matched
     obligation is a satisfying guard)."""
     guards = {"requireApproval", "dualAuthorization", "precondition", "requireMatch"}
     for rname, aname, adef in _allowed_action_defs(policy, registry):
@@ -780,7 +780,7 @@ def _check_open_on_irreversible(
 def _check_compensable_has_compensation(
     policy: Policy, registry: InMemoryRegistry, report: LintReport
 ) -> None:
-    """§13.10 (CS-008) — a ``compensable`` allowed action MUST declare a
+    """§13.10 — a ``compensable`` allowed action MUST declare a
     compensation, and any declared compensation MUST name a resource+action that
     exists in the registry. Enforces the §5 definition of ``compensable`` ("a
     declared undo exists"); ``irreversible`` MAY declare one but is not required to.
@@ -857,7 +857,7 @@ def _check_reads_disclosure(
 
 
 def _check_standing_deny_conflict(policy: Policy, report: LintReport) -> None:
-    """§13.11 (v0.2, CS-010) — an action in both ``deny`` and a ``standing``
+    """§13.11 (v0.2) — an action in both ``deny`` and a ``standing``
     rule's ``enables`` is unsatisfiable (deny always wins, §6.2) ⇒ ERROR."""
     deny_star: set[Kind] = set()
     deny_tokens: dict[Kind, set[str]] = {}
@@ -909,7 +909,7 @@ def _check_standing_deny_conflict(policy: Policy, report: LintReport) -> None:
 def _check_ambiguous_bare_allow(
     policy: Policy, registry: InMemoryRegistry, report: LintReport
 ) -> None:
-    """§13.12 (v0.2, CS-012) — a bare action name in ``allow`` declared by more
+    """§13.12 (v0.2) — a bare action name in ``allow`` declared by more
     than one resource applies everywhere it is declared ⇒ WARN (use the
     ``{Entity: [names]}`` map form to disambiguate)."""
     resources = registry.file.resources
@@ -937,7 +937,7 @@ def _check_ambiguous_bare_allow(
 
 
 def _check_dual_auth_quorum(policy: Policy, report: LintReport) -> None:
-    """§13.13 (v0.2, CS-014) — ``dualAuthorization`` with an explicit
+    """§13.13 (v0.2) — ``dualAuthorization`` with an explicit
     ``quorum`` < 2 contradicts the gate's definition (§7.9) ⇒ ERROR."""
     for key, gateset in policy.gates.items():
         cfg = gateset.get("dualAuthorization")

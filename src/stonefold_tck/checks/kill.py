@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """KILL profile — kill-switch semantics, in the TCK's *serialized* form.
 
-Black-box note (docs/12 §5): the specification's no-race guarantee (§9, CS-004) is a
+Black-box note (docs/12 §5): the specification's no-race guarantee (§9) is a
 concurrency property of the implementation's dispatch transaction; a TCK
 cannot assert the absence of a race from outside. What it CAN assert is the
 serialized contract the race-free implementation must satisfy at every
@@ -62,7 +62,7 @@ def e2_serialized_no_race(driver: ConformanceDriver) -> None:
     expect(effects_of(driver, "pay") == 1, "the second pay did not dispatch")
     driver.kill(scope="agent", agent="tck-agent")
     expect(effects_of(driver, "pay") == 1,
-           "a kill un-sent a committed effect (guarantee scope, CS-004)")
+           "a kill un-sent a committed effect (guarantee scope)")
 
 
 @check("E6", "an action-class kill halts that action and nothing else", PROFILE_KILL,

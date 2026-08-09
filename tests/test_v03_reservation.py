@@ -1,5 +1,5 @@
-"""v0.3 reservation lifecycle — CS-035 (+CS-037 consumption audit; R6 orphan
-recovery; F5.2 clock skew; CS-023 batch composition).
+"""v0.3 reservation lifecycle — §? (+§? consumption audit; R6 orphan
+recovery; F5.2 clock skew; §? batch composition).
 
 Obligation state tracks the staged effect's lifecycle exactly: reserve before
 the staging commit returns, liveness at the dispatch claim, consume with the
@@ -47,7 +47,7 @@ T0 = datetime(2026, 7, 9, 9, 0, tzinfo=timezone.utc)
 FRESHNESS = FreshnessConfig(
     default_ttl=timedelta(hours=24), irreversible_ttl=timedelta(minutes=30)
 )
-RESERVATION_TTL_S = 26 * 3600.0  # >= the row's decision TTL (CS-035 R6)
+RESERVATION_TTL_S = 26 * 3600.0  # >= the row's decision TTL (§? R6)
 
 POLICY_DATA: dict[str, Any] = {
     "apiVersion": "stele/v0.1",
@@ -138,7 +138,7 @@ def harness(
 
 
 # ==========================================================================
-# Reserve at staging (CS-035): before the commit returns, visible to queries
+# Reserve at staging: before the commit returns, visible to queries
 # ==========================================================================
 class TestReserveAtStaging:
     def test_staged_row_carries_the_claim_and_the_line_reserves(self) -> None:
@@ -213,7 +213,7 @@ class TestReserveAtStaging:
 
 
 # ==========================================================================
-# Consume at settle (CS-035/CS-037): with the effect, never without it
+# Consume at settle: with the effect, never without it
 # ==========================================================================
 class TestConsumeAtSettle:
     def test_successful_dispatch_consumes_with_receipt(self) -> None:
@@ -272,7 +272,7 @@ class TestConsumeAtSettle:
 
 
 # ==========================================================================
-# Release on terminal non-success (CS-035): kill, stale, expiry, rejection
+# Release on terminal non-success: kill, stale, expiry, rejection
 # ==========================================================================
 class TestRelease:
     def test_rejection_releases_the_line_for_resubmission(self) -> None:
@@ -339,7 +339,7 @@ class TestRelease:
 
     def test_release_is_idempotent_across_restart(self) -> None:
         # a new worker (empty release cache) re-releases every terminal claim:
-        # all NotHeld no-ops — the CS-035 restart reconciliation.
+        # all NotHeld no-ops — the §? restart reconciliation.
         h = harness()
         result = h.enforce()
         h.worker_at(T0 + timedelta(minutes=1), connector=FailingConnector()).run_once()
@@ -402,7 +402,7 @@ class TestOrphansAndSkew:
 
 
 # ==========================================================================
-# CS-023 composition: batch reservations are all-or-nothing
+# §? composition: batch reservations are all-or-nothing
 # ==========================================================================
 class TestBatch:
     def test_refused_reservation_refuses_the_batch_and_releases_all(self) -> None:

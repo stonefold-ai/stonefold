@@ -84,23 +84,23 @@ class PendingAction(BaseModel):
     gates: tuple[GateResult, ...] = ()
     approval: ApprovalSpec | None = None
     approvals: tuple[str, ...] = ()  # distinct approver ids recorded so far
-    # v0.3 (CS-031): how many times this same question was asked — a duplicate
+    # v0.3: how many times this same question was asked — a duplicate
     # hold within the deployment's dedupe window collapses into this row and
     # increments the count instead of queueing a second item.
     attempts: int = 1
-    # v0.3 (CS-027): the release contract of EVERY holding gate; the row promotes
+    # v0.3: the release contract of EVERY holding gate; the row promotes
     # only when all are satisfied. Empty for pre-v0.3 rows — ``effective_contracts``
     # synthesises the legacy single contract from ``approval`` in that case.
     releases: tuple[ReleaseContract, ...] = ()
     compensation: Compensation | None = None
-    # v0.3 (CS-035): the reservation this row holds against its matched
+    # v0.3: the reservation this row holds against its matched
     # obligation — reserved before the staging commit returned, liveness-checked
     # at the dispatch claim, consumed at settle, released on any terminal
     # non-success. ``None`` when no requireMatch gate matched (or consume: none).
     obligation: ObligationClaim | None = None
     result: dict[str, Any] | None = None  # connector result on settle
     reason: str | None = None  # why cancelled/failed
-    # Decision TTL (v0.2 CS-017): the staging-time expiry. A row claimed at or
+    # Decision TTL (v0.2): the staging-time expiry. A row claimed at or
     # after this instant is cancelled ``stale-decision``. ``None`` = no expiry
     # (freshness not configured — pre-v0.2 behaviour).
     expires_at: datetime | None = None
@@ -114,14 +114,14 @@ class PendingAction(BaseModel):
 KillCheck = Callable[[PendingAction], bool]
 
 # The freshness check evaluated INSIDE the dispatch claim, after the kill check
-# and before the connector call (v0.2 CS-017: kill → TTL → volatile gates →
+# and before the connector call (v0.2 kill → TTL → volatile gates →
 # connector). Returns the cancel reason (``stale-decision`` /
 # ``stale-guard:<gate>``) or ``None`` when the row may dispatch.
 StaleCheck = Callable[[PendingAction], "str | None"]
 
 
 def expired_hold_reason(gate: str) -> str:
-    """Settle reason for a held row cancelled by the expiry sweep (v0.3 CS-028) —
+    """Settle reason for a held row cancelled by the expiry sweep (v0.3) —
     normative, like ``stale-decision``."""
     return f"expired-hold:{gate}"
 
@@ -129,14 +129,14 @@ def expired_hold_reason(gate: str) -> str:
 def hold_dedupe_key(
     agent: str, resolved: ResolvedAction, gates: tuple[GateResult, ...]
 ) -> tuple[Any, ...] | None:
-    """The identity of a hold (CS-031, sharpened by CS-040): per holding gate,
+    """The identity of a hold (sharpened by §?): per holding gate,
     (agent, action, reason code, the gate's EVIDENCE — which carries the
     matched-candidate refs — and the VALUES of the intent fields the gate
-    compared, its CS-030 ``fields`` set). Two holds with the same key within
+    compared, its §? ``fields`` set). Two holds with the same key within
     the dedupe window are the same question wearing two disguises — one queue
     item.
 
-    The identity is deliberately asymmetric (CS-040): over-distinguishing
+    The identity is deliberately asymmetric: over-distinguishing
     costs one extra queue item; over-collapsing loses a question. So a
     zero-candidate hold is identified by what the intent CLAIMED (its
     compared ``data.*`` values) — two different vendors' unmatched invoices
@@ -177,7 +177,7 @@ def hold_dedupe_key(
 
 
 def effective_contracts(row: PendingAction) -> tuple[ReleaseContract, ...]:
-    """The release contracts governing a held row (CS-027).
+    """The release contracts governing a held row.
 
     v0.3 rows carry them in ``releases``; a pre-v0.3 row synthesises the single
     legacy contract from ``approval`` (crediting its recorded ``approvals`` so an
@@ -198,14 +198,14 @@ def apply_release(
     row: PendingAction, approver_id: str, *, gate: str | None = None
 ) -> PendingAction:
     """Credit one release identity against a held row's contracts and return the
-    updated row (CS-027). Pure — both stores persist the result.
+    updated row. Pure — both stores persist the result.
 
     ``gate="precondition"`` credits only that gate's contract — a resolution is
     recorded as (who, when, WHICH contract). ``gate=None`` is the pre-v0.3
     approval call shape: it credits the APPROVAL-SHAPED contracts only
     (``requireApproval``/``dualAuthorization``) — never a check-driven
     resolver contract, or one untargeted approval would silently release a
-    hold whose question a different role owns (the CS-027 bypass the TCK's J3
+    hold whose question a different role owns (the §? bypass the TCK's J3
     check exists for). A row whose only contract is check-driven keeps the
     single-contract convenience (the bare call targets it unambiguously).
     Rules: a ``dual_auth``/``distinct_from_actor`` contract never accepts the
@@ -227,7 +227,7 @@ def apply_release(
             if len(contracts) != 1:
                 raise ApprovalError(
                     f"{row.id} is held by several non-approval contracts; "
-                    f"the release must name its gate (CS-027)"
+                    f"the release must name its gate"
                 )
             targeted_gates = {contracts[0].gate}
     else:
@@ -262,7 +262,7 @@ def apply_release(
 
 
 def releases_audit(row: PendingAction, status: str) -> "dict[str, Any] | None":
-    """The spec §11 ``approval`` rendering of a row's release contracts (CS-027)
+    """The spec §11 ``approval`` rendering of a row's release contracts
     at settle time: which gates held it, who released what, reason codes and
     evidence (I7). ``None`` for rows nothing held."""
     if not row.releases:
@@ -275,8 +275,8 @@ def releases_audit(row: PendingAction, status: str) -> "dict[str, Any] | None":
 
 
 def cancellation_record(row: PendingAction, reason: str) -> AuditRecord:
-    """The audit record for a row cancelled inside the dispatch claim (CS-017)
-    or by the held-row expiry sweep (v0.3 CS-028) — audited in the same
+    """The audit record for a row cancelled inside the dispatch claim
+    or by the held-row expiry sweep (v0.3) — audited in the same
     transaction as the cancel, preserving the original hold reason code in the
     ``gates`` trace and the release contracts in ``approval``. Deferred import
     keeps the module import graph acyclic-by-inspection."""
@@ -301,7 +301,7 @@ def cancellation_record(row: PendingAction, reason: str) -> AuditRecord:
         result=result,
         outcome="cancelled",
         approval=releases_audit(row, "cancelled"),
-        # CS-035/CS-037: a cancelled row's reservation is released — the
+        # a cancelled row's reservation is released — the
         # worker's reconcile sweep guarantees it (idempotent), so the settle
         # record states the lifecycle outcome.
         consumption=(
@@ -335,8 +335,8 @@ class OutboxStore(Protocol):
         """Persist a new staged row and return it (with generated id + key).
 
         ``staged_at`` is the decision-time clock (``RequestEnv.now``) when one
-        is injected — it anchors ``created_at`` so the CS-028 hold-expiry
-        deadlines (``created_at + timeout``) and the CS-017 staging TTL
+        is injected — it anchors ``created_at`` so the §? hold-expiry
+        deadlines (``created_at + timeout``) and the §? staging TTL
         (``expires_at``) run on the SAME clock. ``None`` ⇒ the store's wall
         clock (identical in production, where ``env.now`` is the wall clock).
         """
@@ -353,7 +353,7 @@ class OutboxStore(Protocol):
     ) -> PendingAction | None:
         """Atomically move one ``PENDING`` row to ``DISPATCHING`` and return it —
         or cancel it inside the same claim if ``kill_check`` matches (reason
-        ``kill``) or ``stale_check`` returns a reason (CS-017; audited) and keep
+        ``kill``) or ``stale_check`` returns a reason (audited) and keep
         scanning. ``None`` if no row is ready."""
         ...
 
@@ -368,14 +368,14 @@ class OutboxStore(Protocol):
     ) -> PendingAction:
         """Move a ``DISPATCHING`` row to ``DONE``/``FAILED``, writing ``audit`` in
         the **same transaction** as the state change (invariant 6). ``reason``
-        records *why* a row failed/cancelled (e.g. ``scope-lost``, CS-018)."""
+        records *why* a row failed/cancelled (e.g. ``scope-lost``)."""
         ...
 
     def approve(
         self, action_id: str, approver_id: str, *, gate: str | None = None
     ) -> PendingAction:
         """Record a release identity; promote to ``PENDING`` once EVERY release
-        contract is satisfied (CS-027 — ``apply_release`` is the shared logic).
+        contract is satisfied (``apply_release`` is the shared logic).
         ``gate`` targets one contract; ``None`` credits all the identity may
         satisfy. Raises ``SelfApprovalError`` if the actor approves its own
         dual-auth/distinct contract."""
@@ -386,7 +386,7 @@ class OutboxStore(Protocol):
         ...
 
     def bump_attempts(self, action_id: str) -> PendingAction:
-        """Record one more attempt at the same held question (v0.3 CS-031):
+        """Record one more attempt at the same held question (v0.3):
         increment ``attempts`` on an open held row and return it. The audit
         record for the attempt is written by the pipeline as always."""
         ...

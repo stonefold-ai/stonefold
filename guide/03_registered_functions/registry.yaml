@@ -13,7 +13,7 @@ preconditionChecks:
   - targetIsActive                  # plain two-valued check: pass/fail
   - name: inventoryAvailable        # v0.3 object form: this check MAY hold,
     holdCapable: true               # and declares every code it can emit
-    reasonCodes:                    # with its retry class (CS-029)
+    reasonCodes:                    # with its retry class
       stock-uncertain: escalate
 
 resources:

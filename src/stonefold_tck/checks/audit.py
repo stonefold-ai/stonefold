@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """AUDIT profile — every outcome recorded; effects and evidence agree (spec §11).
 
-Black-box note: transactionality itself (CS-006, the audit write sharing the
+Black-box note: transactionality itself (the audit write sharing the
 settle transaction) is not observable from outside — what IS observable is its
 consequence: after any sequence of operations, the set of executed effects and
 the set of success-outcome audit records must agree exactly, and every refusal
@@ -57,5 +57,5 @@ def f2_effects_evidence_consistency(driver: ConformanceDriver) -> None:
         settled_ok == executed,
         f"success-audit records ({settled_ok}) diverge from executed effects "
         f"({executed}) — no effect without a record, no record without an "
-        f"effect (CS-006's observable face)",
+        f"effect (§?'s observable face)",
     )

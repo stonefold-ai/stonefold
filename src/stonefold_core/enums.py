@@ -45,7 +45,7 @@ class Outcome(str, Enum):
 
 class RetryClass(str, Enum):
     """The retry class every deny/hold reason code declares (spec §11, v0.3
-    CS-029): what an iterating agent should do with the refusal. An
+    §?): what an iterating agent should do with the refusal. An
     undeclared/unknown code defaults to ``TERMINAL`` — the safe direction is to
     stop retrying."""
 
@@ -55,7 +55,7 @@ class RetryClass(str, Enum):
 
 
 class FeedbackLevel(str, Enum):
-    """What the AGENT receives on a deny/hold (spec §11, v0.3 CS-030). The audit
+    """What the AGENT receives on a deny/hold (spec §11, v0.3 §?). The audit
     record always carries everything — redact on return, never on write."""
 
     CODE = "code"  # reason code + retry class only

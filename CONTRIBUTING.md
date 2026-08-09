@@ -62,8 +62,7 @@ before 1.0.
 **Lane B — design changes. Start from a problem, not a solution.** A proposal to change
 the spec or the enforcement core must name the demonstrated hole it fixes, or the real
 thing the current design cannot express. If the maintainer agrees the problem is real,
-the fix is worked jointly through the spec repo's change-set process (`CS-nnn` items),
-and you can author the change set. Proposals that arrive as a finished design with no
+the fix is worked jointly in the spec repo first, and you can author it. Proposals that arrive as a finished design with no
 agreed problem behind it will be declined regardless of quality.
 
 Two standing commitments in this zone:
@@ -134,8 +133,7 @@ An attack that *breaks* the current gateway is even more valuable — report tho
   behavior, the implementation won't be reviewed.
 - **No capability changes hidden in refactors.** A PR does one thing. Refactoring and
   behavior change in the same PR will be sent back for splitting.
-- **Declare your delta against the spec.** State which spec sections (or `CS-nnn`
-  change-set items) your change implements or touches, or state that it touches none.
+- **Declare your delta against the spec.** State which spec sections your change implements or touches, or state that it touches none.
 
 ## LLM-assisted contributions
 
@@ -169,7 +167,7 @@ make demo                      # scripted adversarial demo
   green including integration.
 - All `spec/examples/*` still validate against their schemas.
 - `mypy --strict` clean; public types/functions typed and docstring'd.
-- The PR notes which spec sections (or `CS-nnn` change-set items) it implements. Any
+- The PR notes which spec sections it implements. Any
   unavoidable ambiguity is marked `# STONEFOLD-AMBIGUITY:` with the specification reference.
 - Specs (documents, schemas, fixtures) live only in the `spec/` submodule — if your change
   needs spec wording, a schema, or a fixture to move, land it in the

@@ -1,6 +1,6 @@
-"""CS-021 — the IdentityProvider seam.
+"""§? — the IdentityProvider seam.
 
-Spec: ``docs/changeset-v0.1-to-v0.2.md`` §CS-021 + ``docs/03`` key decision 11.
+Spec: ``docs/03`` key decision 11 (the identity seam).
 
 Identity — the authenticated ``actor``/session the pipeline enforces on — enters
 through an ``IdentityProvider`` seam *ahead* of the pipeline, the same shape as the

@@ -15,7 +15,7 @@ from stonefold_core.scope import ScopePredicate
 
 
 class EmailConnector:
-    # CS-018: SMTP accepts once and cannot re-assert scope at commit — the
+    # SMTP accepts once and cannot re-assert scope at commit — the
     # residual window is declared rather than hidden (B5).
     scope_capability = ScopeCapability.window_declared("smtp accept")
 

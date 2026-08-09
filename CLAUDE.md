@@ -15,7 +15,7 @@ The **Stonefold Gateway**: a deterministic enforcement point between an AI agent
 > here. The runnable TCK code is the reverse case: it lives **here**
 > (`src/stonefold_tck/`); the spec repo carries only its specification (spec/docs/12).
 1. `spec/docs/00-sif-wire-format.md` — the intent format (the five kinds + the shape an intent takes on the wire), **v0.3**. Canonical home for the kinds.
-2. `spec/docs/01-stele-policy-language.md` — Stele policy semantics (*what's allowed*), **v0.3** (changelogs at top); references the intent format for the kinds. Deltas for older builds: `spec/docs/changeset-v0.1-to-v0.2.md`, then `spec/docs/changeset-v0.2-to-v0.3.md`. A Change Set wins on any conflict with older wording.
+2. `spec/docs/01-stele-policy-language.md` — Stele policy semantics (*what's allowed*), **v0.3**; references the intent format for the kinds.
 3. `docs/02-implementation-design.md` — mechanism (*how*). Code snippets there are illustrative pseudocode; realise them in the pinned Python stack.
 4. `docs/03-architecture-decisions.md` — pinned stack & layout (Python: FastAPI + pydantic + Postgres + Redis).
 5. `spec/schema/sif.schema.json`, `spec/schema/stele.schema.json`, `spec/schema/registry.schema.json` — the JSON Schemas for intents, policies, and registries. Every `spec/examples/*` must validate against the matching schema.
