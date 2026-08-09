@@ -20,7 +20,7 @@ Everything comes up via `docker compose` from a clean checkout, given an API key
 
 | Component | What it is | Notes |
 |---|---|---|
-| **Stonefold Gateway** | the real product (FastAPI) + the demo UI | the agent reaches it only through the SIF-native `submit_intent` tool |
+| **Stonefold Gateway** | the real product (FastAPI) + the demo UI | the agent reaches it only through the gated `submit_intent` tool |
 | **Agent runner** | a tool-use loop calling a **real LLM** (Claude default; OpenAI supported) | needs `ANTHROPIC_API_KEY`; cheap model (e.g. Haiku). The UI also runs it in-process; a scripted **fake-LLM** mode needs no key. |
 | **Postgres** | the fake **ledger** (accounts, payees, invoices, payments) **and** the gateway's `audit_log`, `pending_actions` (outbox), `kill_orders` | Postgres specifically — the durable outbox uses real `SELECT … FOR UPDATE` |
 | **Redis** | rate counters | |

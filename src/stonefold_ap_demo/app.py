@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """The demo gateway HTTP/WebSocket service (docs/05 components: Stonefold Gateway + UI).
 
-Wraps an ``APBundle`` in FastAPI: the SIF-native ``submit_intent`` tool (identity
+Wraps an ``APBundle`` in FastAPI: the gated ``submit_intent`` endpoint (identity
 from headers, never the body — invariant 3), a live trace WebSocket for the UI,
 the untrusted invoice inbox, the kill + approvals control planes (reused routers),
 an in-process agent runner for the UI's interactive scenarios, and the static UI.
@@ -80,10 +80,6 @@ def create_app(bundle: APBundle, *, default_provider: str = "auto") -> FastAPI:
 
     app = FastAPI(title="Stonefold Accounts-Payable Demo", version="0.1", lifespan=lifespan)
     sif = SifNativeTransport(bundle.gateway)
-
-    @app.get("/tool-schema")
-    def tool_schema() -> dict[str, Any]:
-        return sif.tool_schema
 
     @app.get("/inbox")
     def inbox() -> dict[str, Any]:

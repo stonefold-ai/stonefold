@@ -14,7 +14,7 @@ For human-facing APIs that split works: the API server is the PEP, the request i
 
 An AI agent breaks all three assumptions:
 
-1. **There is no trustworthy PEP by default.** The agent holds the tools; nothing intercepts them. Stonefold's first job is *building* the chokepoint — the gateway that is the only path to any effect ([`02`](02-implementation-design.md) §0) — and the typed intent surface (SIF, enum-injected from the registry) that makes calls decidable at all.
+1. **There is no trustworthy PEP by default.** The agent holds the tools; nothing intercepts them. Stonefold's first job is *building* the chokepoint — the gateway that is the only path to any effect ([`02`](02-implementation-design.md) §0) — and the typed surface generated from the registry that makes calls decidable at all.
 2. **Two verdicts aren't enough.** Agent governance needs **four**: `allow` / `hold` / `deny` / `halt` (RFC [`01`](01-RFC-agent-control-policy.md) §2). `hold` — pause this action until a human approves — is not expressible in a stateless PDP: it requires the action to be **staged** somewhere a human event can release ([`02`](02-implementation-design.md) §7). `halt` requires kill machinery with a no-race guarantee (RFC §9). These two verdicts are most of the product.
 3. **The decision is the cheap part.** What makes an agent deployable is what surrounds it: staged effects with idempotent dispatch, stateful gates (rate/quota/spend counters), scope injected *below* the model, transactional audit with `resultRefs`, fail-closed dependency handling. None of that lives in a PDP.
 
@@ -26,7 +26,7 @@ An AI agent breaks all three assumptions:
 |---|---|---|---|
 | **Verdicts** | allow / deny | allow / deny | allow / **hold** / deny / **halt** |
 | **Enforcement point** | bring your own PEP | the API endpoint | the gateway **is** the PEP — sole path to effects, interception coverage checked |
-| **Intent surface** | whatever the PEP passes | API call + IAM context | **SIF**: typed, registry-validated, enum-injected — invalid names unrepresentable |
+| **Intent surface** | whatever the PEP passes | API call + IAM context | **declared intents**: typed, registry-validated — an undeclared action cannot be offered or accepted |
 | **Vocabulary** | generic principal/action/resource | services, roles, ARNs | registry-typed **kinds** + **governance attributes** (reversibility, emission, operativeForce, …) |
 | **Granularity** | whatever facts the PEP gathers | per-API, per-role | per-action, **per-parameter, per-instance** (`data.amount > 10000`, `resource.patientId`) |
 | **Stateful limits** | no (external data) | quotas at best | `rate` / `quota` / `spendLimit` / `quantityCap` as first-class gates |
@@ -70,7 +70,7 @@ AgentCore is the strongest evidence the category is real: it already runs **Ceda
 - **Organisation-wide policy-as-code.** OPA governs Kubernetes admission, CI, microservices — one language across the estate. Stonefold deliberately governs one thing: agent actions at a gateway. It should not become your org's general policy plane.
 - **Maturity.** Years of production hardening, tooling, and hiring pools. Stonefold is a concept-stage reference implementation.
 
-Stonefold's bet is not "a better policy language." It is that agent governance is **80% machinery, 20% decision** — and the machinery (SIF's typed surface, staging, holds, kill, transactional evidence) is precisely what no PDP provides. The policy language is kept small *on purpose*, so a security officer can read and certify a policy in one sitting (RFC §1); anything needing industrial-strength decision logic can delegate to an industrial-strength decision engine through the seam.
+Stonefold's bet is not "a better policy language." It is that agent governance is **80% machinery, 20% decision** — and the machinery (the typed declared surface, staging, holds, kill, transactional evidence) is precisely what no PDP provides. The policy language is kept small *on purpose*, so a security officer can read and certify a policy in one sitting (RFC §1); anything needing industrial-strength decision logic can delegate to an industrial-strength decision engine through the seam.
 
 ---
 
@@ -78,7 +78,7 @@ Stonefold's bet is not "a better policy language." It is that agent governance i
 
 §2's table says what differs; this section says what the difference *stops*. Every entry lives in the same structural gap: the space between "the decision was correct" and "reality obeyed the decision." A PDP is not there when that space is attacked; a gateway that owns dispatch is.
 
-1. **Bypass / coverage gaps.** PDP enforcement holds only if every call site remembers to ask — an unwrapped tool or a new code path is a silent full bypass, the perennial PDP failure mode. SIF-native has no unwrapped path to forget: coverage is structural, not a per-integration promise.
+1. **Bypass / coverage gaps.** PDP enforcement holds only if every call site remembers to ask — an unwrapped tool or a new code path is a silent full bypass, the perennial PDP failure mode. A surface generated from the registry has no unwrapped path to forget: coverage is structural, not a per-integration promise.
 2. **TOCTOU / stale decisions.** A verdict at time T, execution at T+n, nothing re-checks — a payee sanctioned after approval, a record that changed tenants between check and write. Dispatch-time re-validation inside a serialized transaction (RFC §12, §6.3) is only buildable because the decider owns dispatch; a PDP architecturally isn't present when the window closes.
 3. **Salami-slicing / aggregates.** Fifty refunds each under the limit. A stateless PDP needs external counter plumbing fed to it — which is where these controls quietly rot. `rate`/`quota`/`spendLimit`/`quantityCap` are first-class and stateful because the gateway owns the store.
 4. **Result-side exfiltration.** A PDP authorizes the request and never sees the response — but data leaks through results. The `disclosure` post-check withholds rows on the return path (RFC §7.12); nothing else in the stack sits on the return path at all.

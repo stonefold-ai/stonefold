@@ -261,7 +261,7 @@ document.addEventListener("click", async (e) => {
 $("refreshApprovals").onclick = refreshApprovals;
 document.querySelectorAll('input[name="gw"]').forEach((r) => r.addEventListener("change", onGatewayChange));
 
-getJSON("/tool-schema").then((s) => { $("provider").textContent = "gateway online"; }).catch(() => {});
+getJSON("/inbox").then(() => { $("provider").textContent = "gateway online"; }).catch(() => {});
 reflectGateway();
 connectTrace();
 refreshApprovals();

@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
-"""stonefold_gateway — the application layer: transports (SIF-native tool + MCP proxy),
-the kill control plane, the thin admin console, and the dispatch worker (M4–M6).
+"""stonefold_gateway — the application layer: the transports (the intent endpoint,
+and the MCP surface of typed tools, retrieval and the interception proxy), the kill
+control plane, the thin admin console, and the dispatch worker (M4–M6).
 
 The ``Gateway`` chokepoint and the transport/coverage helpers depend only on
 ``stonefold_core`` and are re-exported here. The FastAPI app factory lives in
@@ -28,14 +29,12 @@ from stonefold_gateway.transport import (
     ToolMapping,
     interception_coverage_check,
     mcp_tool_schemas,
-    submit_intent_schema,
     validate_intent_data,
 )
 
 __all__ = [
     "Gateway",
     "SifNativeTransport",
-    "submit_intent_schema",
     "MCPProxy",
     "ToolMapping",
     "interception_coverage_check",

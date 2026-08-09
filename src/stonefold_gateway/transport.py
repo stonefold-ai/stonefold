@@ -8,9 +8,12 @@ every transport routes through the same ``enforce`` call and none can diverge.
 
 Two transports sit in front of it (RFC §3):
 
-* **SIF-native** (design §1.1): the agent gets exactly one tool, ``submit_intent``,
-  whose schema is generated from the registry (resource/action enums injected).
-  Coverage is structural — there is no other tool, so there is no other path.
+* **The declared surface** (design §1.1): the agent's tools are generated from the
+  registry — one typed tool per declared action (``mcp_tool_schemas``), served with
+  retrieval over them (``stonefold_gateway.mcp_search``) for a registry too large to
+  put in front of a model at once. Coverage is structural: a tool exists because an
+  action is declared. A client that would rather build the intent itself posts it to
+  ``submit_intent`` (``SifNativeTransport``) and lands in the same place.
 * **Interception / MCP proxy** (design §1.2): the agent keeps its tools, but each
   call is mapped to a declared action and enforced. The mapping is the coverage
   boundary, so: an **unmapped tool denies** (never pass-through, review note),
@@ -288,48 +291,14 @@ def validate_intent_data(
             )
 
 
-# --- SIF-native: the single generated tool (design §1.1) ------------------
-def submit_intent_schema(registry: InMemoryRegistry) -> dict[str, Any]:
-    """Generate the ``submit_intent`` tool schema from the registry.
-
-    The agent can name only declared resources/actions (enum-injected), so it can
-    emit nothing the registry doesn't know — the structural-coverage property.
-    ``x-stonefold-actions`` carries the resource→actions catalogue for richer clients.
-    """
-    catalogue = {
-        name: sorted(rdef.actions) for name, rdef in registry.file.resources.items()
-    }
-    return {
-        "name": "submit_intent",
-        "description": (
-            "Submit one intended action for enforcement. The gateway validates it "
-            "against policy, injects scope, runs the gates, and either executes, "
-            "stages, holds, or refuses it."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "resource": {"type": "string", "enum": sorted(catalogue)},
-                "action": {"type": "string"},
-                "data": {"type": "object"},
-            },
-            "required": ["resource", "action"],
-            "additionalProperties": False,
-        },
-        "x-stonefold-actions": catalogue,
-    }
-
-
+# --- The intent endpoint: one attempted action in, one decision out -------
 class SifNativeTransport:
-    """The SIF-native executor of the one tool (design §1.1). It *is* the tool's
-    implementation: every ``submit_intent`` call routes straight to the gateway."""
+    """The executor behind ``POST /submit_intent``: an intent arrives in the SIF
+    wire form and routes straight to the gateway. Every other transport ends up
+    here, so the decision cannot depend on how the call was expressed."""
 
     def __init__(self, gateway: Gateway) -> None:
         self._gateway = gateway
-
-    @property
-    def tool_schema(self) -> dict[str, Any]:
-        return submit_intent_schema(self._gateway.registry)
 
     def submit_intent(
         self, payload: Mapping[str, Any], *, actor: Actor, session: Session

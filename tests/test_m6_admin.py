@@ -60,12 +60,13 @@ _DUAL = {"agent": "pay", "allow": [{"effect": ["pay"]}],
          "gates": {"pay": {"dualAuthorization": {"approvers": "role:treasury"}}}}
 
 
-# --- the tool schema is served --------------------------------------------
-def test_tool_schema_endpoint() -> None:
+# --- the declared surface is served ---------------------------------------
+def test_mcp_tools_endpoint() -> None:
     client, *_ = _app(_SUPPORT)
-    schema = client.get("/tool-schema").json()
-    assert schema["name"] == "submit_intent"
-    assert "Email" in schema["parameters"]["properties"]["resource"]["enum"]
+    body = client.get("/mcp/tools").json()
+    names = {t["name"] for t in body["tools"]}
+    assert "Email.sendEmail" in names
+    assert body["of"] == len(names)
 
 
 # --- trace: a run replays as intent → decision → effect -------------------

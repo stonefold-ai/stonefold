@@ -1,6 +1,6 @@
 # THE REGISTRY — platform/policy team artifact (see 01 for the full story).
 # Note there is nothing interception-specific here: the vocabulary is the
-# same one a SIF-native agent would use. The mapping file translates INTO it.
+# same one an agent on the declared surface would use. The mapping translates INTO it.
 connectors: [in_memory]
 
 resources:

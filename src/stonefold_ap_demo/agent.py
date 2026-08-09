@@ -6,7 +6,7 @@ The agent has exactly two tools:
 * ``read_inbox`` — fetch the pending invoice emails. This is the agent's
   **untrusted input**, not a gated action: the gateway governs what the agent
   *does*, not what it *reads*. The malicious instruction rides in here.
-* ``submit_intent`` — the single SIF-native gated tool. Every read of accounts /
+* ``submit_intent`` — the single gated tool. Every read of accounts /
   payees and every payment goes through it, so the gateway sees and rules on each.
 
 Three interchangeable backends realise those tools:

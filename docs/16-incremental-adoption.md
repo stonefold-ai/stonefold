@@ -5,11 +5,12 @@ this page narrates them as the ramp an organisation actually walks, with the cov
 guarantee at each stage stated honestly. The principle: enterprises adopt ramps, not
 cliffs. Nothing here asks anyone to rewrite their agent on day one.*
 
-The two transport bindings this builds on are normative (SIF RFC §7): **interception**
-(existing tool/MCP calls mapped to declared actions; an unmapped call MUST be denied)
-and **SIF-native** (the agent's only surface is one registry-generated `submit_intent`
-tool; coverage is structural). The ramp is simply: enter through the first, migrate
-entity by entity to the second, in risk order.
+The two transport bindings this builds on are normative (RFC §7): **interception**
+(the tools you already have, mapped to declared actions; an unmapped call MUST be
+denied) and **the declared surface** (the agent's tools are generated from the
+registry, so a tool exists only because an action was declared). The ramp is simply:
+enter through the first, replace tools with declared ones entity by entity, in risk
+order.
 
 ---
 
@@ -32,7 +33,7 @@ connector/predicate implementations are the real work and arrive in later stages
 
 Terminate the agent's existing tool/MCP transport at the gateway. Each incoming call is
 mapped to a declared action, enforced (authorize → scope → gates), then forwarded or
-refused. **Unmapped calls are denied** (SIF RFC §7) — never silently passed — and the
+refused. **Unmapped calls are denied** (RFC §7) — never silently passed — and the
 startup **coverage check** fails if the agent holds any tool endpoint that does not go
 through the gateway (architecture decision 1). The agent itself is unchanged.
 
@@ -65,15 +66,21 @@ identifiers are never in the agent's hands), interception-grade coverage for the
 The guarantee upgrades **per entity**, exactly where the risk is, exactly when you pay
 the connector cost — the spend follows the risk ranking, not a big-bang project plan.
 
-## Stage 3 — SIF-native: the surface is the guarantee
+## Stage 3 — the declared surface: the registry is the guarantee
 
-The last raw tool is retired. The agent holds exactly one tool; its schema is generated
-from the reviewed registry; enum injection bounds what a confused or injected model can
-*say*, not merely what passes. **Coverage guarantee: structural.** "Did we wrap
-everything?" stops being an audit question because there is nothing to wrap — the
-question becomes "what does the registry declare?", which is a document review, plus
-"is the executing code what was declared?", which digest pinning answers (docs/06 §5)
-and the trust-boundary page bounds honestly (docs/13).
+The last raw tool is retired. Every tool the agent holds is generated from the
+reviewed registry, so what a confused or injected model can *say* is bounded, not
+merely what passes. **Coverage guarantee: structural.** "Did we wrap everything?"
+stops being an audit question because there is nothing left to wrap — the question
+becomes "what does the registry declare?", which is a document review, plus "is the
+executing code what was declared?", which digest pinning answers (docs/06 §5) and
+the trust-boundary page bounds honestly (docs/13).
+
+One operational note that arrives with scale rather than with risk: past a few
+hundred declared actions, hand the model the output of `GET /mcp/search?q=<the
+step>` rather than the whole catalogue. It is the same surface either way — the
+retrieval is deterministic and does not consult policy — but a model choosing among
+hundreds of tools chooses worse, and this stage is where the catalogue gets long.
 
 ---
 
@@ -84,7 +91,7 @@ and the trust-boundary page bounds honestly (docs/13).
 | 0 draft | no | none (nothing enforced) | a review meeting |
 | 1 interception | no | mapped + loud gaps (unmapped ⇒ deny; startup coverage check) | mapping table, policy file |
 | 2 per-entity | per entity: raw tools removed | structural for migrated entities, mapped for the rest | registry review + connector, per entity |
-| 3 SIF-native | one tool total | structural (nothing to wrap) | the last connectors |
+| 3 declared surface | raw tools retired | structural (nothing to wrap) | the last connectors |
 
 Every stage is independently useful and independently reversible (each is gateway
 configuration plus registry state — rolling back a stage does not touch the agent's

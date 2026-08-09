@@ -155,11 +155,6 @@ def create_app(
             "error": exc.as_error(),
         }
 
-    @app.get("/tool-schema")
-    def tool_schema() -> dict[str, Any]:
-        """The single SIF-native tool schema, generated from the registry."""
-        return sif.tool_schema
-
     @app.get("/mcp/tools")
     def mcp_tools_route() -> dict[str, Any]:
         """The whole surface: one typed tool per declared action.

@@ -1,6 +1,6 @@
 """THE AGENT — your EXISTING agent, unchanged. That is this example's point.
 
-No Stonefold imports, no submit_intent, no SIF: this agent still calls the
+No Stonefold imports, no submit_intent, no declared actions: this agent still calls the
 same old tools it always had (lookup_customer, open_ticket, export_crm,
 run_sql), with the same old argument names. The only thing that moved is the
 URL those calls go to — the gateway's proxy now sits where the tool server
