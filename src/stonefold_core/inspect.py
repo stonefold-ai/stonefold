@@ -28,6 +28,17 @@ from stonefold_core.policy import Policy
 from stonefold_core.registry import InMemoryRegistry
 
 
+#: Gates that can depend on content living outside the policy — a registered
+#: check, a content hook, an obligation registry. Everything else compares the
+#: intent against constants the policy itself carries (a `valueLimit`'s ceiling, a
+#: `rate`'s window), and a constant cannot go stale, so listing those as "reads
+#: nothing" would bury the real finding in noise. This is the set the `silent`
+#: list is drawn from.
+CONTENT_DEPENDENT_GATES = frozenset({
+    "precondition", "emissionControl", "contentCheck", "requireMatch",
+})
+
+
 @dataclass(frozen=True)
 class GateRead:
     """One gate's declared dependency on one source."""
@@ -45,10 +56,15 @@ class GateRead:
 class ReadsReport:
     """What a policy says about one source, and what it does not say.
 
-    ``silent`` is the finding: gates on actions of the same kind that declare no
-    source at all. They are not necessarily wrong — plenty of gates depend on
-    nothing that ages — but a gate that *should* have read the overdue rule set
-    is in this list and nowhere else.
+    ``silent`` is the finding: **content-dependent** gates that declare no source
+    at all. Restricted to the gates that *could* read something outside the policy
+    (a registered check, a content hook, an obligation registry), because a
+    `valueLimit` compares against a number written in the policy and a number
+    cannot go stale — listing those would bury the real finding in noise.
+
+    A gate in this list is not necessarily wrong; plenty of checks depend on
+    nothing that ages. But a gate that *should* have read the overdue rule set is
+    in this list and nowhere else.
     """
 
     source: str
@@ -113,7 +129,7 @@ def gates_reading(
                 on_stale=_on_stale_of(reads, source),
                 on_unavailable=str(cfg.get("onUnavailable", "deny")),
             ))
-        elif not named:
+        elif not named and gate in CONTENT_DEPENDENT_GATES:
             silent.append((resource, action, gate))
 
     return ReadsReport(
