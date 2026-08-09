@@ -220,6 +220,7 @@ class HttpDriver:
                 action=r.get("action"),
                 outcome=str(r.get("outcome", "")),
                 reason=str(r.get("reason") or ""),
+                reason_code=str(r.get("reasonCode") or ""),
             )
             for r in body.get("records", [])
         ]

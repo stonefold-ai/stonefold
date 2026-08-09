@@ -142,7 +142,7 @@ human is the declared resolver, `role:warehouse-lead`.)
 
 ## What to notice
 
-1. **The agent didn't change.** Same one tool as example 02; the missing row,
+1. **The agent didn't change.** Same client as example 02; the missing row,
    the blocked payload, and the hold all happened below it.
 2. **Three verdicts, three worlds.** O1 is active and stocked → allow. O2 is
    cancelled → deny (fail closed). O3's stock is *readable but ambiguous* →

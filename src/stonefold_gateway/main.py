@@ -1,10 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
 """The gateway application factory (plan M6, design §0/§1).
 
-``create_app`` wires the one chokepoint behind FastAPI: the SIF-native
-``submit_intent`` tool, the kill control plane (``kill_api``), and the thin admin
-UI (``admin_api``). Every route ends in the *same* ``Gateway.submit`` →
-``enforce`` call (design §0) — the transports cannot diverge.
+``create_app`` wires the one chokepoint behind FastAPI: the intent endpoint
+(``submit_intent``), the MCP surface (``/mcp/tools``, ``/mcp/search``,
+``/mcp/call`` — design §1.2), the kill control plane (``kill_api``), and the thin
+admin UI (``admin_api``). Every route ends in the *same* ``Gateway.submit`` →
+``enforce`` call (design §0) — the transports cannot diverge. Retrieval changes
+what an agent is shown, never what it may do.
 
 Identity is resolved by the **``IdentityProvider`` seam** (CS-021,
 ``stonefold_gateway.identity``) from the authenticated transport (the ``X-Actor-Id`` /
@@ -31,7 +33,16 @@ from stonefold_gateway.identity import (
 )
 from stonefold_gateway.kill_api import create_kill_router
 from stonefold_gateway.kill_service import KillService
-from stonefold_gateway.transport import Gateway, SifNativeTransport
+from stonefold_gateway.mcp_search import search_response
+from stonefold_gateway.transport import (
+    Gateway,
+    InvalidIntentError,
+    MCPProxy,
+    SifNativeTransport,
+    ToolMapping,
+    mcp_tool_schemas,
+    validate_intent_data,
+)
 from stonefold_core.outbox import OutboxStore
 
 
@@ -50,6 +61,14 @@ class SubmitBatchBody(BaseModel):
     commits or stages."""
 
     operations: list[SubmitIntentBody] = Field(min_length=1)
+
+
+class McpCallBody(BaseModel):
+    """An intercepted MCP tool call (design §1.2): the tool's name and its
+    arguments. Identity comes from the transport here as everywhere else."""
+
+    tool: str
+    arguments: dict[str, Any] = Field(default_factory=dict)
 
 
 def _render(result: Any) -> dict[str, Any]:
@@ -79,6 +98,22 @@ def create_app(
 ) -> FastAPI:
     app = FastAPI(title="Stonefold Gateway", version="0.1")
     sif = SifNativeTransport(gateway)
+    # The MCP surface (design §1.2): one typed tool per declared action, and a
+    # proxy that maps each back to the action it was generated from. Generated
+    # once at startup — the registry does not change under a running gateway,
+    # and an unmapped tool is denied rather than passed through.
+    mcp_tools = mcp_tool_schemas(gateway.registry)
+    mcp_proxy = MCPProxy(
+        gateway,
+        [
+            ToolMapping(
+                tool=tool["name"],
+                resource=tool["name"].split(".", 1)[0],
+                action=tool["name"].split(".", 1)[1],
+            )
+            for tool in mcp_tools
+        ],
+    )
     # CS-021: identity enters through the seam ahead of the pipeline. The default
     # is the standalone built-in (transport-authenticated ids verbatim) — so an
     # unconfigured gateway behaves exactly as before; a credential verifier plugs
@@ -90,10 +125,78 @@ def create_app(
     if audit is not None and outbox is not None:
         app.include_router(create_admin_router(audit=audit, outbox=outbox))
 
-    @app.get("/tool-schema")
-    def tool_schema() -> dict[str, Any]:
-        """The single SIF-native tool schema, generated from the registry."""
-        return sif.tool_schema
+    def _identify(
+        actor_id: str,
+        session_id: str,
+        correlation_id: str | None,
+        credential: str | None,
+    ) -> Any:
+        # identity from the authenticated transport via the seam, NOT the body
+        # (invariant 3, binding on every provider — CS-021). Shared by every
+        # transport so none of them can resolve identity its own way.
+        try:
+            return identity_provider.identify(
+                TransportCredential(
+                    actor_id=actor_id, session_id=session_id,
+                    correlation_id=correlation_id or session_id,
+                    credential=credential,
+                )
+            )
+        except IdentityRejected as exc:
+            raise HTTPException(status_code=401, detail=str(exc))
+
+    def _invalid(exc: InvalidIntentError) -> dict[str, Any]:
+        """A malformed call is a shape error, not a decision — no rule ran, so
+        it is not reported as a refusal (SIF §6 carries the pointer)."""
+        return {
+            "decision": "error",
+            "rule": "invalid-data",
+            "reasonCode": exc.code,
+            "error": exc.as_error(),
+        }
+
+    @app.get("/mcp/tools")
+    def mcp_tools_route() -> dict[str, Any]:
+        """The whole surface: one typed tool per declared action.
+
+        Correct for a small estate. At several hundred actions, prefer
+        ``/mcp/search`` — a model choosing among hundreds of tools chooses worse,
+        and this endpoint has no way to help it.
+        """
+        return {"tools": mcp_tools, "of": len(mcp_tools)}
+
+    @app.get("/mcp/search")
+    def mcp_search_route(q: str = "", limit: int = 5) -> dict[str, Any]:
+        """The short candidate list for one step the agent is about to take.
+
+        Retrieval only decides what the model is shown. Whether the action it
+        then picks is allowed is decided by policy, on the way through
+        ``/mcp/call``.
+        """
+        return search_response(mcp_tools, q, limit=limit)
+
+    @app.post("/mcp/call")
+    def mcp_call(
+        body: McpCallBody,
+        x_actor_id: str = Header(..., alias="X-Actor-Id"),
+        x_session_id: str = Header(..., alias="X-Session-Id"),
+        x_correlation_id: str | None = Header(None, alias="X-Correlation-Id"),
+        authorization: str | None = Header(None, alias="Authorization"),
+    ) -> dict[str, Any]:
+        """An intercepted tool call, enforced. An unmapped tool is denied and
+        audited by the proxy — never passed through."""
+        who = _identify(x_actor_id, x_session_id, x_correlation_id, authorization)
+        # Same shape check as the intent endpoint, so the two surfaces reject a
+        # malformed call identically.
+        resource, _, action = body.tool.partition(".")
+        try:
+            validate_intent_data(gateway.registry, resource, action, body.arguments)
+        except InvalidIntentError as exc:
+            return _invalid(exc)
+        result = mcp_proxy.call_tool(
+            body.tool, body.arguments, actor=who.actor, session=who.session
+        )
+        return _render(result)
 
     @app.post("/submit_intent")
     def submit_intent(
@@ -103,26 +206,18 @@ def create_app(
         x_correlation_id: str | None = Header(None, alias="X-Correlation-Id"),
         authorization: str | None = Header(None, alias="Authorization"),
     ) -> dict[str, Any]:
-        # identity from the authenticated transport via the seam, NOT the body
-        # (invariant 3, binding on every provider — CS-021).
-        try:
-            who = identity_provider.identify(
-                TransportCredential(
-                    actor_id=x_actor_id, session_id=x_session_id,
-                    correlation_id=x_correlation_id or x_session_id,
-                    credential=authorization,
-                )
-            )
-        except IdentityRejected as exc:
-            raise HTTPException(status_code=401, detail=str(exc))
+        who = _identify(x_actor_id, x_session_id, x_correlation_id, authorization)
 
         if isinstance(body, SubmitBatchBody):
             # SIF wire form (SIF §5): the batch is decided atomically (CS-023);
             # a refusal's structured error names the failing operation (SIF §6).
-            batch = sif.submit_intent_batch(
-                [op.model_dump() for op in body.operations],
-                actor=who.actor, session=who.session,
-            )
+            try:
+                batch = sif.submit_intent_batch(
+                    [op.model_dump() for op in body.operations],
+                    actor=who.actor, session=who.session,
+                )
+            except InvalidIntentError as exc:
+                return _invalid(exc)
             response: dict[str, Any] = {
                 "decision": batch.decision.value,
                 "operations": [_render(r) for r in batch.results],
@@ -141,10 +236,13 @@ def create_app(
                 }
             return response
 
-        result = sif.submit_intent(
-            {"resource": body.resource, "action": body.action, "data": body.data},
-            actor=who.actor, session=who.session,
-        )
+        try:
+            result = sif.submit_intent(
+                {"resource": body.resource, "action": body.action, "data": body.data},
+                actor=who.actor, session=who.session,
+            )
+        except InvalidIntentError as exc:
+            return _invalid(exc)
         return _render(result)
 
     @app.get("/", response_class=HTMLResponse)

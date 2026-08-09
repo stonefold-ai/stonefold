@@ -1,9 +1,9 @@
 # 06 — Keep your tools: interception without a rewrite
 
-**The question this example answers:** examples 02–05 gave the agent one
-SIF tool. But your agent already exists, with its own tools — and you were
-promised you would not have to rewrite it. How does the gateway govern the
-tools you already have?
+**The question this example answers:** examples 02–05 gave the agent tools
+generated from the registry. But your agent already exists, with its own tools —
+and you were promised you would not have to rewrite it. How does the gateway
+govern the tools you already have?
 
 **The answer, up front:** a **mapping** — one declared, reviewed YAML table
 that gives each existing tool a meaning in the registry's vocabulary. The
@@ -84,7 +84,7 @@ acknowledged. High-risk holes must be opened on purpose, in code review.)
 ## Step 3 (agent developer) — change nothing
 
 `agent.py` is what it always was: four old tools, old argument names, one
-base URL. No SIF, no `submit_intent`, no Stonefold imports.
+base URL. No declared actions, no `submit_intent`, no Stonefold imports.
 
 ## Run it
 
@@ -121,7 +121,7 @@ driver: 4 audit records — the mapping translated, the same pipeline decided
    `run_sql` was never declared — refused before any policy ran
    (`unmapped-tool`), same as example 01's undeclared name.
 3. **This is the adoption ramp, not a downgrade.** The mapping work *is*
-   the registry review: the same entries later generate the one-tool SIF
-   schema of example 02, so migrating agent by agent throws nothing away.
+   the registry review: the same entries generate the declared tools of
+   example 02, so migrating agent by agent throws nothing away.
    The full ramp is `docs/16-incremental-adoption.md`; the design reasoning
    is `spec/docs/17-interception-mapping.md`.

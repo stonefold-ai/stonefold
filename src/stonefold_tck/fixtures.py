@@ -54,6 +54,13 @@ preconditionChecks:
     holdCapable: true
     reasonCodes:
       tck-never: terminal
+  # v0.6.1 (CS-041): the standard closure check. Named like any other, but the
+  # gateway supplies it and §7.6 defines what it does.
+  - name: dispositionIsDeclared
+    holdCapable: true
+    reasonCodes:
+      DISPOSITION_REQUIRED:    retryable
+      CLOSED_WITHOUT_THE_WORK: escalate
 hooks:              [ tck.rejectMarker ]
 sinks:              [ tckSink ]
 
@@ -123,6 +130,24 @@ entities:
       unzap:
         kind: effect
         connector: tck-effects
+
+  # v0.6.1 (CS-041): a queue item whose closing action declares what closing it
+  # means. `resolved` claims the work was done; the other three do not, so an
+  # actor always has an honest way to close an item it could not handle.
+  Task:
+    dataSource: tck-data
+    properties:
+      id: { type: string }
+    actions:
+      close:
+        kind: record
+        connector: tck-data
+        data:
+          taskId:      { type: string, required: true }
+          disposition: { values: [resolved, escalated, referred, duplicate], required: true }
+        closure:
+          dispositionField: disposition
+          claimsCompletion: [resolved]
 
   Email:
     dataSource: tck-data
@@ -401,4 +426,24 @@ gates:
       onNoMatch: deny
       onAmbiguous: hold
       resolvers: role:tck-clerk
+"""
+
+
+# N1–N4 (CS-041): the closure check on a queue item's closing action, with a
+# refusable effect in the same policy so a run can contain a refusal.
+POLICY_CLOSURE = """apiVersion: stele/v0.1
+agent: tck-agent
+defaults: { failureMode: closed, audit: full }
+killable: true
+allow:
+  - record: [close]
+  - effect: [pay]
+gates:
+  close:
+    precondition:
+      checks: [dispositionIsDeclared]
+      resolvers: role:tck-resolver
+  pay:
+    valueLimit: { field: data.amount, max: 1000 }
+    spendLimit: "100000/day"
 """

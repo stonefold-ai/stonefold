@@ -18,14 +18,27 @@ If an agent has any route to a side effect that does not pass through the gatewa
 
 There are two integration modes (RFC §3). They differ entirely in *how the action reaches the gateway*, which determines coverage.
 
-### 1.1 SIF-native mode
-The agent is given exactly **one** tool, `submit_intent`, whose schema is generated from the registry (enum-injected resource/action names). The agent can emit nothing else. The gateway *is* the executor of that tool.
+### 1.1 The declared surface
+The agent's tools are **generated from the registry** — one typed tool per declared
+action, served from `GET /mcp/tools`, each call arriving at `POST /mcp/call`. A
+client that would rather build the intent itself posts it to `POST /submit_intent`
+instead; both end in the same `enforce()`.
 
 ```
-LLM --tool_call: submit_intent({kind, entity, action, data})--> Gateway --> connector
-                                                          (returns tool_result)
+LLM --tool_call: Payment.pay({invoiceNo, amount})--> Gateway --> connector
+                                                (returns tool_result)
 ```
-Coverage is **structural**: there is no other tool, so there is no other path. This is the strong tier.
+Coverage is **structural**: a tool exists because an action is declared, and a call
+the gateway cannot map to a declared action is denied rather than forwarded. There
+is no free-form pass-through to forget about. This is the strong tier.
+
+At the size of a real estate the catalogue is the problem rather than the coverage:
+a model choosing among several hundred tools chooses worse, because a long surface
+is where two names start to plausibly fit the same request. `GET /mcp/search?q=…`
+returns the few candidates for one step (deterministic, lexical, explainable), so
+the model sees a short list. Retrieval changes what the agent is *shown* and
+nothing about what it is *allowed* — the catalogue is deliberately not filtered by
+policy, because that would move an enforcement decision into a ranking function.
 
 ### 1.2 Interception mode
 The agent keeps its existing tools/MCP servers, but its tool traffic is routed **through** the gateway, which speaks the same protocol on both sides — an **MCP/tool proxy**.
@@ -39,7 +52,7 @@ Technically the gateway is a reverse proxy for the tool transport: for HTTP/SSE-
 
 > **Design note.** Interception's coverage is only as good as the mapping and the routing. Two failure modes to engineer against: (1) a tool the gateway doesn't know about (unmapped) — policy: **unmapped ⇒ deny** by default, never pass-through; (2) network paths that bypass the proxy — must be closed at deployment (egress policy / the agent runtime only has the gateway endpoint). There should be a "coverage check" that fails startup if the agent has any configured tool endpoint that isn't the gateway.
 
-> **Design note.** Be explicit in the product: interception gives "stop/bound/log any action that flows through the gateway"; it does **not** give the SIF-native "no escape hatch" property, because a mapped tool could itself be a raw `run_sql`. The mapping layer should flag tools whose arguments are free-form strings as *high-risk pass-throughs* and require explicit acknowledgement.
+> **Design note.** Be explicit in the product: interception gives "stop/bound/log any action that flows through the gateway"; it does **not** give the declared surface's "no escape hatch" property, because a mapped tool could itself be a raw `run_sql`. The mapping layer should flag tools whose arguments are free-form strings as *high-risk pass-throughs* and require explicit acknowledgement.
 
 ---
 

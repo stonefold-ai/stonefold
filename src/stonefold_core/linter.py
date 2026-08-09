@@ -17,7 +17,11 @@ from typing import Any
 from stonefold_core.condition import Path, parse, parse_and_validate
 from stonefold_core.enums import Kind, Reversibility
 from stonefold_core.policy import FailureMode, Policy, Targets
-from stonefold_core.registry import ActionDef, InMemoryRegistry
+from stonefold_core.registry import (
+    DISPOSITION_IS_DECLARED,
+    ActionDef,
+    InMemoryRegistry,
+)
 
 _SENSITIVE_FLOOR = frozenset({"public", "internal"})
 
@@ -168,7 +172,94 @@ def lint(policy: Policy, registry: InMemoryRegistry) -> LintReport:
     _check_require_match(policy, registry, report)
     _check_creation_execution_separation(policy, registry, report)
     _check_consume_none_irreversible(policy, registry, report)
+    _check_per_item_threshold_without_aggregate(policy, registry, report)
+    _check_closure_declaration(policy, registry, report)
     return report
+
+
+# Aggregate gates that bound total spend/rate/volume over a window, as opposed
+# to a single request. Kept as a set so the rule generalises to any of them.
+_AGGREGATE_GATES = frozenset({"spendLimit", "rate", "quota"})
+
+
+def _check_per_item_threshold_without_aggregate(
+    policy: Policy, registry: InMemoryRegistry, report: LintReport
+) -> None:
+    """§13.19 (CS-042) — a per-request money threshold with no companion aggregate.
+
+    A gate that caps or approves a *single* request by its amount (a
+    ``valueLimit``, or a ``requireApproval``/``dualAuthorization`` whose ``when``
+    clause tests an amount) is one arithmetic step from useless on its own: the
+    same total split across N smaller requests slips under it. The fix is an
+    aggregate gate (``spendLimit`` / ``rate`` / ``quota``) on the same action.
+
+    Advisory (WARN): a per-item threshold is not *wrong*, only incomplete, and
+    some actions genuinely want no aggregate.
+    """
+    for resource, action, adef in _allowed_action_defs(policy, registry):
+        gates = _merged_gates(policy, resource, action, adef.kind)
+        if any(agg in gates for agg in _AGGREGATE_GATES):
+            continue
+        trigger = None
+        if "valueLimit" in gates:
+            trigger = "valueLimit"
+        else:
+            for gate in ("requireApproval", "dualAuthorization"):
+                cfg = gates.get(gate)
+                when = cfg.get("when") if isinstance(cfg, dict) else None
+                if isinstance(when, str) and "amount" in when:
+                    trigger = f"{gate}.when"
+                    break
+        if trigger is None:
+            continue
+        report.add(
+            "13.19", Severity.WARN,
+            f"{resource}.{action}: {trigger} bounds a single request by amount but "
+            f"no aggregate gate (spendLimit/rate/quota) is declared for the same "
+            f"action — the same total split across smaller requests evades it",
+        )
+
+
+def _check_closure_declaration(
+    policy: Policy, registry: InMemoryRegistry, report: LintReport
+) -> None:
+    """§13.20 (CS-041) — the standard closure check and its declaration.
+
+    Two directions, and both are mistakes a reviewer would otherwise only find
+    by running the thing:
+
+    * the check named on an action that declares no closure vocabulary ⇒ ERROR.
+      It has nothing to read, so at runtime it can only fail closed.
+    * an action that declares a vocabulary while no rule enforces it ⇒ WARN. A
+      declared disposition nothing checks is decoration, and the audit will show
+      closures nobody verified.
+    """
+    for resource, action, adef in _allowed_action_defs(policy, registry):
+        gates = _merged_gates(policy, resource, action, adef.kind)
+        cfg = gates.get("precondition")
+        names: list[str] = []
+        if isinstance(cfg, dict):
+            names = [str(n) for n in cfg.get("checks", [])]
+        elif isinstance(cfg, list):
+            names = [str(n) for n in cfg]
+        elif isinstance(cfg, str):
+            names = [cfg]
+        named = DISPOSITION_IS_DECLARED in names
+
+        if named and not adef.disposition_vocabulary():
+            report.add(
+                "13.20", Severity.ERROR,
+                f"{resource}.{action}: {DISPOSITION_IS_DECLARED} is named but the "
+                f"action declares no closure disposition vocabulary "
+                f"(registry docs/06 §5c) — the check can only fail closed",
+            )
+        elif adef.closure is not None and not named:
+            report.add(
+                "13.20", Severity.WARN,
+                f"{resource}.{action}: declares a closure disposition vocabulary "
+                f"that no rule enforces — add {DISPOSITION_IS_DECLARED} to its "
+                f"precondition, or the dispositions are recorded and unchecked",
+            )
 
 
 def _check_hold_capable_resolvers(

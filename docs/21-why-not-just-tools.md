@@ -112,12 +112,13 @@ its declared meaning, and the ordinary pipeline runs on every call. Entry cost i
 mapping and a policy file; the agent, the framework, and the model stay as they are
 (docs/16, Stage 1).
 
-## 4. The part you'll question most: SIF
+## 4. The part you'll question most: declared actions instead of your tools
 
 Up to here, most engineers nod along; a policy proxy over tools is a familiar shape.
-The harder sell is the second binding: the agent stops calling tools altogether and
-emits **SIF**, a typed intent ("this declared action, on this entity, with these
-values") against a vocabulary generated from the registry. Why go that far?
+The harder sell is the second binding: the agent stops calling the tools you wrote
+and calls **declared actions** instead — typed tools generated from the registry, each
+one an action somebody declared, with an intent ("this action, on this entity, with
+these values") as what actually crosses the wire. Why go that far?
 
 Because interception, honest as its guarantee is, has a ceiling — and the ceiling is
 exactly the original problem in a smaller room:
@@ -131,14 +132,14 @@ exactly the original problem in a smaller room:
 - The agent's expressive surface is still the raw tool sprawl. Policy checks what
   passes; nothing bounds what the model can say.
 
-SIF closes those three, and the shape of the fix is one we've used before. String-
-concatenated SQL also worked, until attacker-controlled input reached an interpreter
-that couldn't tell data from instructions; what stuck was prepared statements, which
-restrict the untrusted party to filling typed slots in a structure it cannot change.
-SIF is that move applied to agency. The agent's only surface is one generated tool
-whose legal entity, action, field, and value names are injected as enums from the
-reviewed registry. There is no verb for "run this", no free-form command field, no way
-to name what nobody declared. An injection can still make the agent *want* something
+A generated surface closes those three, and the shape of the fix is one we've used
+before. String-concatenated SQL also worked, until attacker-controlled input reached an
+interpreter that couldn't tell data from instructions; what stuck was prepared
+statements, which restrict the untrusted party to filling typed slots in a structure it
+cannot change. This is that move applied to agency. Every tool the agent holds comes
+from the reviewed registry, and its fields and legal values come from the same place.
+There is no verb for "run this", no free-form command field, no way to name what nobody
+declared. An injection can still make the agent *want* something
 harmful; it can only want it in your vocabulary, where a deterministic gate decides.
 Coverage stops being an audit question ("did we wrap everything?") and becomes a
 property of the surface — there is nothing to wrap, and no mapping to drift.
@@ -174,8 +175,8 @@ plausible-but-wrong tool or field, and structured errors ("Patient has no field
 'email'; did you mean 'contactEmail'?") let it self-correct on the next turn instead of
 failing opaquely.
 
-And the honest part: SIF is the destination, not the entry fee. It costs a connector
-per entity, and it's the piece that feels most like indirection. That's why the
+And the honest part: the declared surface is the destination, not the entry fee. It
+costs a connector per entity, and it's the piece that feels most like indirection. That's why the
 adoption path (docs/16) enters through interception and migrates entity by entity,
 highest risk first — the payment entity long before the calendar — with both bindings
 running side by side through one gateway, one policy, one audit stream. You buy the
@@ -189,7 +190,7 @@ calls, because those are the actual content: which actions are irreversible, whi
 argument is the money. Budget a real review, not a rubber stamp.
 
 Interception mode costs a proxy deployment, the mapping, and a policy file, with zero
-agent changes. Each entity you migrate to SIF-native costs its connector. You take on
+agent changes. Each entity you migrate to a declared action costs its connector. You take on
 a runtime component in the action path, and one more layer to look through when
 debugging; the enforcement itself is lookups and deterministic checks, so the
 indirection is the cost to count, not the latency.
@@ -206,7 +207,7 @@ a layer like this makes agents safe is overselling. What it makes them is bounde
 auditable, and stoppable, which is what lets a responsible person sign off on removing
 the human from the loop at all.
 
-Status, plainly: SIF is a v1.0 format spec and Stele a v0.6 policy spec, both evolving
+Status, plainly: the intent format is a v1.0 spec and Stele a v0.6 policy spec, both evolving
 in the open under Apache-2.0, with a Python reference implementation, a runnable
 real-LLM demo, and a conformance test kit so other implementations can certify
 independently. It's a serious effort and an early one, currently driven by one person.
@@ -233,13 +234,11 @@ declared where someone can read it.
 ---
 
 *Where to go next:* [`docs/16-incremental-adoption.md`](16-incremental-adoption.md)
-(the ramp: draft → intercept → migrate → SIF-native, with the honest coverage guarantee
-at each stage) · [`docs/13-who-is-this-for.md`](13-who-is-this-for.md) (industries,
+(the ramp: draft → intercept → migrate → declared surface, with the honest coverage
+guarantee at each stage) · [`docs/13-who-is-this-for.md`](13-who-is-this-for.md) (industries,
 blocking risks, who signs) · [`docs/10-positioning-policy-engines.md`](10-positioning-policy-engines.md)
 (why OPA/Cedar/IAM alone don't cover this, and how they compose with it) ·
 [`spec/docs/17-interception-mapping.md`](https://github.com/stonefold-ai/spec/blob/main/docs/17-interception-mapping.md)
 (how mapping ordinary tool calls works, and its limits) ·
 [`spec/docs/00-RFC-sif-intent-format.md`](https://github.com/stonefold-ai/spec/blob/main/docs/00-RFC-sif-intent-format.md)
-(the SIF format itself) · [`docs/15-benchmark-design.md`](15-benchmark-design.md)
-(pilot measurements of the reliability claim in §4: selection accuracy and token cost,
-SIF surface vs raw tool surface, raw logs in the repo).
+(the intent format itself: the five action kinds and the operation shape).

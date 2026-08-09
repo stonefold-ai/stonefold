@@ -1,8 +1,8 @@
 """M6 — transports and interception coverage (design §0, §1; RFC §3).
 
 Both transports must drive the *same* pipeline (the chokepoint, design §0): the
-SIF-native ``submit_intent`` tool and the MCP proxy each end in the identical
-``enforce`` verdict. Plus the interception guards: an unmapped tool denies, a
+``submit_intent`` endpoint and the MCP proxy each end in the identical ``enforce``
+verdict. Plus the interception guards: an unmapped tool denies, a
 free-form pass-through needs acknowledgement, and a stray (non-gateway) tool
 endpoint fails the startup coverage check.
 """
@@ -32,7 +32,7 @@ from stonefold_gateway.transport import (
     SifNativeTransport,
     ToolMapping,
     interception_coverage_check,
-    submit_intent_schema,
+    mcp_tool_schemas,
 )
 from stonefold_store import InMemoryOutboxStore
 from tests.conftest import full_registry, load_schema
@@ -52,15 +52,17 @@ def _gateway(doc: dict[str, Any], audit: InMemoryAuditSink) -> Gateway:
     )
 
 
-# --- the schema is generated from the registry (design §1.1) --------------
-def test_submit_intent_schema_lists_registry_actions() -> None:
-    schema = submit_intent_schema(full_registry())
-    assert schema["name"] == "submit_intent"
-    enum = schema["parameters"]["properties"]["resource"]["enum"]
-    assert "Customer" in enum and "Email" in enum
-    assert schema["x-stonefold-actions"]["Email"] == ["sendEmail"]
-    # the single-tool property: the agent gets exactly one tool name.
-    assert schema["parameters"]["additionalProperties"] is False
+# --- the surface is generated from the registry (design §1.2) -------------
+def test_mcp_tools_cover_exactly_the_declared_actions() -> None:
+    reg = full_registry()
+    tools = {t["name"] for t in mcp_tool_schemas(reg)}
+    assert "Email.sendEmail" in tools
+    # nothing beyond the registry: an agent cannot be offered an undeclared action
+    assert tools == {
+        f"{resource}.{action}"
+        for resource, rdef in reg.file.resources.items()
+        for action in rdef.actions
+    }
 
 
 # --- both transports drive the SAME pipeline ------------------------------

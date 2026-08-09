@@ -1,15 +1,15 @@
 # Architecture Decisions (ADRs) — pinned
 
-These are decided for this **concept deliverable** (proof-of-concept, not a hardened product). Build on them; don't re-open without a strong reason (leave a note if you must).
+The stack and layout of the reference implementation, which is a proof-of-concept rather than a hardened product. Everything below is a decision that has been made, not a menu.
 
 ## Tech stack (Python)
 - **Language/runtime:** Python 3.12, full type hints, `mypy --strict` in CI.
-- **Gateway framework:** FastAPI + uvicorn — the HTTP surface for the SIF-native tool endpoint, the MCP proxy, the approvals/kill REST API, and the admin-UI backend.
+- **Gateway framework:** FastAPI + uvicorn — the HTTP surface for the intent endpoint, the MCP surface (`/mcp/tools`, `/mcp/search`, `/mcp/call`), the approvals/kill REST API, and the admin-UI backend.
 - **Policy parsing/validation:** PyYAML + pydantic v2 for the typed policy model; structural validation via `jsonschema` against `schema/stele.schema.json`; the semantic linter (RFC §13) on top.
 - **Durable state:** PostgreSQL (via SQLAlchemy 2.x / asyncpg) — `audit`, `pending_actions` (outbox), `approvals`, `kill_orders`.
 - **Hot state / propagation:** Redis (`redis-py`) — rate/quota/spend counters, kill-order cache invalidation (pub/sub), the kill epoch.
 - **Dispatch worker:** an async background task (or a separate process) polling `pending_actions`.
-- **MCP:** the official Python MCP SDK for the SIF-native tool and the interception proxy.
+- **MCP:** the official Python MCP SDK for the declared tool surface and the interception proxy.
 - **Tests:** `pytest` + `testcontainers-python` (real Postgres + Redis); `docker compose` for local runs. No live LLM calls in CI (use a fake LLM client in the demo agent).
 - **Packaging:** `pyproject.toml`, `src/` layout, `uv` (or pip) for envs.
 
@@ -23,7 +23,7 @@ stonefold/
 ├── src/stonefold_gates/       # the 14 gate implementations (depend on stonefold_core + store protocols)
 ├── src/stonefold_store/       # Postgres + Redis adapters: audit, outbox, approvals, kill, counters
 ├── src/stonefold_connectors/  # Connector protocol + in-memory, sql, http, email/stub connectors
-├── src/stonefold_gateway/     # FastAPI app: transports (SIF-native tool + MCP proxy), wiring, REST, dispatch worker
+├── src/stonefold_gateway/     # FastAPI app: transports (intent endpoint + MCP surface), wiring, REST, dispatch worker
 ├── src/stonefold_admin_ui/    # minimal UI: trace, approvals inbox, kill button (thin / can come late)
 ├── src/stonefold_demo/        # the adversarial demo runner + sample agent (fake LLM client)
 ├── src/stonefold_registry_gen/# AUTHORING-TIME registry drafting (SQL/OpenAPI/MCP -> draft registry; docs/06 §9) — never imported by the enforcement path
@@ -33,7 +33,7 @@ stonefold/
 
 ## Key decisions
 1. **Gateway is the sole path (chokepoint).** Two transports into `stonefold_gateway`:
-   - **SIF-native:** one generated tool `submit_intent`; the gateway is its executor. Strong coverage (no other path).
+   - **The declared surface:** one typed tool per declared action, generated from the registry (`/mcp/tools`, with `/mcp/search` when there are hundreds), each call arriving at `/mcp/call`; and `POST /submit_intent` for a client that would rather send an intent directly. Strong coverage: a tool exists only because an action is declared, and nothing is passed through unmapped.
    - **Interception (MCP proxy):** terminate the agent's MCP/tool transport, map each call to a declared action, enforce, forward or refuse. Unmapped tool ⇒ deny. Startup **coverage check** fails if the agent has any tool endpoint that isn't the gateway.
 2. **Pipeline is pure and total** (`enforce()` in `stonefold_core`): resolve → authorize → scope → gates → kill → execute, always ending in an audited decision. Implements RFC §12 / design §3. No LLM call anywhere inside it.
 3. **Policy is compiled at load** into an indexed matcher; the linter (RFC §13) runs at load; an invalid policy prevents startup (never fall back to defaults).
@@ -59,7 +59,7 @@ Every place an external system can plug in, and what runs there when nothing doe
 | Precondition checks (§7.6) | registered functions | the system of record |
 | Outer ring | gateway's own scoped credentials | cloud IAM (docs/10 §3) |
 | Audit out (§11) | Postgres/file sink | SIEM, evidence-pack export |
-| Transport | SIF-native MCP server / interception | any MCP-speaking agent stack |
+| Transport | declared tool surface / interception | any MCP-speaking agent stack |
 
 ## Kill is two axes — operator hard-kill vs `killable`
 
@@ -105,51 +105,6 @@ Every place an external system can plug in, and what runs there when nothing doe
 - **Two registry dialects exist today.** `spec/schema/registry.schema.json` + `spec/docs/06` define the **authoring format** (`domain`/`entities`/`namedSets`/`hooks`, attributes under `attributes:`) used by `examples/*.registry.yaml`; `registry/stonefold-registry.yaml` is the gateway loader's **compact internal dialect** (`resources`/`sets`/`contentHooks`, attributes inline) that the code and tests consume. Both declare the same vocabulary. Unifying them (teach the loader the v1.x authoring format, or generate the compact form from it) is **deferred**; until then the authoring format is the documented one and the compact file carries a header note.
 - **`derived` expression grammar is deferred.** Derived attributes/properties (`operativeForce: { derived: "isHighAlert ? 'high' : 'low'" }`) are implementation-defined: pure, deterministic, no I/O (docs/06 §4). Freezing a small derivation grammar (like the §8 condition grammar) is deferred.
 - **Content-check delegation — TODO (RFC wording).** The gateway can validate structure, limits, and set membership deterministically, but it **cannot judge content** — so an implementation SHOULD (not MUST) provide hooks that delegate content checking to third-party systems (DLP, moderation, fraud scoring), executed at the chokepoint under the gateway's failure mode and audit. The reference already ships the seam (`contentCheck` → `ContentHookRegistry`; conformance contract docs/06 §6; positioning docs/13). The open item is the explicit **SHOULD** wording in `docs/01` §7.7 at the next RFC revision — today §7.7 defines the hook without stating the implementation obligation.
-
-## SIF catalogue presentation at scale — open design item (from the benchmark)
-
-- **The finding (docs/15, realism battery, 2026-07-03 note).** When both surfaces
-  carry production-length capability information, per-tool **structured cards** let
-  the model disambiguate look-alike capabilities almost completely (MCP back to
-  90/90% at N=10/50), while the bench's SIF surface — the same information flattened
-  into one long prose list inside a single tool description — scored 80/70% with 15%
-  clarify-hesitation. Same content, worse packaging: models are heavily trained on
-  discriminating among separate structured tool definitions; a prose wall is
-  out-of-distribution (the risk docs/15 §1 pre-registered).
-- **The work item: think about redesigning how the generated SIF surface presents
-  the capability catalogue at scale** so per-capability signal reaches the model as
-  effectively as N tool cards do — without giving up the single-intent-tool
-  structural coverage. Candidates (none chosen): lean on the structured
-  `x-stonefold-actions` catalogue rather than description prose (the real
-  `submit_intent_schema` already carries it — the bench flattening likely
-  *under-sells* real SIF); group the catalogue by resource; carry per-action `data`
-  schemas in the generated schema; richer enum member descriptions; or a two-step
-  select (resource, then its actions). Constraint: SIF RFC §7's shape (one
-  registry-generated tool) is the invariant; this is about the generated schema's
-  *presentation*, not a new surface.
-- **Acceptance test exists:** the benchmark's `--cards realistic` row
-  (docs/15 realism battery) — the redesign wins when SIF matches structured-card
-  selection while keeping its ~5× token advantage.
-- **Assessment (2026-07-03): the current design can plausibly beat MCP here —
-  no RFC change needed.** What lost was an implementation choice the RFC does not
-  prescribe: the RFC fixes the *shape* (one registry-generated tool, enum-injected
-  names) and leaves the catalogue's *presentation* free. JSON Schema already allows
-  card-equivalent structure inside one tool: a `oneOf` of
-  `{const: <action>, description: …}` entries gives every capability its own
-  card-like description, and per-resource branches can carry per-action `data`
-  schemas with typed, documented parameters — N structured cards inside one tool,
-  with undeclared names still unrepresentable. Qualifications, recorded honestly:
-  (a) buying signal costs tokens — the 5.4× advantage shrinks toward maybe 1.5–2×
-  at full card richness, but presentation depth is *generated*, so it becomes a
-  per-deployment knob (terse for capable models, rich where a small model needs
-  help) that per-tool surfaces don't have; (b) models are trained on the tool-cards
-  format, so a residual out-of-distribution gap on small models may survive good
-  packaging — measurable via the acceptance row, not arguable; (c) the single-turn
-  bench cannot see SIF's structured-error self-correction loop (SIF §6) — a wrong
-  pair gets a recoverable "no such pair" while a wrong MCP tool call executes the
-  wrong tool; the multi-step extension (#6, designed, unbuilt) is what would
-  measure it. Next concrete step: implement the `oneOf` catalogue presentation in
-  the bench's SIF surface and re-run `--cards realistic` — one run decides.
 
 ## Out of scope for this concept
 Full domain-modeling/ontology authoring UX; `assess` explainability tooling beyond the `requireExplanation` gate; multi-agent orchestration / durable workflows; full RBAC/ABAC engine; SaaS multi-tenancy, billing, SSO; auto-generation of policy from a schema; production HA/throughput hardening.

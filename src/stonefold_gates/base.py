@@ -14,7 +14,7 @@ from __future__ import annotations
 import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Protocol
 
 from stonefold_core.condition import (
     ConditionRuntimeError,
@@ -65,6 +65,25 @@ def check_hold(code: str, evidence: dict[str, Any] | None = None) -> CheckResult
 PreconditionCheck = Callable[["GateContext"], "bool | CheckResult"]
 
 
+class DecisionHistory(Protocol):
+    """What this gateway decided earlier in the same run (CS-041).
+
+    Deliberately narrow. It answers one question — *what did I refuse for this
+    actor in this run* — and it answers it from the gateway's own audit of its
+    own traffic. It is not a view of the managed system, and a control MUST NOT
+    use it as one: an action that never passed through the gateway is invisible
+    here, by construction.
+    """
+
+    def refusals_in_run(self, *, actor_id: str, correlation_id: str) -> tuple[str, ...]:
+        """The refused actions (``resource.action``), earliest first.
+
+        A refusal is a ``deny``, ``halt`` or ``hold`` — a hold counts because the
+        action has not happened, which is the whole point of the question.
+        """
+        ...
+
+
 @dataclass(frozen=True)
 class GateContext:
     """Everything a gate may read. Built once per request by the engine."""
@@ -85,6 +104,11 @@ class GateContext:
     # here; a declared registry with no registered adapter is a dependency
     # failure (RFC §10), not a policy decision.
     obligations: Mapping[str, ObligationRegistry] = field(default_factory=dict)
+    # v0.6.1 (CS-041): the gateway's own record of what it decided earlier in
+    # this run, for the standard closure check. ``None`` where the deployment
+    # wired no history — a control that needs it then fails closed under §10
+    # rather than passing on an unverifiable claim.
+    history: "DecisionHistory | None" = None
 
 
 GateFn = Callable[[Any, GateContext], GateResult]

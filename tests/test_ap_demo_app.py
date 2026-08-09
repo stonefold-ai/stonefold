@@ -1,7 +1,7 @@
 """HTTP/WebSocket surface of the demo gateway (docs/05 UI backend).
 
 Drives ``create_app`` with an in-process bundle through FastAPI's TestClient: the
-SIF tool, header-based identity (invariant 3), the inbox, the in-process agent
+gated tool, header-based identity (invariant 3), the inbox, the in-process agent
 runner (fake provider), the live-trace WebSocket, approvals, kill, and audit.
 """
 
@@ -28,12 +28,6 @@ def client() -> Iterator[TestClient]:
     app = create_app(build_inmemory_bundle(clock=lambda: DEMO_NOW), default_provider="fake")
     with TestClient(app) as c:
         yield c
-
-
-def test_tool_schema_is_sif_native(client: TestClient) -> None:
-    schema = client.get("/tool-schema").json()
-    assert schema["name"] == "submit_intent"
-    assert "Payment" in schema["parameters"]["properties"]["resource"]["enum"]
 
 
 def test_inbox_lists_the_invoices(client: TestClient) -> None:

@@ -37,7 +37,7 @@ def start_gateway(port: int) -> subprocess.Popen[bytes]:
     deadline = time.time() + 30
     while time.time() < deadline:
         try:
-            with urllib.request.urlopen(f"http://127.0.0.1:{port}/tool-schema", timeout=1):
+            with urllib.request.urlopen(f"http://127.0.0.1:{port}/mcp/tools", timeout=1):
                 return proc
         except Exception:
             if proc.poll() is not None:

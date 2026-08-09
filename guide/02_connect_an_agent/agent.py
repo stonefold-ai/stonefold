@@ -1,9 +1,9 @@
 """THE AGENT — owned by the agent developer.
 
-Note what this file does NOT import: anything from Stonefold. The agent's
-entire world is one HTTP endpoint and one tool. In a real deployment the
-`scripted_llm` below is an LLM tool-use call (Claude, GPT, anything that
-speaks JSON tools); the payloads it emits are exactly these.
+Note what this file does NOT import: anything from Stonefold. The agent's entire
+world is one HTTP endpoint and the tools the gateway offers it. In a real
+deployment the `scripted_llm` below is an LLM tool-use call (Claude, GPT,
+anything that speaks JSON tools); the payloads it emits are exactly these.
 
 Run against a live gateway:   python agent.py http://localhost:8099
 """
@@ -17,7 +17,7 @@ from typing import Any
 
 
 class GatewayTool:
-    """The one tool the agent holds: fetch its schema, submit intents.
+    """The agent's whole client: ask what it may do, submit intents.
 
     WHO the agent acts as (actor/session) travels in the transport headers —
     it is this client's constructor argument, supplied by the platform that
@@ -47,11 +47,12 @@ class GatewayTool:
         with urllib.request.urlopen(request, timeout=10) as response:
             return json.loads(response.read().decode("utf-8"))
 
-    def schema(self) -> dict[str, Any]:
-        # GET /tool-schema — the ONE tool definition you hand to your LLM.
-        # Resource names are enums generated from the registry, so the model
-        # cannot even express an undeclared name.
-        return self._call("GET", "/tool-schema")  # type: ignore[no-any-return]
+    def tools(self) -> dict[str, Any]:
+        # GET /mcp/tools — the tool definitions you hand to your LLM, one per
+        # declared action, generated from the registry. The model cannot be
+        # offered an action nobody declared. On a large registry ask
+        # /mcp/search?q=... instead and hand over the few it returns.
+        return self._call("GET", "/mcp/tools")  # type: ignore[no-any-return]
 
     def submit_intent(self, payload: dict[str, Any]) -> dict[str, Any]:
         # POST /submit_intent — one attempted action in, one decision out:
@@ -69,7 +70,7 @@ class GatewayTool:
 def scripted_llm(step: int) -> dict[str, Any] | None:
     """Stands in for the model. Swap in a real LLM tool-use loop and nothing
     else in this file changes — these dicts are what a model emits against
-    the tool schema."""
+    the declared actions."""
     steps: list[dict[str, Any]] = [
         {"resource": "Customer", "action": "read", "data": {}},
         {"resource": "Ticket", "action": "create",
@@ -85,9 +86,9 @@ def scripted_llm(step: int) -> dict[str, Any] | None:
 def run(base_url: str) -> list[dict[str, Any]]:
     tool = GatewayTool(base_url, actor="rep-7", session="s1")
 
-    schema = tool.schema()
-    resources = schema["parameters"]["properties"]["resource"]["enum"]
-    print(f"agent: got 1 tool ({schema['name']}), resources = {sorted(resources)}")
+    offered = tool.tools()
+    names = sorted(t["name"] for t in offered["tools"])
+    print(f"agent: got {offered['of']} tools, actions = {names}")
 
     results: list[dict[str, Any]] = []
     step = 0

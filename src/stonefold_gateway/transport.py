@@ -8,9 +8,12 @@ every transport routes through the same ``enforce`` call and none can diverge.
 
 Two transports sit in front of it (RFC §3):
 
-* **SIF-native** (design §1.1): the agent gets exactly one tool, ``submit_intent``,
-  whose schema is generated from the registry (resource/action enums injected).
-  Coverage is structural — there is no other tool, so there is no other path.
+* **The declared surface** (design §1.1): the agent's tools are generated from the
+  registry — one typed tool per declared action (``mcp_tool_schemas``), served with
+  retrieval over them (``stonefold_gateway.mcp_search``) for a registry too large to
+  put in front of a model at once. Coverage is structural: a tool exists because an
+  action is declared. A client that would rather build the intent itself posts it to
+  ``submit_intent`` (``SifNativeTransport``) and lands in the same place.
 * **Interception / MCP proxy** (design §1.2): the agent keeps its tools, but each
   call is mapped to a declared action and enforced. The mapping is the coverage
   boundary, so: an **unmapped tool denies** (never pass-through, review note),
@@ -229,52 +232,85 @@ class Gateway:
         return result
 
 
-# --- SIF-native: the single generated tool (design §1.1) ------------------
-def submit_intent_schema(registry: InMemoryRegistry) -> dict[str, Any]:
-    """Generate the ``submit_intent`` tool schema from the registry.
+# --- Declared shape: shared by every transport ----------------------------
+class InvalidIntentError(ValueError):
+    """A submitted intent does not match the declared shape of its action.
 
-    The agent can name only declared resources/actions (enum-injected), so it can
-    emit nothing the registry doesn't know — the structural-coverage property.
-    ``x-stonefold-actions`` carries the resource→actions catalogue for richer clients.
+    Carries a SIF §6 structured error — code, pointer, message — because the
+    thing an agent most needs from a rejection is *which field to fix*. A bare
+    reason code with no pointer reads as a policy refusal, and an agent that
+    misreads a malformed call as a refusal stops trying instead of correcting.
     """
-    catalogue = {
-        name: sorted(rdef.actions) for name, rdef in registry.file.resources.items()
-    }
-    return {
-        "name": "submit_intent",
-        "description": (
-            "Submit one intended action for enforcement. The gateway validates it "
-            "against policy, injects scope, runs the gates, and either executes, "
-            "stages, holds, or refuses it."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "resource": {"type": "string", "enum": sorted(catalogue)},
-                "action": {"type": "string"},
-                "data": {"type": "object"},
-            },
-            "required": ["resource", "action"],
-            "additionalProperties": False,
-        },
-        "x-stonefold-actions": catalogue,
-    }
+
+    def __init__(self, code: str, pointer: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+        self.pointer = pointer
+        self.message = message
+
+    def as_error(self) -> dict[str, Any]:
+        return {"code": self.code, "pointer": self.pointer, "message": self.message}
 
 
+def validate_intent_data(
+    registry: InMemoryRegistry, resource: str, action: str, data: Mapping[str, Any]
+) -> None:
+    """Check ``data`` against the action's declared shape, if it declares one.
+
+    Deliberately shallow: required fields present, no unknown fields, declared
+    enums honoured. It is not a JSON Schema engine — the point is to name the
+    field the caller got wrong.
+
+    An action that declares no ``data`` (``ActionDef.data is None``) is not
+    checked at all, so a registry that has not declared any shapes behaves
+    exactly as it did before.
+    """
+    rdef = registry.file.resources.get(resource)
+    adef = rdef.actions.get(action) if rdef is not None else None
+    if adef is None or adef.data is None:
+        return
+    for name, prop in sorted(adef.data.items()):
+        if prop.required and data.get(name) in (None, ""):
+            raise InvalidIntentError(
+                "MISSING_FIELD", f"data.{name}",
+                f"{resource}.{action} requires {name}"
+                + (f" ({prop.label})" if prop.label else ""),
+            )
+        value = data.get(name)
+        if value is not None and prop.values and str(value) not in prop.values:
+            raise InvalidIntentError(
+                "BAD_VALUE", f"data.{name}",
+                f"{name} must be one of {', '.join(prop.values)}",
+            )
+    for name in sorted(data):
+        if name not in adef.data:
+            takes = ", ".join(sorted(adef.data)) or "no data at all"
+            raise InvalidIntentError(
+                "UNKNOWN_FIELD", f"data.{name}",
+                f"{resource}.{action} has no field {name}; it takes {takes}",
+            )
+
+
+# --- The intent endpoint: one attempted action in, one decision out -------
 class SifNativeTransport:
-    """The SIF-native executor of the one tool (design §1.1). It *is* the tool's
-    implementation: every ``submit_intent`` call routes straight to the gateway."""
+    """The executor behind ``POST /submit_intent``: an intent arrives in the SIF
+    wire form and routes straight to the gateway. Every other transport ends up
+    here, so the decision cannot depend on how the call was expressed."""
 
     def __init__(self, gateway: Gateway) -> None:
         self._gateway = gateway
 
-    @property
-    def tool_schema(self) -> dict[str, Any]:
-        return submit_intent_schema(self._gateway.registry)
-
     def submit_intent(
         self, payload: Mapping[str, Any], *, actor: Actor, session: Session
     ) -> EvalResult:
+        # Shape first, policy second. A malformed intent is not a refusal and is
+        # not reported as one.
+        validate_intent_data(
+            self._gateway.registry,
+            str(payload.get("resource", "")),
+            str(payload.get("action") or ""),
+            payload.get("data") or {},
+        )
         return self._gateway.submit(
             resource=str(payload.get("resource", "")),
             action=payload.get("action"),
@@ -288,10 +324,53 @@ class SifNativeTransport:
     ) -> BatchResult:
         """The SIF wire form ``{"operations": [...]}`` (SIF §5) — decided
         atomically per RFC §12 / CS-023."""
+        for index, op in enumerate(operations):
+            try:
+                validate_intent_data(
+                    self._gateway.registry,
+                    str(op.get("resource", "")),
+                    str(op.get("action") or ""),
+                    op.get("data") or {},
+                )
+            except InvalidIntentError as exc:
+                # SIF §6 already points at the failing operation in a refused
+                # batch; a malformed one points at the field inside it.
+                raise InvalidIntentError(
+                    exc.code, f"operations[{index}].{exc.pointer}", exc.message
+                ) from None
         return self._gateway.submit_batch(operations, actor=actor, session=session)
 
 
 # --- Interception / MCP proxy (design §1.2) -------------------------------
+def mcp_tool_schemas(registry: InMemoryRegistry) -> list[dict[str, Any]]:
+    """One typed tool per declared action, generated from the registry.
+
+    This is the MCP-facing view of the same catalogue every other surface uses:
+    the tool name is ``resource.action`` (1:1 with a declared action), the
+    description is the action's ``label``, and the input schema is the action's
+    declared ``data`` shape — or a bare object where the action declares none,
+    in which case the agent is being asked to guess and the registry should
+    declare the shape.
+
+    Nothing here widens what an agent can reach: a tool exists because an action
+    is declared, and ``MCPProxy`` denies any call it cannot map to one.
+    """
+    tools: list[dict[str, Any]] = []
+    for resource, rdef in sorted(registry.file.resources.items()):
+        for action, adef in sorted(rdef.actions.items()):
+            schema = adef.data_schema() or {"type": "object", "properties": {}}
+            description = (
+                adef.label
+                or f"{resource}.{action} — a declared {adef.kind.value} action."
+            )
+            tools.append({
+                "name": f"{resource}.{action}",
+                "description": description,
+                "input_schema": schema,
+            })
+    return tools
+
+
 class CoverageError(RuntimeError):
     """Startup coverage failure (design §1 review notes): an agent has a tool path
     that does not pass through the gateway, or an unacknowledged free-form

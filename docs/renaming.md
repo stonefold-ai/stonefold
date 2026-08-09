@@ -1,106 +1,31 @@
 # Renaming — from "Agent Control Policy" / `agent-control-protocol`
 
-**Date:** July 2026. **Status: EXECUTED** — the mechanical and semantic sweeps have run
-(branch `rename/stonefold-stele`); the repo now carries the Stonefold/Stele names
-throughout. This page is kept permanently as the honesty artifact: anyone who saw an old
-name can confirm this is the same project, and the history is visibly not hidden.
-Historical change sets (`docs/RFC-changeset-*.md` up to v0.4) were initially kept in
-their original ACP wording, then swept too (July 2026): the project was not yet public,
-so preserving pre-rename names would only confuse readers — this page, not the old
-identifiers, is the historical record. The GitHub repository rename is done
-(`agent-control-protocol` → `stonefold`, under the `stonefold-ai` org).
+**July 2026, executed.** This project was previously called ACP; the repository was
+`agent-control-protocol`. It is the same project. This page exists so anyone who
+saw an old name can translate it, and so the change is not quietly hidden.
 
-> **Supersedes the earlier "Interlock" proposal.** A prior revision of this page recorded
-> *Interlock* (product) / *Interlock Policy Language* (spec) as the decided names, gated on
-> the author's due diligence. That due diligence **disqualified Interlock: "Interlock" is
-> the name of an active ransomware group** — a fatal association for a security product,
-> and exactly the kind of collision the gate existed to catch. The name was dropped. The
-> domains **stonefold.ai** (primary) and **stonefold.io** (held defensively) are now
-> reserved, and a collision check settled the language name. The decision below —
-> **Stonefold** (product) / **Stele** (policy language) — replaces it. Interlock is recorded
-> here only so the trail is honest; it was **never applied to the repo** (the code was still
-> ACP), so the sweep goes ACP → Stonefold/Stele directly.
-
-## What changes
-
-| Layer | Old name (in repo today) | New name |
+| Layer | Old name | Now |
 |---|---|---|
 | The product / gateway | ACP Gateway ("Agent Control Gateway") | **Stonefold** (the Stonefold Gateway) |
 | The policy language (RFC 01) | Agent Control Policy (ACP) | **Stele** (the Stonefold policy language) |
-| The intent format (RFC 00) | SIF (Structured Intent Format) | **SIF** — unchanged |
+| The intent format (RFC 00) | Structured Intent Format (SIF) | unchanged |
 | Policy file `apiVersion` | `acp/v0.1` | `stele/v0.1` |
 | Policy file extension | `*.acp.yaml` | `*.stele.yaml` |
 | Policy JSON Schema | `schema/acp.schema.json` | `schema/stele.schema.json` |
 | Python packages | `acp_*` | `stonefold_*` |
-| Repository | `agent-control-protocol` | `stonefold` (old GitHub URLs will redirect) |
+| Repository | `agent-control-protocol` | `stonefold` (old GitHub URLs redirect) |
 
-**The naming split is deliberate: Stonefold is the machine; Stele is the tablet the
-machine reads.** "Stonefold" names the product and its code packages (the enforcement
-engine, the runtime); "Stele" names the policy language and everything *written in it* —
-the file extension, the `apiVersion`, the schema. SIF (what the agent emits) keeps its own
-name, unchanged.
+The split is deliberate: **Stonefold** is the machine — the product, the gateway, the
+code packages. **Stele** is the tablet it reads — the policy language and everything
+written in it, so the file extension, the `apiVersion` and the schema carry that name.
 
-One sentence for the whole stack: **the agent speaks SIF; Stonefold enforces; the rules
-are carved in Stele — and nothing else can act.**
+## What the rename did not change
 
-## Why these names
-
-- **Collision (product).** "ACP" collides with the Agent Client Protocol (Zed/JetBrains
-  ecosystem) and IBM's Agent Communication Protocol. The old repo name said "protocol"
-  while the README said "gateway" — a muddled identity at the moment clarity mattered.
-  "Stonefold" is clear in software: a collision check found only an unrelated Lake District
-  holiday-rental business, nothing in software or security (the defunct network-security
-  firm *Stonesoft*, acquired by McAfee in 2013, is a different word — negligible).
-- **Posture.** "Agent Control Protocol" claims a category — "the standard way agents shall
-  be controlled" — which a pre-adoption project has not earned. "Stonefold" claims a
-  product: a specific, opinionated mechanism; adopt it or don't. The design genuinely is
-  opinionated (frozen kinds, frozen gates, a deliberately small condition language), and a
-  named product may say "the shape is frozen; that's the point."
-- **Why a name, not an acronym (language).** The obvious three- and four-letter names for a
-  "Stonefold Policy Language" all collide *inside our own buyer's toolbelt*: **SPL** is
-  Splunk's Search Processing Language; **SpEL** is the Spring Expression Language — the
-  language Spring Security uses to write `@PreAuthorize` access-control expressions (same
-  domain *and* same function); **SPP** is Microsoft's Software Protection Platform, and
-  "protocol" is the framing we retired anyway (SIF owns that slot). The category leaders do
-  not use acronyms — AWS **Cedar**, OPA **Rego**, HashiCorp **Sentinel** — and a distinct
-  evocative name reads as more serious than a taken TLA. **Stele** is clear in the
-  authorization/policy category (none of Cedar, Rego, Sentinel, Styra, Oso, Cerbos,
-  Axiomatics overlap; the only users are a handful of small, unrelated software firms). Its
-  one cost is pronunciation — *STEE-lee* is not obvious from the spelling — a real but
-  survivable tax for a developer tool (cf. Rego, nginx, Kubernetes).
-
-## The metaphor is the architecture
-
-- **Stonefold** — a *fold* is an enclosure (as in a sheepfold): the flock roams freely
-  inside, but it cannot leave. Build the fold of *stone* and it cannot be broken out of.
-  That is the project's whole thesis: the agent inside can be confused, jailbroken, or
-  fully hijacked and **it does not matter**, because containment is a property of the wall,
-  not the occupant. The wall does not reason (no LLM in the enforcement path — deterministic
-  mechanism); there is exactly one gate and it is shut unless a rule opens it (default-deny);
-  the gate can take two keys (dual authorization); and the fold can be sealed instantly
-  (the kill-switch, including its no-race property).
-- **Stele** — an upright stone slab inscribed with law. The oldest surviving legal codes
-  (Hammurabi's among them) were carved on a stele and set up in public, where anyone could
-  read the rule and no one could quietly alter it. A policy *carved in Stele* is exactly
-  that: the rule made permanent, public, and immovable — deterministic, auditable, and
-  beyond the reach of the agent it governs. Cut stone, not soft clay.
-
-## What deliberately does NOT change
-
-- **SIF** — the intent format's name, spec, and semantics stay untouched.
-- **All normative semantics.** The rename changes identifiers, titles, and file names only.
-  No MUST/SHOULD/MAY wording moves. Version numbers are not bumped by the rename;
+- **No normative semantics moved.** Identifiers, titles and file names only; no
+  MUST/SHOULD/MAY wording changed. Version numbers were not bumped by the rename, and
   `stele/v0.1` accepts exactly the files `acp/v0.1` accepted.
-- ~~**The historical change sets** (`docs/RFC-changeset-*.md`) keep their original
-  wording, including old names.~~ **Revised (July 2026):** the change sets were swept to
-  the new names too — identifiers, titles, and file references only; no semantic wording
-  moved. The project had no public users of the old names, so keeping them served no
-  reader; the rename history is preserved by this page, not by stale identifiers.
-
-## Standardization posture (recorded so it isn't re-litigated)
-
-Opinionated named product now; the conformance kit (docs/12) is the standing answer to
-"can others implement this without depending on the author." If standardization becomes
-real — a working group, a second independent implementer — donating the spec under a
-neutralized name at that moment is a move made from strength. The reverse order (neutral
-standard name first, adoption never) is the posture this rename retires.
+- **The historical change sets** (`spec/docs/RFC-changeset-*.md`) were swept to the new
+  identifiers as well, for the same reason: the project had no public users of the old
+  names, so keeping stale identifiers in them served no reader. The version-to-version
+  deltas themselves are unchanged and remain the way to bring an older implementation
+  forward.

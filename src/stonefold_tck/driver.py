@@ -70,6 +70,13 @@ CAP_FEEDBACK = "feedback"
 # unreachable. The ``no-match`` refusal and ``stale-guard:requireMatch`` settle
 # reason are normative for drivers claiming this.
 CAP_OBLIGATION = "obligation"
+# v0.6.1 CS-041: the standard ``dispositionIsDeclared`` check, and a registry
+# able to declare an action's ``closure`` (docs/06 §5c). A driver claiming this
+# MUST supply the gateway's own decision history for the run — the check reads
+# what the gateway refused earlier for the same actor and correlation id, and
+# nothing else. The reason codes ``DISPOSITION_REQUIRED`` and
+# ``CLOSED_WITHOUT_THE_WORK`` are normative for drivers claiming it.
+CAP_CLOSURE = "closure"
 
 ALL_CAPABILITIES = frozenset(
     {
@@ -87,6 +94,7 @@ ALL_CAPABILITIES = frozenset(
         CAP_HOLD,
         CAP_FEEDBACK,
         CAP_OBLIGATION,
+        CAP_CLOSURE,
     }
 )
 
@@ -157,6 +165,11 @@ class AuditEntry:
     # a driver claiming CAP_FRESHNESS / CAP_SCOPE_REASSERT MUST populate this
     # for cancelled/failed settle records. Empty otherwise is acceptable.
     reason: str = ""
+    # The machine-readable reason code the record carries (RFC §11, CS-029).
+    # A driver claiming a profile whose codes are normative — CAP_CLOSURE's
+    # DISPOSITION_REQUIRED / CLOSED_WITHOUT_THE_WORK — MUST populate it, so the
+    # kit can assert that the *record* says why, not only the returned verdict.
+    reason_code: str = ""
 
 
 @dataclass(frozen=True)

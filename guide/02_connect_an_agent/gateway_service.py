@@ -12,7 +12,8 @@ Configuration comes from the environment, like any deployment:
                   (guide/docker-compose.yml provides one)
                   unset -> in-memory audit, with a printed notice
 
-The agent developer never sees this file. They get a URL and one tool.
+The agent developer never sees this file. They get a URL and the tools the
+registry declares.
 """
 
 from __future__ import annotations
@@ -75,7 +76,8 @@ def build_app() -> FastAPI:
     )
 
     # 3. The chokepoint + the HTTP app around it. create_app exposes:
-    #      GET  /tool-schema     — the ONE tool, generated from the registry
+    #      GET  /mcp/tools       — the declared actions as typed tools
+    #      GET  /mcp/search?q=   — the few that fit one step (use at scale)
     #      POST /submit_intent   — identity from X-Actor-Id / X-Session-Id
     #                              headers (your transport's auth), never the body
     #      GET  /admin/trace/{correlationId} — the audit replay (operator surface)

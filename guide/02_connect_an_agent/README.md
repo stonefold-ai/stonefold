@@ -32,7 +32,7 @@ other people's jobs.
 
 | File | Role | What it is |
 |---|---|---|
-| **`agent.py`** | **agent developer — this is YOUR file** | the complete agent side: one HTTP client, one tool, an LLM stand-in. **Imports nothing from Stonefold.** |
+| **`agent.py`** | **agent developer — this is YOUR file** | the complete agent side: one HTTP client, the declared tools, an LLM stand-in. **Imports nothing from Stonefold.** |
 | `registry.yaml` | platform / policy team | what exists (from example 01) |
 | `policy.stele.yaml` | policy author | what this agent may do |
 | `gateway_service.py` | infra engineer | the real HTTP service (`uvicorn gateway_service:app`) |
@@ -50,14 +50,14 @@ import json, sys, urllib.request
 
 That's all. **No Stonefold imports.** Your agent's world is one base URL.
 
-**1a — the one tool.** A small client that fetches the tool schema and
-submits intents:
+**1a — the client.** A small client that asks what it may do and submits
+intents:
 
 ```python
 class GatewayTool:
     def __init__(self, base_url, *, actor, session):
         ...
-    def schema(self):          # GET  /tool-schema
+    def tools(self):           # GET  /mcp/tools
     def submit_intent(self, payload):  # POST /submit_intent
 ```
 
@@ -75,9 +75,12 @@ def scripted_llm(step):
     return {"resource": "Customer", "action": "read", "data": {}}
 ```
 
-To use a real model: give it the schema from `tool.schema()` as its only
-tool, and pass each tool call's arguments to `tool.submit_intent(...)`. The
-dicts in this file are byte-for-byte what a model emits against that schema.
+To use a real model: give it the tools from `tool.tools()`, and pass each tool
+call's arguments to `tool.submit_intent(...)`. The dicts in this file are
+byte-for-byte what a model emits against those schemas. On a registry with
+hundreds of actions, ask `/mcp/search?q=<the step>` and hand over the few it
+returns instead of the whole list — a model choosing among hundreds chooses
+worse.
 (A complete real-LLM loop — Claude/OpenAI providers, retries, an inbox —
 is `src/stonefold_ap_demo/agent.py`.)
 
@@ -106,7 +109,7 @@ Create `gateway_service.py`. It is an ordinary FastAPI service:
    idempotently at boot); unset → in-memory with a printed notice.
 3. **Build the chokepoint and the app**: `Gateway(...)` +
    `create_app(gateway, audit=..., outbox=...)`, which exposes
-   `/tool-schema`, `/submit_intent`, and the operator surfaces
+   `/mcp/tools`, `/mcp/search`, `/submit_intent`, and the operator surfaces
    (`/admin/trace/{id}`, `/admin/approvals`, …).
 
 ## Step 3 — run it, for real
@@ -127,7 +130,8 @@ python guide/02_connect_an_agent/agent.py http://localhost:8099
 Or by hand, the way any HTTP client sees it:
 
 ```bash
-curl http://localhost:8099/tool-schema
+curl http://localhost:8099/mcp/tools
+curl 'http://localhost:8099/mcp/search?q=read+a+customer'
 curl -X POST http://localhost:8099/submit_intent \
   -H "Content-Type: application/json" \
   -H "X-Actor-Id: rep-7" -H "X-Session-Id: s1" \
@@ -161,9 +165,11 @@ audit (last line) names the transport identity, `rep-7`, for every record.
 ## What to notice
 
 1. **The agent file is small and yours.** Securing your agent did not mean
-   rewriting it — it meant taking its direct tools away and handing it one.
-2. **A hallucinated resource can't even be expressed** — `resource` is an
-   enum in the tool schema, generated from the registry.
+   rewriting it — it meant taking its direct tools away and giving it declared
+   ones instead.
+2. **A hallucinated action cannot be offered.** Every tool exists because the
+   registry declares the action behind it, and a call the gateway cannot map to
+   a declared action is denied.
 3. **Identity is not the model's to claim.** The smuggled `"actor": "admin"`
    landed as data; the audit names the transport identity.
 4. **Already on MCP, or attached to your existing tools?** You don't have
