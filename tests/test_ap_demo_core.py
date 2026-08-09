@@ -73,7 +73,7 @@ def test_g1_dispatch_is_idempotent(bundle: APBundle) -> None:
     assert len(bundle.ledger.payments()) == 1  # type: ignore[attr-defined]
 
 
-# --- CS-009: the settled effect's audit carries the downstream id (resultRef) ---
+# --- the settled effect's audit carries the downstream id (resultRef) ---
 def test_executed_pay_audit_carries_result_ref(bundle: APBundle) -> None:
     result = _pay(bundle, _acme_800())
     assert result.decision is Decision.ALLOW
@@ -191,7 +191,7 @@ def test_g3_reject_never_pays(bundle: APBundle) -> None:
 
 # --- E1 kill turns subsequent actions into HALT --------------------------------
 def test_e1_session_kill_halts(bundle: APBundle) -> None:
-    # pre-kill action allowed (staged; its PO line is now reserved, CS-035)
+    # pre-kill action allowed (staged; its PO line is now reserved)
     assert _pay(bundle, _acme_800(), session="live").decision is Decision.ALLOW
     bundle.issue_kill(KillScope.for_session("live"), issued_by="operator")
     after = _pay(bundle, _acme_800(), session="live")

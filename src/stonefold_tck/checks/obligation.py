@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 """L1–L5 (profile ``match``) and M1–M5 (profile ``consume``) — obligation
-matching and the reservation lifecycle (v0.3 CS-032–CS-036).
+matching and the reservation lifecycle (v0.3).
 
 An intent must correspond to exactly one open obligation, read back from the
 registry the gateway queries — never from the agent's copy; the matched line
@@ -111,7 +111,7 @@ def l3_ambiguous_holds_never_picks(driver: ConformanceDriver) -> None:
     driver.dispatch_once()
     expect(
         _pay_effects(driver) == 0,
-        "the gateway auto-selected among ambiguous candidates (CS-032: never a pick)",
+        "the gateway auto-selected among ambiguous candidates (never a pick)",
     )
 
 
@@ -126,7 +126,7 @@ def l4_forged_copy_ignored(driver: ConformanceDriver) -> None:
     forged = {"obligation": {"line": {"amount": 5000.0, "state": "unconsumed"}}}
     expect_decision(
         submit(driver, _pay(5000.0, extra=forged)), "deny",
-        "an intent shipping its own flattering copy of the obligation (CS-036)",
+        "an intent shipping its own flattering copy of the obligation",
     )
 
 
@@ -242,7 +242,7 @@ def m4_no_double_consume(driver: ConformanceDriver) -> None:
     requires=[CAP_OBLIGATION, CAP_STAGING, CAP_AUDIT],
 )
 def m5_lost_reservation_cancels_at_claim(driver: ConformanceDriver) -> None:
-    # CS-035's dispatch-time liveness check, through its one black-box window:
+    # §?'s dispatch-time liveness check, through its one black-box window:
     # the adapter loses the reservation out-of-band (its own orphan-expiry TTL,
     # spec §12 — ``seed_obligations`` models it by clearing reservation state),
     # a second intent legitimately re-reserves the freed line, and the FIRST
@@ -265,5 +265,5 @@ def m5_lost_reservation_cancels_at_claim(driver: ConformanceDriver) -> None:
     expect(
         any(r == "stale-guard:requireMatch" for r in reasons),
         f"the losing intent's cancel lacks the normative 'stale-guard:requireMatch' "
-        f"reason (CS-035), got {reasons[-4:]}",
+        f"reason, got {reasons[-4:]}",
     )

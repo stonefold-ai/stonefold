@@ -90,7 +90,7 @@ class ResolvedAction(BaseModel):
     data: dict[str, Any]
     attrs: Attributes
     connector: str
-    # The connector's pinned artifact digest (CS-020), copied from the registry at
+    # The connector's pinned artifact digest, copied from the registry at
     # resolution so the load-time and dispatch-time checks compare against the same
     # value that was in force when the action was staged. ``None`` ⇒ not pinned.
     connector_digest: str | None = None
@@ -98,7 +98,7 @@ class ResolvedAction(BaseModel):
     # Empty for non-transitions. The built-in transition precondition (M2) uses
     # this; it is a MUST-hold check, not optional policy.
     from_states: tuple[str, ...] = ()
-    # CS-043: the action's declared item-bearing field, carried here so the
+    # the action's declared item-bearing field, carried here so the
     # pipeline can see it without a second registry lookup — the same reason
     # ``from_states`` and ``compensation`` are copied. ``None`` ⇒ one unit.
     items: Any | None = None
@@ -133,7 +133,7 @@ class Session(BaseModel):
 class GateResult(BaseModel):
     """The result of evaluating one gate (design §2).
 
-    v0.3 (CS-026/CS-029): a deny/hold additionally carries a machine-readable
+    v0.3: a deny/hold additionally carries a machine-readable
     ``code``; ``source`` names the registered check/hook that produced the
     verdict (empty for the gate's own logic); ``evidence`` is optional
     check-supplied context for the human resolving a hold. All additive —
@@ -148,18 +148,18 @@ class GateResult(BaseModel):
     code: str = ""
     source: str = ""
     evidence: dict[str, Any] | None = None
-    # v0.3 CS-029: the code's declared retry class (check-declared, else the
+    # v0.3 the code's declared retry class (check-declared, else the
     # gate's built-in default assigned by the engine). ``None`` on PASS and on
     # approval-shaped holds (the agent's move there is to wait).
     retry_class: RetryClass | None = None
-    # v0.3 CS-030: which INTENT field(s) the comparison judged (e.g.
+    # v0.3 which INTENT field(s) the comparison judged (e.g.
     # ``data.amount``) — what ``code+fields`` visibility may reveal. Never
     # carries record-side values; those live only in ``reason``/``evidence``.
     fields: tuple[str, ...] = ()
 
 
 class ItemVerdict(BaseModel):
-    """One item's outcome inside an item-bearing action (CS-043).
+    """One item's outcome inside an item-bearing action.
 
     Each item is decided on its own, so each carries its own reason code and
     retry class: *that* item is retryable and *this* one is not is the whole
@@ -186,11 +186,11 @@ class EvalResult(BaseModel):
     decision: Decision
     rule: str
     gates: tuple[GateResult, ...] = ()
-    # v0.3 CS-029: the machine-readable reason code + retry class for a
+    # v0.3 the machine-readable reason code + retry class for a
     # deny/hold — the agent's convergence signal. Empty/None on ALLOW.
     reason_code: str = ""
     retry_class: RetryClass | None = None
-    # v0.3 CS-030: the visibility level the deciding action's policy declares
+    # v0.3 the visibility level the deciding action's policy declares
     # (stamped by the pipeline; the TRANSPORT applies it via ``agent_view`` —
     # the pipeline's own result, and hence the audit, is always full).
     feedback: FeedbackLevel = FeedbackLevel.CODE_FIELDS
@@ -201,14 +201,14 @@ class EvalResult(BaseModel):
     output: Any | None = None
     # Human-readable description of the scope applied below the model (spec §11).
     scope_applied: tuple[str, ...] = ()
-    # CS-043: one verdict per item for an item-bearing action, and the items
+    # one verdict per item for an item-bearing action, and the items
     # that actually took effect. Empty for every other action.
     #
     # ``decision`` above is the call's fate as a whole: ALLOW only when every
     # item was applied, otherwise the most severe per-item outcome. So a verdict
     # can read DENY while ``applied`` lists nine items — deliberately, because
     # the alternative (ALLOW with the refusals buried in a list) is the mistake
-    # CS-029 exists to prevent: an actor that reads the decision field alone
+    # §? exists to prevent: an actor that reads the decision field alone
     # must not conclude the call succeeded.
     items: tuple[ItemVerdict, ...] = ()
     applied: tuple[str, ...] = ()
@@ -220,7 +220,7 @@ class EvalResult(BaseModel):
 
 
 class BatchResult(BaseModel):
-    """The terminal verdict of one ``enforce_batch`` call (spec §12, CS-023).
+    """The terminal verdict of one ``enforce_batch`` call (spec §12).
 
     A SIF batch is decided atomically: every operation is decided first, then
     the batch either commits as a whole or is refused as a whole. ``results``
@@ -263,27 +263,27 @@ class AuditRecord(BaseModel):
     # "with the deciding rule/gate") — e.g. "gate:denylist", "stale-decision",
     # "scope-lost", "dispatch".
     rule: str | None = None
-    # v0.3 CS-029: the machine-readable code + retry class of a deny/hold —
-    # what the agent was told (subject to CS-030 visibility; the audit always
+    # v0.3 the machine-readable code + retry class of a deny/hold —
+    # what the agent was told (subject to §? visibility; the audit always
     # carries it). Empty/None on ALLOW.
     reasonCode: str = ""
     retryClass: RetryClass | None = None
     approval: dict[str, Any] | None = None
     # Connector result: "success" | "failure" | "not_executed".
     outcome: str = "not_executed"
-    # spec §11 (CS-009): the downstream identifier(s) of an executed/settled effect's
+    # spec §11: the downstream identifier(s) of an executed/settled effect's
     # result — the connector-returned id(s) of the created/changed record(s), the
     # handle/lineage key an external system uses to locate/reconcile/compensate it.
     # A *list* because one action may fan out to several records (a payment + its
     # ledger entry); empty for refusals, holds, and non-effect actions.
     resultRefs: list[str] = Field(default_factory=list)
-    # v0.3 (CS-037): the ENTITLEMENT-side lineage — which declared obligation
+    # v0.3: the ENTITLEMENT-side lineage — which declared obligation
     # registry was matched, the matched/candidate obligation ref(s), and the
     # candidate count (1, 0, or n>1 for a held-ambiguous decision).
     # ``resultRefs`` locate what the effect produced; ``obligationRefs`` locate
     # what entitled it. ``None`` when no ``requireMatch`` gate ran.
     obligationRefs: dict[str, Any] | None = None
-    # v0.3 (CS-037): the reservation lifecycle outcome for the matched
+    # v0.3: the reservation lifecycle outcome for the matched
     # obligation — ``reserved`` (staging record), ``consumed`` + receipt id
     # (successful settle; ``window`` capability surfaced), or ``released``
     # (terminal non-success). ``None`` when nothing was reserved.

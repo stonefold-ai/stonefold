@@ -1,6 +1,6 @@
-"""CS-020 — connector digest pinning verification.
+"""§? — connector digest pinning verification.
 
-Spec: ``docs/changeset-v0.1-to-v0.2.md`` §CS-020 + ``docs/06`` §5.
+Spec: ``docs/06`` §5 (digest pinning).
 
 A connector declaration MAY pin its implementing artifact by content digest
 (``digest: "sha256:<64 hex>"``). When declared, the gateway MUST verify the loaded

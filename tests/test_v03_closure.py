@@ -1,4 +1,4 @@
-"""v0.3 CS-041 — the standard closure check (spec §7.6, registry docs/06 §5c).
+"""v0.3 §? — the standard closure check (spec §7.6, registry docs/06 §5c).
 
 The failure being closed: a gate refuses the work, and the actor then closes the
 item as done. Four rules, one test each, plus the two lint directions and the
@@ -278,7 +278,7 @@ def test_lint_warns_about_a_closure_nothing_enforces() -> None:
     assert rule and rule[0].severity is Severity.WARN
 
 
-# --- §13.19, promoted with CS-042 ----------------------------------------
+# --- §13.19, promoted with §? ----------------------------------------
 def test_lint_warns_on_a_per_item_threshold_with_no_aggregate() -> None:
     reg = load_registry({"resources": {"Payment": {"actions": {
         "pay": {"kind": "effect", "data": {"amount": {"type": "number"}}},
@@ -329,7 +329,7 @@ def test_every_non_completion_disposition_is_a_way_out(disposition: str) -> None
 
 def test_the_check_result_is_a_hold_not_a_fail() -> None:
     """A hold, not a deny: the actor is being asked a question it can answer, and
-    the resolver contract (CS-027) is what a human uses to release it."""
+    the resolver contract is what a human uses to release it."""
     result = _run({"documentId": "D-1"})
     holds = [g for g in result.gates if g.outcome is Outcome.HOLD]
     assert holds and holds[0].code == DISPOSITION_REQUIRED

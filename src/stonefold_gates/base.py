@@ -37,7 +37,7 @@ SESSION_WINDOW_S: float = 10.0 * 365 * 24 * 3600
 @dataclass(frozen=True)
 class CheckResult:
     """The three-valued result of a registered precondition check (spec §7.6,
-    v0.3 CS-026): pass / fail(code) / hold(code, evidence). ``hold`` is legal
+    v0.3 §?): pass / fail(code) / hold(code, evidence). ``hold`` is legal
     only for successfully-read, judgment-shaped ambiguity and MUST carry a
     reason code — the gate resolves a code-less hold to fail-closed FAIL
     (implementation error). A check may still return a plain ``bool``: the
@@ -61,12 +61,12 @@ def check_hold(code: str, evidence: dict[str, Any] | None = None) -> CheckResult
 
 
 # A registered check returns a plain bool (two-valued, pre-v0.3) or a
-# CheckResult (three-valued, CS-026). The gate normalises both.
+# CheckResult (three-valued). The gate normalises both.
 PreconditionCheck = Callable[["GateContext"], "bool | CheckResult"]
 
 
 class DecisionHistory(Protocol):
-    """What this gateway decided earlier in the same run (CS-041).
+    """What this gateway decided earlier in the same run.
 
     Deliberately narrow. It answers one question — *what did I refuse for this
     actor in this run* — and it answers it from the gateway's own audit of its
@@ -99,17 +99,17 @@ class GateContext:
     preconditions: Mapping[str, PreconditionCheck]
     failure_mode: FailureMode
     agent: str
-    # v0.3 (CS-032/CS-034): the registered obligation-registry adapters, keyed
+    # v0.3: the registered obligation-registry adapters, keyed
     # by declared registry name. ``requireMatch`` resolves its ``registry:``
     # here; a declared registry with no registered adapter is a dependency
     # failure (spec §10), not a policy decision.
     obligations: Mapping[str, ObligationRegistry] = field(default_factory=dict)
-    # v0.3 (CS-041): the gateway's own record of what it decided earlier in
+    # v0.3: the gateway's own record of what it decided earlier in
     # this run, for the standard closure check. ``None`` where the deployment
     # wired no history — a control that needs it then fails closed under §10
     # rather than passing on an unverifiable claim.
     history: "DecisionHistory | None" = None
-    # v0.3 (CS-044): the registered source adapters, keyed by declared source
+    # v0.3: the registered source adapters, keyed by declared source
     # name — what a gate's ``reads:`` resolves against. A declared source with no
     # adapter here is unreadable, never fresh.
     sources: Mapping[str, Any] = field(default_factory=dict)

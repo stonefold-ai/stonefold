@@ -1,10 +1,9 @@
-"""v0.3 obligation matching — CS-032/033/034/036/037/038 (changeset
-docs/changeset-v0.2-to-v0.2.md; spec §7.16, §13 rules 14–17, §11
+"""v0.3 obligation matching (spec §7.16, §13 rules 14–17, §11
 ``obligationRefs``).
 
 Decision-time matching only (Phase 5): typed selector → candidate count →
 onNoMatch/onAmbiguous/full-conjunction evaluation against the re-read record;
-``consume: none`` verification end-to-end; the reservation lifecycle (CS-035)
+``consume: none`` verification end-to-end; the reservation lifecycle
 is exercised when the staging/dispatch/settle wiring lands.
 """
 
@@ -114,7 +113,7 @@ def run_gate(
 
 
 # ==========================================================================
-# CS-034 — the in-memory adapter (query + idempotent reserve/consume/release)
+# §? — the in-memory adapter (query + idempotent reserve/consume/release)
 # ==========================================================================
 class TestInMemoryAdapter:
     def test_query_filters_by_equality_constraints(self) -> None:
@@ -157,12 +156,12 @@ class TestInMemoryAdapter:
         reg.reserve("po-1", "i-1")
         assert reg.release("po-1", "i-2") is ReleaseOutcome.NOT_HELD
         assert reg.release("po-1", "i-1") is ReleaseOutcome.RELEASED
-        # a released line is reservable by the next intent (CS-035 resubmit beat)
+        # a released line is reservable by the next intent (§? resubmit beat)
         assert reg.reserve("po-1", "i-2") is ReserveOutcome.RESERVED
 
 
 # ==========================================================================
-# CS-034 — declaration parsing (docs/06 §5b)
+# §? — declaration parsing (docs/06 §5b)
 # ==========================================================================
 class TestDeclaration:
     def test_central_registry_declares_the_example_registries(self) -> None:
@@ -213,13 +212,13 @@ class TestDeclaration:
 
 
 # ==========================================================================
-# CS-032/033/036 — the gate (§7.16 semantics, gate-level)
+# §? — the gate (§7.16 semantics, gate-level)
 # ==========================================================================
 class TestRequireMatchGate:
     def test_unique_match_within_tolerance_passes_with_lineage(self) -> None:
         result = run_gate(MATCH_CFG, GOOD_DATA, po_adapter())
         assert result.outcome is Outcome.PASS
-        # a PASS carries lineage + the consumption PLAN (CS-035: the staging
+        # a PASS carries lineage + the consumption PLAN (the staging
         # commit reserves from consume/capability).
         assert result.evidence == {
             "registry": PO_REGISTRY, "refs": ["po-1"], "candidates": 1,
@@ -295,7 +294,7 @@ class TestRequireMatchGate:
         assert result.fields == ("data.sourceDomain",)
 
     def test_forged_obligation_copy_in_data_changes_nothing(self) -> None:
-        # CS-036: the agent ships a flattering copy of the obligation in its
+        # the agent ships a flattering copy of the obligation in its
         # own payload; every obligation.* operand still resolves from the
         # registry's response, so the verdict is unchanged.
         forged = {
@@ -310,7 +309,7 @@ class TestRequireMatchGate:
     def test_pointer_narrows_but_never_substitutes(self) -> None:
         # An intent-supplied pointer is just another equality clause: it
         # narrows the query, and the remaining conjunction still evaluates
-        # against the re-read record (CS-036). Two identical open lines are
+        # against the re-read record. Two identical open lines are
         # ambiguous without the pointer; with it, exactly one matches — and a
         # pointer at a record that fails the rest of the match is no-match,
         # never "trust the pointer".
@@ -339,7 +338,7 @@ class TestRequireMatchGate:
         assert "fail-closed" in result.reason
 
     def test_null_obligation_path_on_matched_record_fails_closed(self) -> None:
-        # the matched record exists but the tolerance field is null (CS-032
+        # the matched record exists but the tolerance field is null (§?
         # semantics 4: absent or null fails the gate closed).
         broken = {**PO_FIELDS, "line": {"amount": None, "state": "unconsumed"}}
         cfg = {
@@ -533,7 +532,7 @@ class TestEndToEnd:
         assert result.retry_class is RetryClass.ESCALATE
 
     def test_ambiguous_never_relaxes_composition(self) -> None:
-        # CS-032 rule 5: a matched obligation never relaxes another gate — a
+        # §? rule 5: a matched obligation never relaxes another gate — a
         # failing valueLimit still short-circuits to DENY before any hold.
         data = dict(POLICY_DATA)
         data["gates"] = {
@@ -548,7 +547,7 @@ class TestEndToEnd:
         assert result.rule == "gate:valueLimit"
 
     def test_dispatch_revalidation_cancels_when_the_reservation_is_lost(self) -> None:
-        # CS-032 rule 3 / CS-035: for a row holding a reservation, the dispatch
+        # §? rule 3 / for a row holding a reservation, the dispatch
         # claim checks reservation LIVENESS instead of re-running the query. A
         # reservation lost to another intent cancels stale-guard:requireMatch.
         h = harness()
@@ -581,7 +580,7 @@ class TestEndToEnd:
 
 
 # ==========================================================================
-# CS-040 (v0.3) — the hold dedupe identity is the QUESTION, not the code
+# §? (v0.3) — the hold dedupe identity is the QUESTION, not the code
 # ==========================================================================
 class TestDedupeSharpness:
     def _pay(self, h: Harness, vendor: str, amount: float, session: str) -> Any:
@@ -598,7 +597,7 @@ class TestDedupeSharpness:
 
     def test_distinct_unmatched_intents_never_collapse(self) -> None:
         # v0.3's key over-collapsed here: with zero candidates the refs are
-        # empty, so every no-match hold on one action shared a key. CS-040
+        # empty, so every no-match hold on one action shared a key. §?
         # identifies a zero-candidate hold by what the intent CLAIMED — its
         # compared field values — so two different vendors' unmatched invoices
         # are two questions, while resubmitting the SAME one still collapses.
@@ -625,7 +624,7 @@ class TestDedupeSharpness:
 
 
 # ==========================================================================
-# CS-038 — linter rules 14–17 and the rule-4 amendment
+# §? — linter rules 14–17 and the rule-4 amendment
 # ==========================================================================
 def _lint_policy(gates: dict[str, Any], *, allow: list[dict[str, Any]] | None = None) -> Any:
     policy = Policy.model_validate(
@@ -748,10 +747,17 @@ class TestLinterRules:
 
     def test_example_fixtures_lint_clean_under_the_new_rules(self) -> None:
         import yaml
-        from tests.conftest import EXAMPLES
+        from tests.conftest import EXAMPLES, FIXTURES
 
-        for name in ("payments-ops.stele.yaml", "ward-nurse.stele.yaml"):
-            with (EXAMPLES / name).open("r", encoding="utf-8") as fh:
+        # payments-ops ships in the spec's examples; ward-nurse is kept here as
+        # test data (its requireMatch prescription block exercises these rules)
+        # since the spec's examples are tested estates only.
+        paths = (
+            EXAMPLES / "payments-ops.stele.yaml",
+            FIXTURES / "ward-nurse.stele.yaml",
+        )
+        for path in paths:
+            with path.open("r", encoding="utf-8") as fh:
                 data = yaml.safe_load(fh)
             report = validate_only(data, full_registry(), schema=load_schema())
-            assert not report.has_errors, f"{name}: {report.format()}"
+            assert not report.has_errors, f"{path.name}: {report.format()}"

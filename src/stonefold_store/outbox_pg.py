@@ -146,7 +146,7 @@ class PostgresOutboxStore:
     ) -> PendingAction | None:
         # Each iteration claims the next PENDING row in its own FOR UPDATE
         # transaction; a killed/stale row is cancelled in that same transaction
-        # (§8.4 / CS-017) and the scan moves on so it never blocks the queue.
+        # (§8.4) and the scan moves on so it never blocks the queue.
         while True:
             with self._conn.transaction(), self._conn.cursor() as cur:
                 cur.execute(
@@ -168,7 +168,7 @@ class PostgresOutboxStore:
                     self._write(cur, cancelled)
                     return None
                 if stale_check is not None and (stale := stale_check(row)) is not None:
-                    # stale inside the claim (v0.2 CS-017): cancel + audit commit
+                    # stale inside the claim (v0.2): cancel + audit commit
                     # together, then scan for the next fresh row.
                     cancelled = row.model_copy(
                         update={"state": PendingState.CANCELLED, "reason": stale}
@@ -202,7 +202,7 @@ class PostgresOutboxStore:
     ) -> PendingAction:
         with self._conn.transaction(), self._conn.cursor() as cur:
             row = self._lock(cur, action_id)
-            # CS-027: shared, pure release logic — every contract must be
+            # shared, pure release logic — every contract must be
             # satisfied; the FOR UPDATE lock serialises concurrent releases.
             updated = apply_release(row, approver_id, gate=gate)
             self._write(cur, updated)

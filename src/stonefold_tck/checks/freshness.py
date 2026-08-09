@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""FRESHNESS profile — v0.2 timing guarantees (spec §12 CS-017, §6.3 CS-018).
+"""FRESHNESS profile — v0.2 timing guarantees (spec §12 §?, §6.3 §?).
 
 A driver claiming ``CAP_FRESHNESS`` MUST run with the REQUIRED TCK freshness
 config: default decision TTL **24 hours**, irreversible TTL **30 minutes**

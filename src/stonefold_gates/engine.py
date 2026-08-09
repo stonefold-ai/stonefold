@@ -57,7 +57,7 @@ _GATES: dict[str, tuple[int, GateFn]] = {
     "denylist": (15, g.denylist),
     "precondition": (20, g.precondition),
     "emissionControl": (20, g.emission_control),
-    "requireMatch": (20, g.require_match),  # v0.3 CS-032 (volatile band)
+    "requireMatch": (20, g.require_match),  # v0.3 §? (volatile band)
     "disclosure": (20, g.disclosure),
     "rate": (30, g.rate),
     "quota": (30, g.quota),
@@ -122,7 +122,7 @@ class DefaultGateEngine:
         self.registry = registry
         self.counters: CounterStore = counters or InMemoryCounterStore()
         self.hooks: ContentHookRegistry = hooks or default_hooks()
-        # v0.3 (CS-041): the reserved-name standard checks are merged OVER the
+        # v0.3: the reserved-name standard checks are merged OVER the
         # integrator's map, not under it. The name carries normative semantics
         # (§7.6), so a local implementation of it would silently redefine a
         # documented guarantee.
@@ -132,13 +132,13 @@ class DefaultGateEngine:
         # The gateway's own record of this run, for the closure check. ``None``
         # ⇒ a completion claim cannot be verified and fails closed (§10).
         self.history = history
-        # CS-044: source adapters, keyed by declared name (docs/06 §5e).
+        # source adapters, keyed by declared name (docs/06 §5e).
         self.sources: dict[str, Any] = dict(sources or {})
-        # v0.3 (CS-034): obligation-registry adapters, keyed by declared
+        # v0.3: obligation-registry adapters, keyed by declared
         # registry name. A ``requireMatch`` whose registry has no adapter here
         # is a dependency failure at evaluation time (spec §10).
         self.obligations: dict[str, ObligationRegistry] = dict(obligations or {})
-        # CS-027: the deployment's default resolver role for non-approval holds
+        # the deployment's default resolver role for non-approval holds
         # whose gate declares no ``resolvers:``. ``None`` + no ``resolvers:`` on a
         # check-driven hold ⇒ the intent is refused fail-closed
         # (``hold-unresolvable``) — never staged as a row anyone could release.
@@ -201,7 +201,7 @@ class DefaultGateEngine:
             if result.outcome is Outcome.HOLD:
                 holds.append((name, cfg, result))
         if holds:
-            # CS-027: EVERY holding gate contributes a release contract; the
+            # EVERY holding gate contributes a release contract; the
             # staged row promotes only when all are satisfied.
             contracts: list[ReleaseContract] = []
             for name, cfg, result in holds:
@@ -209,7 +209,7 @@ class DefaultGateEngine:
                 if contract is None:
                     # A check-driven hold with no resolvers and no deployment
                     # default: refuse fail-closed rather than stage a row
-                    # anyone could release (CS-027, audited hold-unresolvable).
+                    # anyone could release (audited hold-unresolvable).
                     return GateOutcome(
                         Outcome.FAIL, tuple(results), reason="hold-unresolvable"
                     )
@@ -227,7 +227,7 @@ class DefaultGateEngine:
     def _release_contract(
         self, gate: str, cfg: Any, result: GateResult
     ) -> ReleaseContract | None:
-        """The release contract one holding gate demands (CS-027).
+        """The release contract one holding gate demands.
 
         Approval gates carry their own approver population; a check-driven hold
         (a ``code``-bearing result from ``precondition``/``emissionControl``,
@@ -250,7 +250,7 @@ class DefaultGateEngine:
         elif self.default_resolver_role is not None:
             approvers = (self.default_resolver_role,)
         elif gate == "precondition" or result.code:
-            return None  # check-driven hold with nobody to resolve it (CS-027)
+            return None  # check-driven hold with nobody to resolve it
         else:
             approvers = _approvers(cfg)  # legacy emissionControl authorization hold
         return ReleaseContract(
@@ -269,7 +269,7 @@ class DefaultGateEngine:
         *,
         claim: ObligationClaim | None = None,
     ) -> GateResult | None:
-        """Dispatch-time re-validation of the VOLATILE gates only (v0.2 CS-017).
+        """Dispatch-time re-validation of the VOLATILE gates only (v0.2).
 
         Re-runs ``allowlist``/``denylist``/``window``/``precondition``/
         ``emissionControl`` for a claimed staged row against dispatch-time state;
@@ -278,7 +278,7 @@ class DefaultGateEngine:
         Returns the first non-PASS result (a HOLD here is treated as stale too:
         a claimed row cannot be re-suspended) or ``None`` when still fresh.
 
-        ``requireMatch`` refinement (v0.3 CS-032 rule 3 / CS-035): a row that
+        ``requireMatch`` refinement (v0.3 §? rule 3): a row that
         holds a reservation (``claim``) is checked for **reservation liveness**
         instead of re-running the query — the reserved line's state moved to
         ``reserved``, so a re-query would spuriously no-match the row's own
@@ -299,7 +299,7 @@ class DefaultGateEngine:
     def _reservation_liveness(
         self, claim: ObligationClaim, resolved: ResolvedAction, policy: "CompiledPolicy"
     ) -> GateResult:
-        """Still held, registry reachable (CS-035). The probe is an idempotent
+        """Still held, registry reachable. The probe is an idempotent
         re-``reserve``: RESERVED means the claim is live (an adapter-expired but
         unclaimed reservation is legitimately re-acquired here, F5.2 — the line
         was free, so re-closing the window is safe); anything else means the
@@ -353,7 +353,7 @@ class DefaultGateEngine:
             result = g.check_from_states(cfg["from"], gctx)
         else:
             result = _GATES[name][1](cfg, gctx)
-        # CS-029: every FAIL carries a retry class — check-declared where the
+        # every FAIL carries a retry class — check-declared where the
         # check supplied one (gates.py), else the gate's built-in default.
         if result.outcome is Outcome.FAIL and result.retry_class is None:
             result = result.model_copy(update={"retry_class": gate_class(result.gate)})
@@ -363,7 +363,7 @@ class DefaultGateEngine:
 def make_dispatch_revalidator(
     engine: DefaultGateEngine, policy: "CompiledPolicy"
 ) -> DispatchRevalidator:
-    """Bind an engine + compiled policy into the ``DispatchWorker``'s CS-017
+    """Bind an engine + compiled policy into the ``DispatchWorker``'s §?
     re-validation hook. The row's actor/session are the STAGED identity
     (invariant 3 — never re-derived); only the clock is dispatch-time."""
 
@@ -394,7 +394,7 @@ def _approvers(cfg: Any) -> tuple[str, ...]:
 
 def _timeout_seconds(cfg: Any) -> float | None:
     """Parse the gate's ``timeout`` duration (``30m``/``2h``, spec §7.8) into
-    seconds — enforced by the held-row expiry sweep (v0.3 CS-028). Unparsable ⇒
+    seconds — enforced by the held-row expiry sweep (v0.3). Unparsable ⇒
     ``None`` (the staging TTL remains the backstop)."""
     if not isinstance(cfg, Mapping):
         return None

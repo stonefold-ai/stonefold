@@ -99,7 +99,7 @@ def authoring_to_compact(authoring: Mapping[str, Any]) -> dict[str, Any]:
         resources[ename] = {"connector": edef.get("dataSource"), "actions": actions}
     authoring_connectors = dict(authoring.get("connectors") or {})
     compact_extra: dict[str, Any] = {}
-    # CS-024: a domain substituting its own classification labels declares them
+    # a domain substituting its own classification labels declares them
     # as an ORDERED value set (docs/06 §4); carry the order across the bridge so
     # ``disclosure.maxClassification`` compares by it.
     value_sets = dict(authoring.get("valueSets") or {})
@@ -108,7 +108,7 @@ def authoring_to_compact(authoring: Mapping[str, Any]) -> dict[str, Any]:
     return {
         **compact_extra,
         "connectors": list(authoring_connectors.keys()),
-        # CS-020: carry any pinned connector digests across the dialect bridge so
+        # carry any pinned connector digests across the dialect bridge so
         # the compact loader can verify them (a no-op unless one is declared).
         "connector_digests": {
             name: decl["digest"]
@@ -116,7 +116,7 @@ def authoring_to_compact(authoring: Mapping[str, Any]) -> dict[str, Any]:
             if isinstance(decl, Mapping) and decl.get("digest") is not None
         },
         "scopePredicates": list(authoring.get("scopePredicates") or []),
-        # v0.3 CS-029: the object form (name/holdCapable/reasonCodes) is the
+        # v0.3 the object form (name/holdCapable/reasonCodes) is the
         # same in both dialects — pass items through untouched.
         "preconditionChecks": list(authoring.get("preconditionChecks") or []),
         "contentHooks": list(authoring.get("hooks") or []),
@@ -125,9 +125,9 @@ def authoring_to_compact(authoring: Mapping[str, Any]) -> dict[str, Any]:
             name: list(spec.get("values") or [])
             for name, spec in dict(authoring.get("namedSets") or {}).items()
         },
-        # v0.3 CS-034: the declaration shape is shared between the dialects.
+        # v0.3 the declaration shape is shared between the dialects.
         "obligationRegistries": dict(authoring.get("obligationRegistries") or {}),
-        # v0.3 CS-044: same shape in both dialects — pass through untouched.
+        # v0.3 same shape in both dialects — pass through untouched.
         "sources": dict(authoring.get("sources") or {}),
         "resources": resources,
     }
@@ -140,10 +140,10 @@ _BLOCKED_ITEMS = ("Q-BLOCKED", "Q-ALSO-BLOCKED")
 
 
 def _item_allowed(gctx: GateContext) -> CheckResult:
-    """CS-043 fixture semantics: refuse exactly the blocked items.
+    """§? fixture semantics: refuse exactly the blocked items.
 
     Asserts the fan-out happened by reading a single item — a driver that hands
-    this check the whole list has not implemented CS-043, and the check says so
+    this check the whole list has not implemented §?, and the check says so
     rather than passing quietly.
     """
     ids = gctx.resolved.data.get("itemIds") or []
@@ -156,7 +156,7 @@ def _item_allowed(gctx: GateContext) -> CheckResult:
 
 
 class _SettableSource:
-    """docs/12 §3 fixture semantics for CS-044: a source whose reported age and
+    """docs/12 §3 fixture semantics for a source whose reported age and
     reachability the kit controls. ``age_days = None`` is reachable-but-undated,
     which the spec distinguishes from fresh."""
 
@@ -212,7 +212,7 @@ def _hold_on_marker(ctx: GateContext) -> bool | CheckResult:
 def _codeless_hold(ctx: GateContext) -> bool | CheckResult:
     """docs/12 §3: a CODE-LESS hold iff the target's ``badhold`` field is
     truthy — the implementation error the gateway must resolve fail-closed
-    (CS-026 rule 2); else pass."""
+    (§? rule 2); else pass."""
     if ctx.env.resource.get("badhold"):
         return CheckResult(Outcome.HOLD)  # deliberately no reason code
     return True
@@ -257,7 +257,7 @@ class _FailableObligationRegistry(InMemoryObligationRegistry):
 class _FailableConnector(InMemoryConnector):
     """The world connector, with TCK failure injection for D4. The injection
     hooks ``_dispatch`` so it fires on both dispatch forms (plain and the
-    CS-018 ``dispatch_scoped``)."""
+    §? ``dispatch_scoped``)."""
 
     def __init__(self) -> None:
         super().__init__()
@@ -324,7 +324,7 @@ class ReferenceDriver:
         self._world = _FailableConnector()
         connectors = Connectors({"tck-data": self._world, "tck-effects": self._world})
         self._connectors = connectors
-        # v0.3 (CS-034): one mock adapter per declared obligation registry —
+        # v0.3: one mock adapter per declared obligation registry —
         # the docs/12 §3 fixture semantics (line.state moves with the lifecycle).
         self._sources: dict[str, _SettableSource] = {
             name: _SettableSource(lambda: self._now)
@@ -344,11 +344,11 @@ class ReferenceDriver:
                 "tck.codelessHold": _codeless_hold,
             },
             obligations=self._obligations,
-            # v0.3 (CS-041): a driver claiming CAP_CLOSURE must supply the
+            # v0.3: a driver claiming CAP_CLOSURE must supply the
             # gateway's own decision history — what it refused earlier for the
             # same actor and run, read from its own audit and nothing else.
             history=AuditDecisionHistory(self._audit),
-            # CS-044: one settable source per declared name (docs/12 §3).
+            # one settable source per declared name (docs/12 §3).
             sources=self._sources,
         )
         self._registry = registry
@@ -363,14 +363,14 @@ class ReferenceDriver:
             outbox=self._outbox,
             kill=self._kill,
             env_factory=self._env_factory,
-            freshness=_TCK_FRESHNESS,  # v0.2 CS-017: TTL stamped at staging
-            obligations=self._obligations,  # v0.3 CS-035: reserve at staging
-            # v0.3 CS-031: the REQUIRED TCK dedupe window — one hour, like the
+            freshness=_TCK_FRESHNESS,  # v0.2 TTL stamped at staging
+            obligations=self._obligations,  # v0.3 reserve at staging
+            # v0.3 the REQUIRED TCK dedupe window — one hour, like the
             # freshness TTLs a fixture semantics the J6 check counts on.
             dedupe_window_s=3600.0,
             agent=policy.agent,
         )
-        # CS-020: the load-time digest gate — a pinned connector that fails
+        # the load-time digest gate — a pinned connector that fails
         # verification refuses the load (fail closed), like a lint ERROR.
         try:
             assert_connector_digests(
@@ -381,7 +381,7 @@ class ReferenceDriver:
         except DigestMismatchError as exc:
             return LoadResult(ok=False, errors=[str(exc)])
         # v0.2 wiring: the worker re-checks TTL + volatile gates inside the
-        # claim (CS-017) and re-asserts scope at dispatch (CS-018).
+        # claim and re-asserts scope at dispatch.
         self._worker = DispatchWorker(
             self._outbox,
             connectors,
@@ -390,12 +390,12 @@ class ReferenceDriver:
             clock=self._worker_clock,
             revalidate=self._make_revalidator(engine, policy),
             scopes=scopes,
-            obligations=self._obligations,  # v0.3 CS-035: consume/release
+            obligations=self._obligations,  # v0.3 consume/release
         )
         return LoadResult(ok=True, warnings=warnings)
 
     def _make_revalidator(self, engine: DefaultGateEngine, policy: Any) -> Any:
-        """The CS-017 dispatch revalidator, with the target's resource facts
+        """The §? dispatch revalidator, with the target's resource facts
         RE-RESOLVED at dispatch time — the whole point of volatile-gate
         re-validation is that the world may have moved, and a target-fact
         check (``tck.flagSet``, ``tck.holdOnMarker``) re-validated against an
@@ -441,7 +441,7 @@ class ReferenceDriver:
             actor=Actor(id=actor.id, roles=set(actor.roles), claims=dict(actor.claims)),
             session=Session(id=session_id),
         )
-        # ``result`` IS the agent view (Gateway.submit applies the CS-030
+        # ``result`` IS the agent view (Gateway.submit applies the §?
         # redaction); serializing it verbatim is what lets the kit assert what
         # the agent did and did not see.
         return SubmitResult(
@@ -450,7 +450,7 @@ class ReferenceDriver:
             reason_code=result.reason_code,
             retry_class=result.retry_class.value if result.retry_class else None,
             agent_view=json.dumps(result.model_dump(mode="json"), default=str),
-            # v0.3 CS-043: per-item verdicts, in submission order
+            # v0.3 per-item verdicts, in submission order
             items=[
                 {"item": v.item, "decision": v.decision.value, "reasonCode": v.reason_code,
                  "retryClass": v.retry_class.value if v.retry_class else None,

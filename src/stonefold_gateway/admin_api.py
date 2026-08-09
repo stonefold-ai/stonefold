@@ -43,7 +43,7 @@ class ReplayableAudit(Protocol):
 
 def reason_code_stats(records: list[AuditRecord]) -> list[dict[str, Any]]:
     """Deny-rate + reason-code distribution per (agent, principal) — the
-    CS-030 probing-detection surface. Reason codes are an oracle even at the
+    §? probing-detection surface. Reason codes are an oracle even at the
     tightest visibility (each probe maps one policy wall); the countermeasure
     is not blunting the codes (that kills the convergence loop) but watching
     this distribution: a converging loop and a mapping loop look different."""
@@ -72,7 +72,7 @@ def reason_code_stats(records: list[AuditRecord]) -> list[dict[str, Any]]:
 
 class ApproverBody(BaseModel):
     approver: str
-    # v0.3 (CS-027): target one release contract by its gate key (e.g.
+    # v0.3: target one release contract by its gate key (e.g.
     # "precondition"); None credits every contract the identity may satisfy.
     gate: str | None = None
 

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""O1–O4 — per-item verdicts (v0.3 CS-043; profile ``per-item``).
+"""O1–O4 — per-item verdicts (v0.3; profile ``per-item``).
 
 The failure under test: one action carries twenty items, thirteen of which need a
 human. A gateway that can only allow or refuse the call takes the seven
@@ -8,7 +8,7 @@ control.
 
 O2 is the one that matters most. A driver that reports ``allow`` for a partial
 application fails it, because an actor reading the decision alone would conclude
-the whole call went through — the same mistake CS-029 exists to prevent, one
+the whole call went through — the same mistake §? exists to prevent, one
 level up.
 """
 
@@ -45,7 +45,7 @@ def o1_mixed_call_partitions(driver: ConformanceDriver) -> None:
     expect(
         len(result.items) == 3,
         f"the call carried 3 items and came back with {len(result.items)} verdicts — "
-        "every item gets its own (CS-043)",
+        "every item gets its own",
     )
     verdicts = _verdicts(result)
     expect(
@@ -83,7 +83,7 @@ def o2_partial_is_not_allow(driver: ConformanceDriver) -> None:
         result.decision != "allow",
         "a call where one item was refused reported 'allow'. An actor reading the "
         "decision alone would conclude the whole call went through, which is the "
-        "CS-029 failure one level up (CS-043)",
+        "§? failure one level up",
     )
     expect(
         result.decision == "deny",

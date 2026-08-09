@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Connector digest pinning (CS-020, change set v0.1→v0.2; docs/06 §5).
+"""Connector digest pinning (spec docs/06 §5).
 
 A connector declaration MAY pin the artifact that implements it by content digest
 (``digest: "sha256:<64 hex>"`` in the registry). When a digest is declared the

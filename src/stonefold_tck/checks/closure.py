@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""N1–N4 — closure accountability (v0.3 CS-041; profile ``closure``).
+"""N1–N4 — closure accountability (v0.3; profile ``closure``).
 
 The failure under test: a gate refuses the work, and the actor then closes the
 item as done. The refusal becomes invisible — the queue is empty and the managed
@@ -48,12 +48,12 @@ def n1_missing_disposition_holds(driver: ConformanceDriver) -> None:
     expect(
         result.reason_code == "DISPOSITION_REQUIRED",
         f"the hold is coded {result.reason_code!r} instead of the normative "
-        "'DISPOSITION_REQUIRED' (CS-041 rule 2)",
+        "'DISPOSITION_REQUIRED' (§? rule 2)",
     )
     expect(
         result.retry_class == "retryable",
         f"a missing disposition is classed {result.retry_class!r}; it is the actor's "
-        "to fix by resubmitting, so the normative class is 'retryable' (CS-029)",
+        "to fix by resubmitting, so the normative class is 'retryable'",
     )
     # and the same for a value outside the declared vocabulary
     invented = expect_decision(
@@ -81,7 +81,7 @@ def n2_completion_after_refusal_holds(driver: ConformanceDriver) -> None:
     expect(
         result.reason_code == "CLOSED_WITHOUT_THE_WORK",
         f"the hold is coded {result.reason_code!r} instead of the normative "
-        "'CLOSED_WITHOUT_THE_WORK' (CS-041 rule 3)",
+        "'CLOSED_WITHOUT_THE_WORK' (§? rule 3)",
     )
     expect(
         result.retry_class == "escalate",
@@ -134,7 +134,7 @@ def n4_the_attempt_is_in_the_record(driver: ConformanceDriver) -> None:
     expect(
         bool(closures),
         "the refused closure left no audit record — the attempt to close the item as "
-        "done is exactly what nothing else in the estate can see (CS-041)",
+        "done is exactly what nothing else in the estate can see",
     )
     last = closures[-1]
     expect(

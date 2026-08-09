@@ -1,4 +1,4 @@
-"""v0.3 reason codes + retry classes — CS-029 (spec §11).
+"""v0.3 reason codes + retry classes — §? (spec §11).
 
 Every deny/hold carries a machine-readable code with a declared retry class:
 ``retryable`` (fix the intent, resubmit) | ``terminal`` (stop) | ``escalate``
@@ -148,7 +148,7 @@ def test_approval_hold_carries_no_class() -> None:
 def test_hold_from_undeclared_check_is_an_implementation_error(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    # CS-026 rule 3: hold capability is a registry declaration. A bare-name
+    # §? rule 3: hold capability is a registry declaration. A bare-name
     # (two-valued) check that returns hold resolves fail-closed, loudly.
     with caplog.at_level(logging.ERROR, logger="stonefold.gates"):
         result = _run(

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""What a gate reads, and what to do when it cannot be trusted (CS-044).
+"""What a gate reads, and what to do when it cannot be trusted.
 
 **The failure this exists for.** A control reads content that ages — a
 critical-analyte list, a sanctions list, a tariff table, the fraud rules a bank
@@ -42,7 +42,7 @@ from typing import Any, Protocol
 from stonefold_core.enums import Outcome
 from stonefold_gates.base import CheckResult, GateContext, check_hold, window_seconds
 
-#: Reason codes, all three reaching the audit (CS-029).
+#: Reason codes, all three reaching the audit.
 SOURCE_STALE = "SOURCE_STALE"
 SOURCE_UNDATED = "SOURCE_UNDATED"
 SOURCE_UNAVAILABLE = "SOURCE_UNAVAILABLE"

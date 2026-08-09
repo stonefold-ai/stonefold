@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""P1–P4 — what a gate reads (v0.3 CS-044; profile ``reads``).
+"""P1–P4 — what a gate reads (v0.3; profile ``reads``).
 
 A control that depends on content which ages works perfectly while the content is
 current, which is why the failure is found after an incident rather than before
@@ -76,7 +76,7 @@ def p2_stale_is_not_unavailable(driver: ConformanceDriver) -> None:
         gone.reason_code != stale.reason_code,
         "a stale copy and an unreachable source produced the SAME code, so 'the world "
         "says no' and 'my copy of the world is old' cannot be told apart — which is "
-        "the failure CS-044 exists to remove",
+        "the failure §? exists to remove",
     )
 
 

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Questions answerable about a policy without running it (CS-044).
+"""Questions answerable about a policy without running it.
 
 A reviewer, an auditor and a regulatory assessment all **read** a policy; none of
 them runs the system, because the entire value of a review is knowing before the

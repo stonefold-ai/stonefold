@@ -44,7 +44,7 @@ def a4_open_on_irreversible(driver: ConformanceDriver) -> None:
 def a4b_unknown_name(driver: ConformanceDriver) -> None:
     result = driver.load(TCK_REGISTRY, POLICY_INVALID_UNKNOWN_NAME)
     expect(not result.ok,
-           "a policy denying an undeclared name loaded (must refuse, spec §13.1, CS-016)")
+           "a policy denying an undeclared name loaded (must refuse, spec §13.1)")
 
 
 @check("A6", "deny + standing.enables on the same action refuses to load", PROFILE_LINT)
@@ -63,8 +63,8 @@ def a8_dual_quorum(driver: ConformanceDriver) -> None:
 
 @check("A9", "a hold-capable check declared without reasonCodes refuses to load", PROFILE_LINT)
 def a9_hold_capable_needs_codes(driver: ConformanceDriver) -> None:
-    # §13 rule 18 (CS-038): every hold such a check returned would be code-less
-    # and resolve fail (CS-026 rule 2) — so the DECLARATION is the error.
+    # §13 rule 18: every hold such a check returned would be code-less
+    # and resolve fail (§? rule 2) — so the DECLARATION is the error.
     result = driver.load(REGISTRY_INVALID_HOLD_NO_CODES, POLICY_MINIMAL_OBSERVE)
     expect(not result.ok,
            "a holdCapable check with no reasonCodes loaded (must refuse, spec §13 rule 18)")

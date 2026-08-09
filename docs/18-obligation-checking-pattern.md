@@ -2,7 +2,7 @@
 
 *Supporting document (context, not requirements). The pattern described here is
 normative in Stele v0.3: the adoption path and the `requireMatch` gate are
-specified in spec §7.16, the reservation lifecycle in §12 (CS-032–CS-036). This
+specified in spec §7.16, the reservation lifecycle in §12. This
 page is the plain-language account of the problem and the pattern; the specification is
 the contract.*
 
@@ -80,7 +80,7 @@ its own transaction; the gateway keeps doing what it does.
 homegrown list, a slow-posting upstream), v0.3's `requireMatch` closes the
 window instead: the gateway reserves the matched record with the staging
 commit, checks the reservation is still live at dispatch, consumes it with the
-settle, and releases it on any terminal non-success (spec §12, CS-035). Don't
+settle, and releases it on any terminal non-success (spec §12). Don't
 hand-build that inside a check — stateful hooks bring back all the complexity
 the pattern avoids; the lifecycle is exactly what the gate exists for.
 
@@ -101,7 +101,7 @@ separation of duties. That was true before agents and stays true.
 An earlier version of this page listed `hold` and a declarative match gate as
 "what would need a specification (not now)", with a deliberately high bar: field
 evidence first. **v0.3 added both without that field evidence — a strategy
-decision, not a trigger firing** — because the change set was the moment the
+decision, not a trigger firing** — because the specification change was the moment the
 feedback channel, hold composition, and consumption semantics could be
 specified coherently, and because the coverage analysis (docs/19) showed
 exactly where fail-with-reason is clumsiest. Honest accounting: the design was

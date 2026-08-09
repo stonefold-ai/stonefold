@@ -1,4 +1,4 @@
-"""v0.2 CS-023 — batch decision semantics (spec §12; SIF §5).
+"""v0.2 §? — batch decision semantics (spec §12; SIF §5).
 
 Acceptance H1–H4: a SIF batch is decided atomically — every operation is
 decided first (each with its own audit record); any DENY/HALT refuses the whole
@@ -100,7 +100,7 @@ def test_h1_deny_refuses_batch_before_anything_commits_or_stages() -> None:
 
     assert result.decision is Decision.DENY
     assert result.failing_index == 1
-    # nothing committed, nothing staged (CS-023: "before anything commits or stages")
+    # nothing committed, nothing staged ("before anything commits or stages")
     assert h.notes() == []
     assert h.outbox.list_by_state(PendingState.PENDING) == []
     assert h.outbox.list_by_state(PendingState.PENDING_APPROVAL) == []
@@ -168,7 +168,7 @@ def test_h4_rejection_does_not_roll_back_committed_record_ops() -> None:
     h.outbox.reject(held.ticket, "carol")
     h.drain()
     assert h.world.effects == []  # the held effect never dispatches
-    assert len(h.notes()) == 1  # ...but the committed record op remains (CS-023)
+    assert len(h.notes()) == 1  # ...but the committed record op remains
 
 
 # --- the whole-batch record consistency: per-op audit on commit too ----------

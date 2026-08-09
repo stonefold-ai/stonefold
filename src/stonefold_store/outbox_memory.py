@@ -50,7 +50,7 @@ def build_pending(
     generation lives here (the I/O layer), not in the pure pipeline (invariant
     1). ``staged_at`` (the injected decision clock, when the caller has one)
     anchors ``created_at`` so hold-timeout deadlines and the staging TTL run on
-    one clock (CS-017/CS-028)."""
+    one clock."""
     now = staged_at if staged_at is not None else _now()
     return PendingAction(
         id=f"act_{uuid.uuid4().hex[:12]}",
@@ -129,7 +129,7 @@ class InMemoryOutboxStore:
                 )
                 continue
             if stale_check is not None and (stale := stale_check(row)) is not None:
-                # stale inside the claim (v0.2 CS-017) ⇒ CANCELLED + audited, in
+                # stale inside the claim (v0.2) ⇒ CANCELLED + audited, in
                 # this same (logical) transaction; keep scanning for a fresh row.
                 cancelled = row.model_copy(
                     update={"state": PendingState.CANCELLED, "reason": stale, "updated_at": _now()}
@@ -168,7 +168,7 @@ class InMemoryOutboxStore:
         self, action_id: str, approver_id: str, *, gate: str | None = None
     ) -> PendingAction:
         row = self._require(action_id)
-        # CS-027: shared, pure release logic — every contract must be satisfied.
+        # shared, pure release logic — every contract must be satisfied.
         updated = apply_release(row, approver_id, gate=gate).model_copy(
             update={"updated_at": _now()}
         )

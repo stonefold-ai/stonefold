@@ -1,9 +1,9 @@
-"""v0.3 hold substrate — CS-026/027/028 (changeset docs/changeset-v0.2-to-v0.2.md).
+"""v0.3 hold substrate (spec §7.6, §12).
 
 Preconditions may resolve HOLD (three-valued checks, spec §7.6); a held row
 carries the release contract of EVERY holding gate and promotes only when all
-are satisfied (§12, CS-027 — the approval-bypass regression); held rows expire
-actively (CS-028). Driven through the in-memory outbox + dispatch worker; the
+are satisfied (§12, §? — the approval-bypass regression); held rows expire
+actively. Driven through the in-memory outbox + dispatch worker; the
 Postgres approve path shares ``apply_release`` and is exercised in
 ``test_m4_pg_integration.py``.
 """
@@ -44,7 +44,7 @@ CFG = FreshnessConfig(
     default_ttl=timedelta(hours=24), irreversible_ttl=timedelta(minutes=30)
 )
 # The scripted check registers under a name the central registry declares
-# hold-capable with reason codes (CS-026 rule 3 / CS-029 — a hold from a check
+# hold-capable with reason codes (§? rule 3 / §? — a hold from a check
 # not declared holdCapable resolves fail-closed).
 CHECK = "matchesOpenPurchaseOrder"
 # A declared, bare-name (two-valued) check for the bool-compat tests.
@@ -135,7 +135,7 @@ def harness(
 HOLD_GATE = {"precondition": {"checks": [CHECK], "resolvers": "role:ap-clerk"}}
 
 
-# --- CS-026: three-valued checks ------------------------------------------
+# --- three-valued checks ------------------------------------------
 
 
 def test_check_hold_stages_row_with_resolver_contract() -> None:
@@ -191,7 +191,7 @@ def test_resolver_release_promotes_and_dispatches() -> None:
 
 def test_released_row_that_holds_again_at_dispatch_cancels_stale_guard() -> None:
     # R2/U3: a claimed row is never re-suspended — a fresh hold at the claim is
-    # stale, exactly like any other volatile-gate movement (CS-017).
+    # stale, exactly like any other volatile-gate movement.
     check = ScriptedCheck(check_hold("multiple-candidates"))
     h = harness(HOLD_GATE, check)
     result = h.enforce()
@@ -205,7 +205,7 @@ def test_released_row_that_holds_again_at_dispatch_cancels_stale_guard() -> None
 
 
 def test_code_less_hold_is_an_implementation_error(caplog: pytest.LogCaptureFixture) -> None:
-    # I4 / CS-026 rule 2: a hold without a machine-readable reason code resolves
+    # I4 / §? rule 2: a hold without a machine-readable reason code resolves
     # fail-closed and is logged loudly.
     check = ScriptedCheck(CheckResult(outcome=Outcome.HOLD))
     h = harness(HOLD_GATE, check)
@@ -217,7 +217,7 @@ def test_code_less_hold_is_an_implementation_error(caplog: pytest.LogCaptureFixt
 
 
 def test_crash_fails_closed_never_holds() -> None:
-    # I5 / CS-026 rule 1: a crash is a dependency failure — fail, never hold.
+    # I5 / §? rule 1: a crash is a dependency failure — fail, never hold.
     h = harness(HOLD_GATE, CrashingCheck())
     result = h.enforce()
     assert result.decision is Decision.DENY
@@ -261,7 +261,7 @@ def test_bool_checks_stay_valid() -> None:
         assert h.enforce().decision is expected
 
 
-# --- CS-027: multi-hold release contracts ----------------------------------
+# --- multi-hold release contracts ----------------------------------
 
 
 def test_hold_unresolvable_without_resolvers_or_default() -> None:
@@ -335,7 +335,7 @@ def test_gate_targeted_release_satisfies_that_contract_only() -> None:
     assert h.get(result.ticket).state is PendingState.PENDING
 
 
-# --- CS-028: held-row expiry ------------------------------------------------
+# --- held-row expiry ------------------------------------------------
 
 
 def test_staging_ttl_expires_held_row_preserving_reason_code() -> None:
@@ -355,7 +355,7 @@ def test_staging_ttl_expires_held_row_preserving_reason_code() -> None:
     assert last.rule == expired_hold_reason("precondition")
     hold_trace = [g for g in last.gates if g.gate == "precondition"]
     assert hold_trace and hold_trace[0].code == "multiple-candidates"
-    # a late release cannot resurrect the cancelled row (CS-017 rule unchanged)
+    # a late release cannot resurrect the cancelled row (§? rule unchanged)
     with pytest.raises(Exception):
         h.outbox.approve(result.ticket, "clerk-1")
 
@@ -374,7 +374,7 @@ def test_gate_timeout_on_timeout_deny_cancels_before_staging_ttl() -> None:
 
 
 def test_on_timeout_allow_satisfies_its_own_contract_only() -> None:
-    # CS-028: onTimeout: allow promotes iff every OTHER contract is satisfied.
+    # onTimeout: allow promotes iff every OTHER contract is satisfied.
     check = ScriptedCheck(check_hold("no-open-match"))
     gates = dict(HOLD_GATE)
     gates["requireApproval"] = {
@@ -411,7 +411,7 @@ def test_kill_covers_precondition_holds_exactly_like_approval_holds() -> None:
     assert h.effect_conn.effects == []
 
 
-# --- the emissionControl checks-key fix (found during CS-026) ---------------
+# --- the emissionControl checks-key fix (found during §?) ---------------
 
 
 def test_emission_control_runs_declared_checks() -> None:
@@ -442,7 +442,7 @@ def test_emission_control_runs_declared_checks() -> None:
     assert failing.calls == 1
 
 
-# --- CS-031: hold dedupe ------------------------------------------------------
+# --- hold dedupe ------------------------------------------------------
 
 
 def _enforce_dedupe(
@@ -470,7 +470,7 @@ def _enforce_dedupe(
 
 
 def test_duplicate_holds_collapse_into_one_queue_item() -> None:
-    # CS-031: the same (agent, action, reason code, candidate refs) within the
+    # the same (agent, action, reason code, candidate refs) within the
     # dedupe window is one question - the agent gets the SAME ticket, the row
     # counts the attempt, and each attempt still writes its own audit record.
     check = ScriptedCheck(check_hold("no-open-match", {"candidates": ["PO-9"]}))

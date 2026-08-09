@@ -279,7 +279,7 @@ class _Parser:
         )
 
     def _rhs_collection(self) -> Union[Literal, Operand]:
-        # spec §8 (v0.2, CS-013): the right side of `in` is a list literal OR a
+        # spec §8 (v0.2): the right side of `in` is a list literal OR a
         # function returning a collection/range (e.g. `in window("08:00-18:00")`).
         if self._peek().type == "lbrack":
             return self._list()
@@ -404,7 +404,7 @@ def validate(
 
     ``extra_namespaces`` admits a context-specific read-only namespace beyond
     the frozen five — today only ``obligation`` inside ``requireMatch``'s
-    ``match``/``provenance`` clauses (spec §8 note, v0.3 CS-036); it is not
+    ``match``/``provenance`` clauses (spec §8 note, v0.3 §?); it is not
     available anywhere else a condition appears."""
     problems: list[str] = []
     _walk(expr, problems, NAMESPACES | extra_namespaces)

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Decision freshness (v0.2 CS-017, changeset docs/changeset-v0.1-to-v0.2.md).
+"""Decision freshness (spec §12).
 
 A staged effect's decision is only valid for a bounded time: every staged row
 carries an ``expires_at`` stamped at staging from deployment configuration (NOT
@@ -23,26 +23,26 @@ from stonefold_core.enums import Kind, Reversibility
 from stonefold_core.models import GateResult, ResolvedAction
 from stonefold_core.outbox import PendingAction
 
-# The gate classes re-validated at dispatch (CS-017 rule 2): their facts change
+# The gate classes re-validated at dispatch (§? rule 2): their facts change
 # with the world, not with the frozen staged payload. Everything else is
 # non-volatile BY DEFINITION and MUST NOT be re-run: valueLimit/contentCheck
 # (the payload is frozen), rate/quota/quantityCap/spendLimit (consumed at
 # decision time — re-running double-counts), requireApproval/dualAuthorization
 # (the grant IS the release; its freshness is bounded by the TTL).
-# ``requireMatch`` (v0.3 CS-032 rule 3) is volatile as a full re-query for now;
-# CS-035 (reservation lifecycle) replaces the dispatch-time re-run with a
+# ``requireMatch`` (v0.3 §? rule 3) is volatile as a full re-query for now;
+# §? (reservation lifecycle) replaces the dispatch-time re-run with a
 # reservation-liveness check once obligations are reserved at staging.
 VOLATILE_GATES: frozenset[str] = frozenset(
     {"allowlist", "denylist", "window", "precondition", "emissionControl",
      "requireMatch"}
 )
 
-# Settle reason for a row claimed after its TTL (CS-017 rule 1).
+# Settle reason for a row claimed after its TTL (§? rule 1).
 STALE_DECISION = "stale-decision"
 
 
 def stale_guard_reason(gate: str) -> str:
-    """Settle reason for a dispatch-time volatile-gate failure (CS-017 rule 2)."""
+    """Settle reason for a dispatch-time volatile-gate failure (§? rule 2)."""
     return f"stale-guard:{gate}"
 
 
@@ -54,7 +54,7 @@ DispatchRevalidator = Callable[[PendingAction, datetime], GateResult | None]
 
 @dataclass(frozen=True)
 class FreshnessConfig:
-    """Decision-TTL deployment configuration (CS-017 rule 1).
+    """Decision-TTL deployment configuration (§? rule 1).
 
     Both TTLs MUST be finite and positive; the irreversible TTL SHOULD be short
     (minutes–hours, not days) — an irreversible effect's decision goes stale
@@ -66,7 +66,7 @@ class FreshnessConfig:
 
     def __post_init__(self) -> None:
         if self.default_ttl <= timedelta(0) or self.irreversible_ttl <= timedelta(0):
-            raise ValueError("freshness TTLs must be finite and positive (CS-017)")
+            raise ValueError("freshness TTLs must be finite and positive")
 
     def ttl_for(self, resolved: ResolvedAction) -> timedelta:
         """The TTL class an action falls in: irreversible effects get the short

@@ -45,7 +45,7 @@ PAYEES: list[dict[str, Any]] = [
      "domain": "initech.example"},
 ]
 
-# --- open purchase orders (the OBLIGATIONS, v0.3 CS-032/CS-034) ---------------
+# --- open purchase orders (the OBLIGATIONS, v0.3 §?) ---------------
 # The system of record `requireMatch` matches payments against: an invoice is
 # payable only against an open, unconsumed PO line from the same vendor within
 # tolerance. One PO per legitimate inbox invoice; the fraudulent invoice has —

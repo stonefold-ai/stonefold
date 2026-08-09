@@ -1,4 +1,4 @@
-"""v0.3 CS-043 — per-item verdicts for item-bearing actions (spec §12).
+"""v0.3 §? — per-item verdicts for item-bearing actions (spec §12).
 
 The failure being closed: one action carries twenty worklist items, thirteen of
 which need a human. The gateway can allow the call or refuse it, so refusing it
@@ -144,7 +144,7 @@ def test_the_envelope_cannot_be_read_as_success() -> None:
     """A partial application does not report `allow`.
 
     The alternative — `allow`, with the refusals in a list an actor may not read
-    — is the mistake CS-029 exists to prevent, one level up.
+    — is the mistake §? exists to prevent, one level up.
     """
     result = enforce(_mark("W-1", "W-13"), ACTOR, RUN, **_world())
     assert result.decision is Decision.DENY
@@ -240,7 +240,7 @@ def test_a_single_item_is_not_fanned_out() -> None:
 
 
 def test_a_batch_is_still_atomic() -> None:
-    """CS-023 is unchanged: inside a batch an item-bearing action is one unit, so
+    """§? is unchanged: inside a batch an item-bearing action is one unit, so
     a refused item refuses the whole batch rather than partially applying."""
     world = _world()
     batch = enforce_batch(

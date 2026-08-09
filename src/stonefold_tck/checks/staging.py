@@ -32,7 +32,7 @@ def d1_staged_exactly_once(driver: ConformanceDriver) -> None:
     expect_decision(r, "allow", "small pay")
     expect_ticket(r, "allowed effect")
     expect(effects_of(driver, "pay") == 0,
-           "an effect left before the dispatch step (effects stage by default, CS-003)")
+           "an effect left before the dispatch step (effects stage by default)")
     driver.dispatch_once()
     expect(effects_of(driver, "pay") == 1, "the staged effect did not dispatch exactly once")
     driver.dispatch_once()  # a worker retry must not double-send

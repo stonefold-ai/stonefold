@@ -59,7 +59,7 @@ logger = logging.getLogger("stonefold.dispatch")
 
 
 def _result_refs_of(result: ConnectorResult) -> list[str]:
-    """The downstream id(s) of a settled effect (spec §11 ``resultRefs``, CS-009):
+    """The downstream id(s) of a settled effect (spec §11 ``resultRefs``):
     the connector's explicit ``result_refs``, else ``[receipt['id']]`` if present,
     else ``[]``. The handle(s) an external system uses to locate/compensate it; a
     list because one dispatch may fan out to several records."""
@@ -99,12 +99,12 @@ class DispatchWorker:
         self._inflight = inflight
         self._clock = clock
         self._revalidate = revalidate
-        # CS-018 scope no-race, opt-in like freshness: with a resolver the worker
+        # §? scope no-race, opt-in like freshness: with a resolver the worker
         # re-asserts the scope predicate at dispatch — inside the effect's own
         # transaction for a transactional connector, via a pre-dispatch target
         # re-resolve for a window connector. ``None`` = v0.2 behaviour.
         self._scopes = scopes
-        # v0.3 (CS-035): the obligation-registry adapters — the worker consumes
+        # v0.3: the obligation-registry adapters — the worker consumes
         # a row's reservation at successful settle and releases it on any
         # terminal non-success (the reconcile sweep below is the guarantee).
         self._obligations: dict[str, ObligationRegistry] = dict(obligations or {})
@@ -119,7 +119,7 @@ class DispatchWorker:
         return self._kill.matches(KillTarget.from_pending(row)) is not None
 
     def _stale_check(self, row: PendingAction) -> str | None:
-        # Decision freshness inside the claim (v0.2 CS-017), after the kill check:
+        # Decision freshness inside the claim (v0.2), after the kill check:
         # TTL first, then the volatile-gate re-run. The worker is I/O-layer code,
         # so a wall clock is the default; tests/gateways inject their own.
         now = self._clock() if self._clock is not None else datetime.now(timezone.utc)
@@ -132,14 +132,14 @@ class DispatchWorker:
         return None
 
     def sweep_expired_holds(self) -> int:
-        """Expire lapsed held rows (v0.3 CS-028) — run with the worker's loop.
+        """Expire lapsed held rows (v0.3) — run with the worker's loop.
 
         A held row expires at the earlier of (a) its staging TTL and (b) any
         unsatisfied contract's declared ``timeout``. Expiry settles
         ``CANCELLED``/``expired-hold:<gate>``, audited, with the original hold
         reason code preserved in the ``gates`` trace. ``onTimeout: allow``
         satisfies **that contract only** (credited as ``system:timeout``); the
-        row promotes iff every other contract is also satisfied (CS-027).
+        row promotes iff every other contract is also satisfied.
         Returns the number of rows acted on.
         """
         now = self._clock() if self._clock is not None else datetime.now(timezone.utc)
@@ -175,10 +175,10 @@ class DispatchWorker:
             audit=cancellation_record(row, reason),
         )
 
-    # --- CS-035: reservation release / consumption --------------------------
+    # --- reservation release / consumption --------------------------
     def release_terminal_claims(self) -> int:
         """Release the reservation of every terminally non-successful row
-        (CS-035: kill, stale, expired hold, rejection, dispatch failure) — run
+        (kill, stale, expired hold, rejection, dispatch failure) — run
         with the worker's loop, like the hold-expiry sweep.
 
         One mechanism covers every cancel path, including the ones the STORE
@@ -186,7 +186,7 @@ class DispatchWorker:
         transport-driven ``reject``. Correctness comes from idempotency
         (releasing an already-released or adapter-expired reservation is a
         ``NotHeld`` no-op — a restart just re-releases); the ``_released``
-        cache only keeps the sweep O(new terminals). Doubles as the CS-035
+        cache only keeps the sweep O(new terminals). Doubles as the §?
         restart reconciliation (reservations ↔ staged rows).
         """
         released = 0
@@ -218,8 +218,8 @@ class DispatchWorker:
             )
 
     def _consume_claim(self, row: PendingAction) -> dict[str, Any] | None:
-        """Consume the row's reservation with the successful settle (CS-035)
-        and return the CS-037 ``consumption`` audit field.
+        """Consume the row's reservation with the successful settle
+        and return the §? ``consumption`` audit field.
 
         The reference consumes immediately after connector confirmation for
         BOTH capabilities and records which one the registry declared:
@@ -253,8 +253,8 @@ class DispatchWorker:
 
     def run_once(self, kill_check: KillCheck | None = None) -> bool:
         """Process at most one staged row. Returns ``True`` if one was handled."""
-        self.sweep_expired_holds()  # CS-028: the worker's loop is the sweep
-        # CS-035: release claims of rows that went terminal since the last tick
+        self.sweep_expired_holds()  # the worker's loop is the sweep
+        # release claims of rows that went terminal since the last tick
         # (reject, kill-service cancels) — and, in the ``finally``, of rows THIS
         # tick cancelled inside the claim (kill / stale-decision / stale-guard),
         # so a drain that ends on a cancellation does not strand a reservation.
@@ -287,7 +287,7 @@ class DispatchWorker:
             self._maybe_compensate(claimed)
             return True
 
-        # CS-020: the pinned connector's artifact must still match its digest at
+        # the pinned connector's artifact must still match its digest at
         # dispatch. A mismatch is a fail-closed dependency failure — the effect
         # never leaves, and since it never landed nothing is compensated (the same
         # floor as scope-lost: "authorized state or not at all").
@@ -297,7 +297,7 @@ class DispatchWorker:
             self._settle_digest_failure(claimed)
             return True
 
-        # CS-018 scope no-race (B4/B5): with a resolver wired, re-assert the scope
+        # §? scope no-race (B4/B5): with a resolver wired, re-assert the scope
         # predicate at dispatch. The connector's declared capability picks the
         # form; either way the audit records which one ran.
         scope: ScopePredicate | None = None
@@ -370,7 +370,7 @@ class DispatchWorker:
             if call is not None and self._inflight is not None:
                 self._inflight.unregister(call.handle)
 
-        # CS-035: consumption executes with the settle — after the connector
+        # consumption executes with the settle — after the connector
         # confirmed, before the settle record is written, so the audit and the
         # spend can never disagree about what happened.
         consumption = self._consume_claim(claimed)
@@ -388,7 +388,7 @@ class DispatchWorker:
     def _settle_scope_failure(
         self, row: PendingAction, reason: str, scope_trace: tuple[str, ...]
     ) -> None:
-        """Settle a row whose scope could not be re-asserted at dispatch (CS-018).
+        """Settle a row whose scope could not be re-asserted at dispatch.
 
         Never stages a compensation: a scope failure means the effect did NOT
         land ("authorized state or not at all"), so there is nothing to undo.
@@ -404,8 +404,7 @@ class DispatchWorker:
         )
 
     def _settle_digest_failure(self, row: PendingAction) -> None:
-        """Settle a row whose connector failed digest verification at dispatch
-        (CS-020). Never stages a compensation: the connector was never called, so
+        """Settle a row whose connector failed digest verification at dispatch. Never stages a compensation: the connector was never called, so
         the effect did not land and there is nothing to undo."""
         self._store.settle(
             row.id,
@@ -465,7 +464,7 @@ class DispatchWorker:
         scope_applied: tuple[str, ...] = (),
         consumption: dict[str, Any] | None = None,
     ) -> AuditRecord:
-        # CS-035/CS-037: a terminally non-successful settle of a row holding a
+        # a terminally non-successful settle of a row holding a
         # reservation records the lifecycle outcome — the release itself is
         # guaranteed by the reconcile sweep (idempotent).
         if consumption is None and row.obligation is not None and outcome in (
@@ -489,7 +488,7 @@ class DispatchWorker:
             result=result,
             outcome=outcome,
             result_refs=result_refs,
-            # I7 (CS-027): the settle record carries who released which contract.
+            # I7: the settle record carries who released which contract.
             approval=releases_audit(row, "released"),
             consumption=consumption,
         )

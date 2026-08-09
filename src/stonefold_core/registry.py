@@ -73,14 +73,14 @@ class PropertyDef(BaseModel):
         return node
 
 
-#: CS-041: the reserved name of the standard closure check. Declared here rather
+#: the reserved name of the standard closure check. Declared here rather
 #: than with its implementation because the linter (core) must know it and core
 #: never imports the gate layer.
 DISPOSITION_IS_DECLARED = "dispositionIsDeclared"
 
 
 class ClosureDef(BaseModel):
-    """What closing this action means (docs/06 §5c, Stele §7.6 CS-041).
+    """What closing this action means (docs/06 §5c, Stele §7.6 §?).
 
     ``dispositionField`` names the ``data`` field carrying the disposition — the
     declared vocabulary is that field's ``values`` — and ``claimsCompletion``
@@ -97,7 +97,7 @@ class ClosureDef(BaseModel):
 
 
 class SourceDecl(BaseModel):
-    """Something a control reads, declared by name (docs/06 §5e, CS-044).
+    """Something a control reads, declared by name (docs/06 §5e).
 
     A rule set that ages (a critical-analyte list, a sanctions list, a tariff
     table), a record in another system, or a fact the deployment maintains. The
@@ -119,7 +119,7 @@ class SourceDecl(BaseModel):
 
 
 class ItemsDef(BaseModel):
-    """An action that carries a list of items in one field (CS-043, docs/06 §5d).
+    """An action that carries a list of items in one field (docs/06 §5d).
 
     ``markManyReviewed(itemIds)``, ``payBatch(payments)`` — one action, N targets.
     Without this declaration the gateway can only allow or refuse the whole call,
@@ -178,15 +178,15 @@ class ActionDef(BaseModel):
     # error), and a populated map is the shape. Conflating the first two would
     # leave "this action takes no arguments" inexpressible.
     data: dict[str, PropertyDef] | None = None
-    # CS-041: what closing this action means. Inert on its own — the standard
+    # what closing this action means. Inert on its own — the standard
     # ``dispositionIsDeclared`` check is what reads it.
     closure: ClosureDef | None = None
-    # CS-043: the action carries N items in one field. Absent ⇒ the call is one
+    # the action carries N items in one field. Absent ⇒ the call is one
     # unit, as before.
     items: ItemsDef | None = None
 
     def fans_out(self) -> bool:
-        """Whether this action is decided item by item (CS-043).
+        """Whether this action is decided item by item.
 
         Both halves are required: a declaration that the items exist, and the
         assertion that applying a subset of them is meaningful.
@@ -242,7 +242,7 @@ class ResourceDef(BaseModel):
 
 
 class PreconditionCheckDecl(BaseModel):
-    """One declared precondition check (docs/06 §5, v0.3 CS-026/CS-029).
+    """One declared precondition check (docs/06 §5, v0.3 §?).
 
     The bare-name form declares a two-valued check whose codes default
     ``terminal``; the object form additionally declares hold capability and the
@@ -274,32 +274,32 @@ class RegistryFile(BaseModel):
 
     resources: dict[str, ResourceDef] = Field(default_factory=dict)
     connectors: tuple[str, ...] = ()
-    # CS-020: optional connector→digest pins. The loader accepts either the bare
+    # optional connector→digest pins. The loader accepts either the bare
     # name list above (no pins) or a map form (``{name: {digest: "sha256:…"}}``,
-    # like the registry/v1.x authoring dialect); the map form's digests are split
+    # like the registry/v0.x authoring dialect); the map form's digests are split
     # out here so ``connectors`` stays a plain name tuple for every other consumer.
     connector_digests: dict[str, str] = Field(default_factory=dict)
     scopePredicates: tuple[str, ...] = ()
     contentHooks: tuple[str, ...] = ()
     preconditionChecks: tuple[str, ...] = ()
-    # v0.3 (CS-026/CS-029): the full declarations behind the name list — the
+    # v0.3: the full declarations behind the name list — the
     # loader accepts each ``preconditionChecks`` item as a bare name or an
     # object (``{name, holdCapable, reasonCodes}``) and splits them here, the
-    # CS-020 ``connector_digests`` pattern. Every declared check has an entry
+    # §? ``connector_digests`` pattern. Every declared check has an entry
     # (bare names get the two-valued default).
     precondition_decls: dict[str, PreconditionCheckDecl] = Field(default_factory=dict)
     sets: dict[str, tuple[str, ...]] = Field(default_factory=dict)
-    # CS-044: the sources a gate may declare that it reads (docs/06 §5e).
+    # the sources a gate may declare that it reads (docs/06 §5e).
     sources: dict[str, SourceDecl] = Field(default_factory=dict)
     sinks: tuple[str, ...] = ()
-    # v0.3 (CS-034): the systems of record ``requireMatch`` matches against
+    # v0.3: the systems of record ``requireMatch`` matches against
     # (docs/06 §5b). A declared ``digest`` pins the adapter connector's artifact
-    # — merged into ``connector_digests`` below so CS-020's load/dispatch
+    # — merged into ``connector_digests`` below so §?'s load/dispatch
     # verification covers obligation adapters with no extra machinery.
     obligationRegistries: dict[str, ObligationRegistryDecl] = Field(
         default_factory=dict
     )
-    # CS-024: the DECLARED ORDER of classification labels (lowest first) that
+    # the DECLARED ORDER of classification labels (lowest first) that
     # ``disclosure.maxClassification`` compares by. The default is the built-in
     # ``resultSensitivity`` order (spec §7.12); a domain substituting its own
     # labels MUST declare them as an ordered value set (docs/06 §4 — order is
@@ -315,7 +315,7 @@ class RegistryFile(BaseModel):
     @classmethod
     def _split_connector_digests(cls, data: Any) -> Any:
         """Normalise a map-form ``connectors`` block into a name tuple plus a
-        ``connector_digests`` map (CS-020). A list stays a list (no pins). An
+        ``connector_digests`` map. A list stays a list (no pins). An
         explicit ``connector_digests`` key is honoured and merged."""
         if not isinstance(data, dict):
             return data
@@ -333,7 +333,7 @@ class RegistryFile(BaseModel):
     @classmethod
     def _merge_obligation_digests(cls, data: Any) -> Any:
         """Merge each obligation registry's declared adapter ``digest`` into the
-        connector digest map (CS-034: "CS-020 pinning applies"). An explicit pin
+        connector digest map ("§? pinning applies"). An explicit pin
         on the same connector wins; order relative to the connectors-map split
         is irrelevant because both merge over whatever is already present."""
         if not isinstance(data, dict):
@@ -364,7 +364,7 @@ class RegistryFile(BaseModel):
     @classmethod
     def _split_precondition_decls(cls, data: Any) -> Any:
         """Normalise ``preconditionChecks`` items (bare name | object, v0.3
-        CS-029) into the name tuple plus a ``precondition_decls`` map. Every
+        §?) into the name tuple plus a ``precondition_decls`` map. Every
         check gets a declaration; bare names get the two-valued default."""
         if not isinstance(data, dict):
             return data
@@ -434,7 +434,7 @@ class InMemoryRegistry:
 
     @property
     def connector_digests(self) -> Mapping[str, str]:
-        """The declared connector→digest pins (CS-020); empty when none are pinned."""
+        """The declared connector→digest pins; empty when none are pinned."""
         return self._data.connector_digests
 
     def connector_digest(self, name: str) -> str | None:
@@ -451,19 +451,19 @@ class InMemoryRegistry:
         return name in self._data.preconditionChecks
 
     def precondition_decl(self, name: str) -> PreconditionCheckDecl | None:
-        """The full declaration behind a check name (v0.3 CS-029); ``None`` for
+        """The full declaration behind a check name (v0.3); ``None`` for
         an undeclared name."""
         return self._data.precondition_decls.get(name)
 
     def check_hold_capable(self, name: str) -> bool:
-        """Whether the check declared ``holdCapable`` (spec §7.6 rule 3, CS-026).
+        """Whether the check declared ``holdCapable`` (spec §7.6 rule 3).
         A hold from a check that didn't is an implementation error — the gate
         resolves it fail-closed."""
         decl = self._data.precondition_decls.get(name)
         return decl is not None and decl.holdCapable
 
     def reason_class(self, check: str, code: str) -> RetryClass:
-        """The declared retry class of one check code (CS-029); undeclared
+        """The declared retry class of one check code; undeclared
         codes default ``terminal`` — the safe direction is to stop retrying."""
         decl = self._data.precondition_decls.get(check)
         if decl is None:
@@ -474,7 +474,7 @@ class InMemoryRegistry:
         return name in self._data.obligationRegistries
 
     def obligation_registry(self, name: str) -> ObligationRegistryDecl | None:
-        """The declaration behind an obligation registry name (v0.3 CS-034);
+        """The declaration behind an obligation registry name (v0.3);
         ``None`` for an undeclared name — the ``requireMatch`` gate treats that
         as fail-closed and §13 rule 14 rejects it at load."""
         return self._data.obligationRegistries.get(name)
@@ -493,7 +493,7 @@ class InMemoryRegistry:
         return name in self._data.sinks
 
     def classification_rank(self, label: str) -> int | None:
-        """The label's position in the declared classification order (CS-024),
+        """The label's position in the declared classification order,
         lowest first — or ``None`` for a label not in the order, which the
         ``disclosure`` gate treats as fail-closed (spec §8 runtime resolution)."""
         try:

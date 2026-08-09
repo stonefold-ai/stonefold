@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""DIGEST profile — connector digest pinning (v0.2 CS-020; registry §5, spec §10).
+"""DIGEST profile — connector digest pinning (v0.2; registry §5, spec §10).
 
 The TCK authors the pin itself: ``connector_digest`` reports the digest of the
 implementation actually loaded (computed the way the gateway verifies it), the

@@ -46,7 +46,7 @@ class RequestEnv:
 class ApprovalSpec:
     """What a HOLD needs to be released by a human (spec §7.8/§7.9). Derived from
     the holding gate's config and carried to the outbox so the staged row knows
-    how many distinct approvals it requires. v0.3 (CS-027) generalises this into
+    how many distinct approvals it requires. v0.3 generalises this into
     ``ReleaseContract`` — one per holding gate; ``ApprovalSpec`` remains for
     pre-v0.3 rows and callers."""
 
@@ -61,11 +61,10 @@ class ApprovalSpec:
 @dataclass(frozen=True)
 class ReleaseContract:
     """What ONE holding gate demands before the staged row may promote
-    (spec §12, CS-027). A held row carries one contract per holding gate and
+    (spec §12). A held row carries one contract per holding gate and
     promotes only when every contract is satisfied — satisfying one never
     satisfies another. ``satisfied_by`` records the identities credited so far
-    (a human approver/resolver, or ``system:timeout`` for ``onTimeout: allow``,
-    CS-028)."""
+    (a human approver/resolver, or ``system:timeout`` for ``onTimeout: allow``)."""
 
     gate: str  # the holding gate key, e.g. "requireApproval", "precondition"
     cause: str = ""  # audit cause, e.g. "precondition:matchesOpenPurchaseOrder"
@@ -75,7 +74,7 @@ class ReleaseContract:
     approvers: tuple[str, ...] = ()  # approver/resolver role names (identity seam)
     timeout_s: float | None = None
     on_timeout: str = "deny"  # "deny" (default) | "allow"
-    reason_code: str = ""  # the hold's machine-readable code (CS-026 rule 2)
+    reason_code: str = ""  # the hold's machine-readable code (§? rule 2)
     evidence: dict[str, Any] | None = None  # optional check-supplied context
     satisfied_by: tuple[str, ...] = ()
 
@@ -101,7 +100,7 @@ class ReleaseContract:
 
 
 def contract_from_approval(spec: ApprovalSpec) -> ReleaseContract:
-    """Adapt a pre-v0.3 ``ApprovalSpec`` row to the contract model (CS-027
+    """Adapt a pre-v0.3 ``ApprovalSpec`` row to the contract model (§?
     compatibility: legacy held rows keep their exact release semantics)."""
     gate = "dualAuthorization" if spec.dual_auth else "requireApproval"
     return ReleaseContract(
@@ -120,7 +119,7 @@ def contract_from_approval(spec: ApprovalSpec) -> ReleaseContract:
 class GateOutcome:
     """The gate stage's verdict: PASS ⇒ ALLOW, FAIL ⇒ DENY, HOLD ⇒ HOLD
     (spec §12 step 4). ``results`` is the per-gate trace for the audit record;
-    ``releases`` carries the release contract of EVERY holding gate (CS-027);
+    ``releases`` carries the release contract of EVERY holding gate;
     ``approval`` mirrors the first approval-shaped contract for pre-v0.3
     consumers."""
 

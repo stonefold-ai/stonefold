@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 """Obligation registries — the systems of record ``requireMatch`` matches
-against (spec §7.16 / CS-032, docs/06 §5b / CS-034).
+against (spec §7.16 / §?, docs/06 §5b).
 
 This module is pure (no I/O — trust kernel): it declares the value types that
 cross the gate↔adapter boundary, the four-operation adapter ``Protocol`` the
@@ -11,7 +11,7 @@ that consumes all of this lives in ``stonefold_gates``.
 
 Stonefold never stores, owns, or edits obligations — the declaration names the
 source and types the fields the policy compares; the gateway matches against the
-adapter's response and (CS-035, Phase 6) consumes from it.
+adapter's response and (Phase 6) consumes from it.
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 NUMERIC_TYPES = frozenset({"int", "integer", "number", "float", "decimal", "money"})
 
 # Sentinel for "this path does not exist on the record" — distinct from an
-# explicit ``None`` value only in that neither ever matches (CS-032 rule 4:
+# explicit ``None`` value only in that neither ever matches (§? rule 4:
 # absent OR null fails closed / excludes the record).
 MISSING: Any = object()
 
@@ -89,7 +89,7 @@ class Obligation:
 class EqConstraint:
     """One conjunct of the typed selector (§7.16 semantics 1): the record's
     ``field`` (dotted, record-relative) must equal ``value`` — the intent-side
-    operand the gateway resolved at decision time. A pointer (CS-036) is just
+    operand the gateway resolved at decision time. A pointer is just
     an ``EqConstraint`` on the record's id field: it narrows the query and the
     full ``match`` conjunction still evaluates against the re-read record."""
 
@@ -104,7 +104,7 @@ Selector = tuple[EqConstraint, ...]
 
 
 class ReserveOutcome(str, Enum):
-    """Result of ``reserve(ref, intent_id)`` (CS-034; idempotent per pair)."""
+    """Result of ``reserve(ref, intent_id)`` (idempotent per pair)."""
 
     RESERVED = "reserved"
     ALREADY_RESERVED = "already_reserved"  # held by a DIFFERENT intent
@@ -123,7 +123,7 @@ class ReleaseOutcome(str, Enum):
 
 @dataclass(frozen=True)
 class ConsumeResult:
-    """``consume``'s receipt (CS-035/CS-037): a retry by the SAME intent is
+    """``consume``'s receipt: a retry by the SAME intent is
     idempotent and returns the original receipt id."""
 
     outcome: ConsumeOutcome
@@ -134,7 +134,7 @@ class ObligationRegistry(Protocol):
     """The four-operation adapter contract behind a declared obligation
     registry (docs/06 §5b). All four are idempotent per (ref, intent id).
     Phase 5 (decision-time matching) calls ``query`` only; the reservation
-    lifecycle (CS-035) wires the other three at staging/dispatch/settle."""
+    lifecycle wires the other three at staging/dispatch/settle."""
 
     def query(self, selector: Selector) -> Sequence[Obligation]: ...
 
@@ -146,7 +146,7 @@ class ObligationRegistry(Protocol):
 
 
 class Capability(str, Enum):
-    """How ``consume`` composes with the effect's settlement (CS-034/CS-035):
+    """How ``consume`` composes with the effect's settlement:
     ``transactional`` — inside the same transaction as the effect's commit and
     the audit write; ``window`` — immediately after connector confirmation,
     with the residual window surfaced in the audit record."""
@@ -156,8 +156,7 @@ class Capability(str, Enum):
 
 
 class ObligationClaim(BaseModel):
-    """The reservation a staged row holds against its matched obligation
-    (CS-035): which registry and ref were matched at decision time, the
+    """The reservation a staged row holds against its matched obligation: which registry and ref were matched at decision time, the
     ``consume`` path to mark spent at settlement, the registry's declared
     capability, and the reservation's idempotency key — ``reserve``/``consume``/
     ``release`` are all keyed by (``ref``, ``intent_id``), so retries and
@@ -173,7 +172,7 @@ class ObligationClaim(BaseModel):
     intent_id: str
 
     def audit_dict(self, state: str, *, receipt: str | None = None) -> dict[str, Any]:
-        """The spec §11 ``consumption`` rendering (CS-037): the lifecycle state
+        """The spec §11 ``consumption`` rendering: the lifecycle state
         (``reserved`` | ``consumed`` | ``released`` | a refusal note), the
         registry+ref lineage, and — for ``window`` registries — the declared
         capability, surfacing that consumption ran post-confirm rather than in
@@ -193,7 +192,7 @@ class ObligationClaim(BaseModel):
 
 def claim_evidence(gates: Sequence["GateResult"]) -> Mapping[str, Any] | None:
     """The ``requireMatch`` PASS evidence when the decision matched a
-    CONSUMABLE obligation — the plan a staging commit reserves from (CS-035).
+    CONSUMABLE obligation — the plan a staging commit reserves from.
     ``None`` when no match ran, the gate did not pass, or ``consume: none``
     (pure verification reserves nothing)."""
     from stonefold_core.enums import Outcome
@@ -227,7 +226,7 @@ class ObligationProperty(BaseModel):
 class ObligationRegistryDecl(BaseModel):
     """A declared obligation registry (docs/06 §5b). ``schema`` is the match
     surface, not a domain model: only the fields policies compare and consume.
-    ``digest`` pins the adapter connector's artifact (CS-020 applies — the
+    ``digest`` pins the adapter connector's artifact (§? applies — the
     registry loader merges it into the connector digest map)."""
 
     model_config = ConfigDict(frozen=True, extra="forbid", populate_by_name=True)

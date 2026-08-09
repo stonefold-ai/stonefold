@@ -166,7 +166,7 @@ Each gate is a small deterministic function `GateResult eval(ResolvedAction, Act
 | `valueLimit` | none (stateless) | read `data.field`, compare | in-memory |
 | `spendLimit` | Redis accumulator per session | add estimated cost, compare | ~1 op |
 | `allowlist`/`denylist` | named sets cached in memory (refreshed) | set membership on `data.field` | in-memory |
-| `precondition` | registry (transition from-states) + registered check fns | call check(s) — three-valued since v0.3 CS-026 (pass/fail/hold; bool stays valid; crash ⇒ fail, code-less hold ⇒ fail); transition: read current state, test ∈ from | 0–1 read |
+| `precondition` | registry (transition from-states) + registered check fns | call check(s) — three-valued since v0.3 §? (pass/fail/hold; bool stays valid; crash ⇒ fail, code-less hold ⇒ fail); transition: read current state, test ∈ from | 0–1 read |
 | `contentCheck` | external hook (DLP svc) | sync call, deterministic verdict pass/block | network call |
 | `requireApproval` | DB (approval request) | returns HOLD; resolved out-of-band (§7) | 1 DB write |
 | `dualAuthorization` | DB (2 approvals, distinct ids) | returns HOLD until 2 distinct approve | DB |
@@ -304,11 +304,11 @@ This gives at-least-once dispatch with idempotency (effectively once), a cancell
 
 > **Design note.** The cost is that effects are now **asynchronous**: the agent gets "accepted/pending," not "sent," on the first turn. For most enterprise actions that's correct (and matches how humans work). For the rare effect that must be synchronous and is safely cancellable, allow an inline fast-path that still writes the audit — but default to staging. The specification should make "effects are staged by default, inline is an opt-in for cancellable effects" explicit.
 
-### 9.1 Decision freshness (v0.2 CS-017) — what, why, how
+### 9.1 Decision freshness (v0.2) — what, why, how
 
-**What.** Staging opens a time gap between *decision* and *dispatch*, and a fact that was true at decision time can stop being true inside it (a payee newly sanctioned, an approval granted days ago). CS-017 closes that gap two ways: every staged row carries an **`expires_at`** (a decision TTL, set from deployment configuration — never policy syntax), and the dispatch claim **re-validates the volatile gates** — `allowlist`/`denylist`, `window`, `precondition`, `emissionControl` — against dispatch-time state. A lapsed row settles `CANCELLED`/`stale-decision`; a dispatch-time gate failure settles `CANCELLED`/`stale-guard:<gate>`. Both are audited in the same transaction as the cancel, and the scan continues so a stale row never blocks the queue. Check order inside the claim: **kill → TTL → volatile gates → connector**. Non-volatile gates are *not* re-run, by definition: counters (`rate`/`quota`/`quantityCap`/`spendLimit`) were consumed at decision time, `valueLimit`/`contentCheck` judge the frozen payload, and an approval grant *is* the release — its freshness is bounded by the TTL. A late approval promotes the row, but the TTL still cancels it at claim; the intent must be re-submitted.
+**What.** Staging opens a time gap between *decision* and *dispatch*, and a fact that was true at decision time can stop being true inside it (a payee newly sanctioned, an approval granted days ago). §? closes that gap two ways: every staged row carries an **`expires_at`** (a decision TTL, set from deployment configuration — never policy syntax), and the dispatch claim **re-validates the volatile gates** — `allowlist`/`denylist`, `window`, `precondition`, `emissionControl` — against dispatch-time state. A lapsed row settles `CANCELLED`/`stale-decision`; a dispatch-time gate failure settles `CANCELLED`/`stale-guard:<gate>`. Both are audited in the same transaction as the cancel, and the scan continues so a stale row never blocks the queue. Check order inside the claim: **kill → TTL → volatile gates → connector**. Non-volatile gates are *not* re-run, by definition: counters (`rate`/`quota`/`quantityCap`/`spendLimit`) were consumed at decision time, `valueLimit`/`contentCheck` judge the frozen payload, and an approval grant *is* the release — its freshness is bounded by the TTL. A late approval promotes the row, but the TTL still cancels it at claim; the intent must be re-submitted.
 
-**Why.** It is the question a payments/healthcare buyer opens with: "what if the world changes after you decide but before you act?" v0.2 answered it only with the kill switch; CS-017 makes the answer structural — no staged decision can outlive its TTL, and set-membership/time/world-state guards are as fresh as the dispatch itself.
+**Why.** It is the question a payments/healthcare buyer opens with: "what if the world changes after you decide but before you act?" v0.2 answered it only with the kill switch; §? makes the answer structural — no staged decision can outlive its TTL, and set-membership/time/world-state guards are as fresh as the dispatch itself.
 
 **How.** Freshness is opt-in and off by default (v0.2 behaviour is unchanged when it's not configured). Wiring it takes three pieces:
 
@@ -337,16 +337,16 @@ worker = DispatchWorker(
 )
 ```
 
-The agent sees a cancelled ticket resolve to a recoverable refusal (`stale-decision` / `stale-guard:<gate>`); nothing is ever partially dispatched. Spec text and acceptance scenarios: `docs/changeset-v0.1-to-v0.2.md` (CS-017), scenarios D5/D6, tests in `tests/test_v04_freshness.py`.
+The agent sees a cancelled ticket resolve to a recoverable refusal (`stale-decision` / `stale-guard:<gate>`); nothing is ever partially dispatched. Spec text and acceptance scenarios: the Stele spec §12 and `tests/acceptance-scenarios.md`.
 
-### 9.2 Scope no-race (v0.2 CS-018) — what, why, how
+### 9.2 Scope no-race (v0.2) — what, why, how
 
-**What.** Scope-on-effect (§5) is a *decision-time* pre-check, and staging widens the gap to the effect's commit: the target can be reassigned to another tenant in between, and the effect lands on state the actor was never authorized for — a classic TOCTOU race. CS-018 closes it where it can be closed and prices it where it can't, keyed on a capability **each connector declares once** (`ScopeCapability`, connector metadata in gateway code — like the scope-predicate bindings, never policy syntax):
+**What.** Scope-on-effect (§5) is a *decision-time* pre-check, and staging widens the gap to the effect's commit: the target can be reassigned to another tenant in between, and the effect lands on state the actor was never authorized for — a classic TOCTOU race. §? closes it where it can be closed and prices it where it can't, keyed on a capability **each connector declares once** (`ScopeCapability`, connector metadata in gateway code — like the scope-predicate bindings, never policy syntax):
 
 - **`transactional`** (SQL-class): the dispatch worker calls `dispatch_scoped(…)`, and the connector ANDs the predicate's constraint into the effect's own write (`UPDATE … WHERE id = %(target)s AND tenant_id = %(scope_tenant_id)s`). Zero rows affected ⇒ the transaction rolls back and the row settles `FAILED`/`scope-lost` — the write commits against authorized state **or not at all**, the same shape as the kill no-race (§8.4). No compensation is staged: nothing landed, so there is nothing to undo.
 - **`window`** (HTTP, email, device): the predicate cannot ride into the upstream's transaction. The worker re-resolves the target under scope (`fetch_target`) immediately before the call — shrinking the race to connector latency; a vanished target settles `FAILED`/`scope-lost` with nothing sent — and the connector's *declared* residual window is written into the audit's `scopeApplied` (`reassertion:window:<declared>`), so the residual risk is priced, not hidden. An undeclared connector is treated as `window:undeclared` — fail-safe, and honestly labelled in the audit.
 
-**Why.** Together with CS-017 this closes the second half of the decide→act gap a payments/healthcare buyer asks about: freshness covers *facts that move* (sanctions lists, time, world state); scope no-race covers *authorization that moves* (the target itself changing hands). v0.2 documented the window and offered only the kill switch; v0.2 makes the guarantee structural for transactional connectors and auditable for the rest.
+**Why.** Together with §? this closes the second half of the decide→act gap a payments/healthcare buyer asks about: freshness covers *facts that move* (sanctions lists, time, world state); scope no-race covers *authorization that moves* (the target itself changing hands). v0.2 documented the window and offered only the kill switch; v0.2 makes the guarantee structural for transactional connectors and auditable for the rest.
 
 **How.** Opt-in like freshness: give the dispatch worker the same scope resolver the pipeline uses, and nothing else changes.
 
@@ -363,11 +363,11 @@ sql = SqlConnector(conn, effect_sql={
 
 worker = DispatchWorker(
     outbox, connectors, registry=registry,
-    scopes=make_scope_resolver(policy),   # CS-018: re-assert scope at dispatch
+    scopes=make_scope_resolver(policy),   # re-assert scope at dispatch
 )
 ```
 
-Shipped declarations: `SqlConnector` and `InMemoryConnector` are `transactional`; `HttpConnector` (`http round-trip`) and `EmailConnector` (`smtp accept`) declare their windows. A custom transactional connector implements the `TransactionalDispatch` protocol and raises `ScopeLostError` when the re-asserted predicate selects nothing; one that declares `transactional` without implementing it fails closed (`scope-unavailable`). Spec text and acceptance scenarios: `docs/changeset-v0.1-to-v0.2.md` (CS-018), scenarios B4/B5, tests in `tests/test_v04_scope_norace.py` + the Postgres B4 test in `tests/test_m4_pg_integration.py`.
+Shipped declarations: `SqlConnector` and `InMemoryConnector` are `transactional`; `HttpConnector` (`http round-trip`) and `EmailConnector` (`smtp accept`) declare their windows. A custom transactional connector implements the `TransactionalDispatch` protocol and raises `ScopeLostError` when the re-asserted predicate selects nothing; one that declares `transactional` without implementing it fails closed (`scope-unavailable`). Spec text and acceptance scenarios: the Stele spec §12 and `tests/acceptance-scenarios.md`.
 
 Both §9.1 and §9.2 are wired live in everything this repo ships: the scripted demo (`stonefold_demo`), the Accounts-Payable demo (`stonefold_ap_demo`), and the TCK reference adapter — where the TCK's `freshness` profile certifies the behaviour black-box (docs/12 §4).
 

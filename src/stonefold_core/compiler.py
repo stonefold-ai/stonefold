@@ -117,7 +117,7 @@ class CompiledPolicy:
         NOTE on ``standing`` (spec §7.15): standing grants are conditional allows
         evaluated against context (M2). They are NOT applied here, so an action
         in both ``deny`` and ``standing.enables`` stays denied — deny always
-        wins (spec §6.2). spec v0.2 (CS-010) made this explicit: a standing-only
+        wins (spec §6.2). spec v0.2 made this explicit: a standing-only
         action is left out of both ``allow`` and ``deny`` (default-deny covers
         the off state), and the linter rejects the deny∩standing combination
         as unsatisfiable (§13 rule 11).
@@ -158,7 +158,7 @@ class CompiledPolicy:
         return merged
 
     def feedback_for(self, a: ResolvedAction) -> FeedbackLevel:
-        """The agent-feedback visibility level for ``a`` (spec §11, CS-030): the
+        """The agent-feedback visibility level for ``a`` (spec §11): the
         most-specific gate set's ``feedback:`` key, else the ``code+fields``
         default."""
         from stonefold_core.feedback import DEFAULT_FEEDBACK, parse_feedback

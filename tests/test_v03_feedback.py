@@ -1,4 +1,4 @@
-"""v0.3 agent feedback visibility — CS-030 (spec §11).
+"""v0.3 agent feedback visibility — §? (spec §11).
 
 What the agent receives on a deny/hold is a declared choice: ``code`` |
 ``code+fields`` (the new default) | ``code+evidence``. Redaction happens at the

@@ -22,7 +22,7 @@ dispatch-time re-validation:
   else pass
 * precondition ``tck.codelessHold`` — a CODE-LESS hold iff the target's
   ``badhold`` field is truthy; else pass (the gateway must resolve that hold
-  FAIL — CS-026 rule 2)
+  FAIL — §? rule 2)
 * obligation registry ``tck.orders`` — a mock adapter (docs/12 §3): records
   seeded via ``seed_obligations``; ``reserve``/``consume``/``release``
   idempotent per (ref, intent id); reserving/consuming/releasing moves the
@@ -34,7 +34,7 @@ dispatch-time re-validation:
 from __future__ import annotations
 
 TCK_REGISTRY = """\
-apiVersion: registry/v1.0
+apiVersion: registry/v0.1
 domain: tck
 
 connectors:
@@ -45,7 +45,7 @@ connectors:
 scopePredicates: [ tckOwnedBy, tckTenantOf ]
 preconditionChecks:
   - tck.flagSet
-  # v0.3 (CS-026/CS-029): hold-capable checks declare their codes + classes.
+  # v0.3: hold-capable checks declare their codes + classes.
   - name: tck.holdOnMarker
     holdCapable: true
     reasonCodes:
@@ -54,9 +54,9 @@ preconditionChecks:
     holdCapable: true
     reasonCodes:
       tck-never: terminal
-  # v0.3 (CS-041): the standard closure check. Named like any other, but the
+  # v0.3: the standard closure check. Named like any other, but the
   # gateway supplies it and §7.6 defines what it does.
-  # v0.3 (CS-043): refuses exactly the items in BLOCKED_ITEMS, so a mixed call
+  # v0.3: refuses exactly the items in BLOCKED_ITEMS, so a mixed call
   # has something to partition.
   - name: tck.itemAllowed
     holdCapable: false
@@ -67,7 +67,7 @@ preconditionChecks:
     reasonCodes:
       DISPOSITION_REQUIRED:    retryable
       CLOSED_WITHOUT_THE_WORK: escalate
-# v0.3 (CS-044): sources a gate may declare it reads. The driver controls their
+# v0.3: sources a gate may declare it reads. The driver controls their
 # reported age and reachability (set_source_age / set_source_outage).
 sources:
   critical-analyte-list:
@@ -79,7 +79,7 @@ sources:
 hooks:              [ tck.rejectMarker ]
 sinks:              [ tckSink ]
 
-obligationRegistries:               # v0.3 (CS-034): the requireMatch source
+obligationRegistries:               # v0.3: the requireMatch source
   tck.orders:
     connector: tck-orders
     capability: transactional
@@ -146,7 +146,7 @@ entities:
         kind: effect
         connector: tck-effects
 
-  # v0.3 (CS-041): a queue item whose closing action declares what closing it
+  # v0.3: a queue item whose closing action declares what closing it
   # means. `resolved` claims the work was done; the other three do not, so an
   # actor always has an honest way to close an item it could not handle.
   Task:
@@ -164,7 +164,7 @@ entities:
           dispositionField: disposition
           claimsCompletion: [resolved]
 
-  # v0.3 (CS-043): one action, N items, each independently governable. The
+  # v0.3: one action, N items, each independently governable. The
   # `tck.flagSet` check reads the single item the fan-out hands it.
   Queue:
     dataSource: tck-data
@@ -181,7 +181,7 @@ entities:
           independent: true
           maxItems: 100
 
-  # v0.3 (CS-044): the action whose gate declares what it reads. `flag` is read
+  # v0.3: the action whose gate declares what it reads. `flag` is read
   # by tck.flagSet, so P1 can show the gate's own check running once the source is
   # trustworthy.
   Result:
@@ -319,7 +319,7 @@ gates:
     valueLimit: { field: data.amount, max: 100000, when: "resource.no_such_field == 1" }
 """
 
-# C10 (v0.2 CS-024): disclosure.maxClassification compares by the DECLARED
+# C10 (v0.2): disclosure.maxClassification compares by the DECLARED
 # classification order; the ceiling here resolves from the session-supplied
 # actor claim (the §7.12 ``actor.clearance`` form).
 POLICY_CLASSIFICATION = """\
@@ -382,12 +382,12 @@ allow:
   - observe: '*'
 """
 
-# A9 (§13 rule 18, CS-038): a check declared hold-capable with NO reasonCodes
+# A9 (§13 rule 18): a check declared hold-capable with NO reasonCodes
 # is a REGISTRY load error — every hold it returned would be code-less and
-# resolve fail (CS-026 rule 2), so the declaration itself is refused. The
+# resolve fail (§? rule 2), so the declaration itself is refused. The
 # minimal policy alongside is valid, isolating the refusal to the registry.
 REGISTRY_INVALID_HOLD_NO_CODES = """\
-apiVersion: registry/v1.0
+apiVersion: registry/v0.1
 domain: tck
 
 connectors:
@@ -413,7 +413,7 @@ allow:
 """
 
 # --- v0.3 variants ---------------------------------------------------------
-# J1–J5 (CS-026/027/028): a hold-capable check gated with a resolver, composed
+# J1–J5: a hold-capable check gated with a resolver, composed
 # with an approval tier above $1000 so J3 can prove BOTH contracts bind.
 POLICY_HOLD = """\
 apiVersion: stele/v0.1
@@ -432,7 +432,7 @@ gates:
       approvers: role:tck-approver
 """
 
-# J7 (CS-027): the same hold-capable check gated with NO resolvers. The TCK
+# J7: the same hold-capable check gated with NO resolvers. The TCK
 # runs with NO deployment default resolver role (REQUIRED config, docs/12 §2),
 # so a hold from this gate has no resolvable release contract and MUST be
 # refused fail-closed (``hold-unresolvable``) — never staged. Loading this
@@ -450,7 +450,7 @@ gates:
       checks: [tck.holdOnMarker]
 """
 
-# L1–L5 / M1–M4 / K2–K3 (CS-032–CS-036): the payment must correspond to
+# L1–L5 / M1–M4 / K2–K3: the payment must correspond to
 # exactly one open order line in the mock registry, within 10% tolerance;
 # the line is reserved at staging and consumed at settlement.
 POLICY_MATCH = """\
@@ -476,7 +476,7 @@ gates:
 """
 
 
-# N1–N4 (CS-041): the closure check on a queue item's closing action, with a
+# N1–N4: the closure check on a queue item's closing action, with a
 # refusable effect in the same policy so a run can contain a refusal.
 POLICY_CLOSURE = """apiVersion: stele/v0.1
 agent: tck-agent
@@ -496,7 +496,7 @@ gates:
 """
 
 
-# O1–O4 (CS-043): per-item verdicts. `tck.itemAllowed` refuses exactly the items
+# O1–O4: per-item verdicts. `tck.itemAllowed` refuses exactly the items
 # named BLOCKED_ITEMS below, so a call mixing clean and blocked items must apply
 # the clean ones and refuse the rest.
 POLICY_PER_ITEM = """apiVersion: stele/v0.1
@@ -514,7 +514,7 @@ gates:
 BLOCKED_ITEMS = ("Q-BLOCKED", "Q-ALSO-BLOCKED")
 
 
-# P1–P4 (CS-044): a gate that names what it reads. `onUnavailable: hold` is the
+# P1–P4: a gate that names what it reads. `onUnavailable: hold` is the
 # declared choice, so P4 can assert that an unavailable guard queues for a human.
 POLICY_READS = """\
 apiVersion: stele/v0.1

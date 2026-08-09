@@ -336,13 +336,13 @@ def _build_common(
         "in_memory": InMemoryConnector(),
     })
 
-    # v0.3 (CS-032/CS-034/CS-035): the policy's requireMatch gate matches
+    # v0.3: the policy's requireMatch gate matches
     # payments against open purchase orders — the demo's system of record is
     # this seeded in-memory adapter (a real deployment registers one over its
     # ERP). One shared instance: the engine matches against it, the pipeline
     # reserves from it at staging, the worker liveness-checks/consumes/releases.
     # Reserving flips the PO line's state, so a resubmitted invoice no-matches
-    # at DECISION time (the spec §14.4 beat); the reservation TTL is the CS-035
+    # at DECISION time (the spec §14.4 beat); the reservation TTL is the §?
     # orphan backstop, on the adapter's own clock (F5.2).
     obligation_adapters: dict[str, Any] = {
         "erp.purchase_orders": InMemoryObligationRegistry(
@@ -383,17 +383,17 @@ def _build_common(
         outbox=outbox,
         kill=kill,
         env_factory=_env_factory,
-        # v0.2 CS-017: bound how stale a staged payment decision may get — a
+        # v0.2 bound how stale a staged payment decision may get — a
         # payee sanctioned or an approval granted long ago is caught at claim.
         freshness=FreshnessConfig(),
         obligations=obligation_adapters,
-        # v0.3 CS-031: ten resubmissions of the same unmatched invoice are one
+        # v0.3 ten resubmissions of the same unmatched invoice are one
         # question in the AP clerk's queue, with an attempt count.
         dedupe_window_s=24 * 3600.0,
     )
     # v0.2 wiring: the worker's clock is the same injected demo clock the
-    # decisions use; it re-runs volatile gates inside the claim (CS-017) and
-    # re-asserts scope at dispatch (CS-018 — the ledger connector declares a
+    # decisions use; it re-runs volatile gates inside the claim and
+    # re-asserts scope at dispatch (the ledger connector declares a
     # residual window, so the target account is re-resolved pre-dispatch).
     worker = DispatchWorker(
         outbox, connectors, registry=registry, kill=kill, inflight=inflight,

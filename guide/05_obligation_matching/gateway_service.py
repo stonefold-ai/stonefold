@@ -106,8 +106,8 @@ def build_app() -> FastAPI:
         return RequestEnv(now=datetime.now(timezone.utc))
 
     # consumer 2: the Gateway/pipeline — reserves the matched record INSIDE
-    # the staging commit (CS-035), and collapses duplicate holds within the
-    # dedupe window (CS-031/CS-040) so a retrying agent cannot spam the
+    # the staging commit, and collapses duplicate holds within the
+    # dedupe window so a retrying agent cannot spam the
     # clerk's queue with the same question.
     gateway = Gateway(
         registry=registry,

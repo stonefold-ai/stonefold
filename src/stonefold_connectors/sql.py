@@ -4,7 +4,7 @@
 The agent's intent is translated to SQL; the connector then **appends** the
 scope predicate as an extra ``WHERE`` clause (``AND owner_id = %(scope_owner_id)s``)
 that the agent never named and cannot widen. It is the reference *transactional*
-connector (CS-018): a registered effect statement carries the predicate inside
+connector: a registered effect statement carries the predicate inside
 the effect's own transaction, so the write lands on authorized state or not at
 all. ``psycopg`` is imported lazily so the package loads without it.
 """
@@ -30,7 +30,7 @@ class SqlConnector:
     ``effect_sql`` registers the statement each staged effect dispatches to,
     keyed ``"Resource.action"``. A template is plain SQL with ``%(name)s``
     parameters filled from the action's ``data``, plus a literal ``{scope}``
-    slot where the scope predicate's constraint is ANDed in (CS-018) — e.g.::
+    slot where the scope predicate's constraint is ANDed in — e.g.::
 
         UPDATE accounts SET balance = balance - %(amount)s
         WHERE id = %(accountId)s AND {scope}
@@ -81,7 +81,7 @@ class SqlConnector:
     ) -> ConnectorResult:
         template = self._effect_sql.get(f"{action.resource}.{action.action}")
         if template is None:
-            # no registered effect statement (pre-CS-018 stub behaviour): record
+            # no registered effect statement (pre-§? stub behaviour): record
             # a receipt keyed by the idempotency key.
             return ConnectorResult(kind="receipt", receipt={"sent": True}, handle=idempotency_key)
         return self._dispatch(template, action, actor, idempotency_key, None)
@@ -90,7 +90,7 @@ class SqlConnector:
         self, action: ResolvedAction, actor: Actor, idempotency_key: str,
         scope: ScopePredicate,
     ) -> ConnectorResult:
-        """CS-018 transactional dispatch: the scope predicate is ANDed into the
+        """§? transactional dispatch: the scope predicate is ANDed into the
         effect's own write. Zero rows affected ⇒ ``ScopeLostError`` and the
         transaction rolls back — never a partial or un-authorized commit."""
         template = self._effect_sql.get(f"{action.resource}.{action.action}")

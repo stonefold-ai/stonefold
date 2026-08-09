@@ -1,4 +1,4 @@
-"""v0.2 CS-017 — decision freshness (changeset docs/changeset-v0.1-to-v0.2.md).
+"""v0.2 — decision freshness (spec §12).
 
 Acceptance D5 (decision TTL cancels a stale staged effect; a late approval does
 not resurrect it) and D6 (volatile gates re-validated at dispatch; non-volatile
@@ -134,7 +134,7 @@ def test_d5_expired_row_settles_stale_decision_never_dispatched() -> None:
     assert settled.reason == STALE_DECISION
     assert h.effect_conn.effects == []  # nothing was dispatched
 
-    # the cancellation is audited (changeset CS-017: "audited")
+    # the cancellation is audited, as the spec requires
     last = h.audit.records[-1]
     assert last.decision is Decision.DENY
     assert last.outcome == "cancelled"
@@ -287,8 +287,8 @@ def test_freshness_config_rejects_non_finite_ttls() -> None:
 
 
 def test_volatile_gate_set_is_the_specified_six() -> None:
-    # CS-017 freezes the volatile/non-volatile split; a drift here is a spec
-    # bug. v0.3 CS-032 rule 3 adds requireMatch (full re-query interim; CS-035
+    # §? freezes the volatile/non-volatile split; a drift here is a spec
+    # bug. v0.3 §? rule 3 adds requireMatch (full re-query interim; §?
     # replaces it with a reservation-liveness check).
     assert VOLATILE_GATES == {
         "allowlist", "denylist", "window", "precondition", "emissionControl",

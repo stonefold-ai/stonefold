@@ -4,7 +4,7 @@
 Each is ``(cfg, GateContext) -> GateResult``. Stateless gates compute in-memory;
 the four counter gates (``rate``/``quota``/``quantityCap``/``spendLimit``) read a
 ``CounterStore``; ``contentCheck`` calls a registered hook; ``requireMatch``
-(v0.3 CS-032) queries a declared obligation registry. A *dependency* failure
+(v0.3) queries a declared obligation registry. A *dependency* failure
 (missing field, store down, hook timeout, registry unreachable) is turned into
 **fail-closed FAIL** here — never a raised exception and never a silent pass
 (CLAUDE.md, design §10/§12).
@@ -12,7 +12,7 @@ the four counter gates (``rate``/``quota``/``quantityCap``/``spendLimit``) read 
 ``failureMode: open`` (spec §10) flips the dependency-failure cases to pass, at
 two deliberately different strictnesses: the obligation-registry outage
 additionally applies the **irreversible floor** (``should_fail_closed``) because
-§7.16 semantics 4 mandates it, like the kill store (CS-007); the content-hook
+§7.16 semantics 4 mandates it, like the kill store; the content-hook
 and named-check crash paths honour ``open`` plainly, because there §10 alone
 governs and the §13.5 linter refuses an open-mode policy with an irreversible
 effect unless explicitly acknowledged — the floor lives in the linter, not here.
@@ -73,7 +73,7 @@ _WEEKDAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 # --- 3. valueLimit -------------------------------------------------------
 def value_limit(cfg: Any, gctx: GateContext) -> GateResult:
     field = cfg.get("field") if isinstance(cfg, dict) else None
-    fields = (str(field),) if field else ()  # CS-030: what code+fields may reveal
+    fields = (str(field),) if field else ()  # what code+fields may reveal
     try:
         num = to_number(resolve_field(field, gctx))
     except (MissingValueError, ConditionRuntimeError) as exc:
@@ -92,7 +92,7 @@ def _membership(cfg: Any, gctx: GateContext, *, deny: bool) -> GateResult:
     if not isinstance(cfg, dict):
         return failed(name, "fail-closed: gate needs {field, set}")
     field, set_name = cfg.get("field"), cfg.get("set")
-    fields = (str(field),) if field else ()  # CS-030: what code+fields may reveal
+    fields = (str(field),) if field else ()  # what code+fields may reveal
     try:
         value = str(resolve_field(field, gctx))
     except (MissingValueError, ConditionRuntimeError) as exc:
@@ -134,7 +134,7 @@ def check_from_states(from_states: Any, gctx: GateContext) -> GateResult:
 
 def _run_named_check(name: str, gctx: GateContext) -> CheckResult:
     """Run a registered precondition check, normalised to the three-valued
-    ``CheckResult`` (spec §7.6, CS-026). A plain-``bool`` check stays valid.
+    ``CheckResult`` (spec §7.6). A plain-``bool`` check stays valid.
     POC convention (STONEFOLD-AMBIGUITY, spec §7.6): with no registered
     implementation the check passes iff the call carries a boolean flag of the
     same name set ``true`` — deterministic and test-drivable; a real deployment
@@ -150,7 +150,7 @@ def _run_named_check(name: str, gctx: GateContext) -> CheckResult:
 
 
 def _run_checks(gate: str, names: list[Any], gctx: GateContext) -> GateResult:
-    """Shared check-runner for ``precondition``/``emissionControl`` (CS-026).
+    """Shared check-runner for ``precondition``/``emissionControl``.
 
     Verdict composition within one gate: any FAIL wins (a cheap deterministic
     refusal beats a human interruption); else the first HOLD holds; else pass.
@@ -176,7 +176,7 @@ def _run_checks(gate: str, names: list[Any], gctx: GateContext) -> GateResult:
                 f"{name} not satisfied",
                 code=result.code,
                 source=name,
-                # CS-029: the code's class comes from the check's registry
+                # the code's class comes from the check's registry
                 # declaration; undeclared/code-less ⇒ the engine's default.
                 retry_class=(
                     gctx.registry.reason_class(name, result.code) if result.code else None
@@ -184,21 +184,21 @@ def _run_checks(gate: str, names: list[Any], gctx: GateContext) -> GateResult:
             )
         if result.outcome is Outcome.HOLD:
             if not result.code:
-                # CS-026 rule 2 / I4: an uninformative interruption is worse
+                # §? rule 2 / I4: an uninformative interruption is worse
                 # than a deny — treat as an implementation error, fail closed.
                 logger.error(
-                    "check %r returned hold without a reason code (CS-026); "
+                    "check %r returned hold without a reason code; "
                     "resolving fail-closed", name,
                 )
                 return failed(
                     gate, f"fail-closed: {name} held without a reason code", source=name
                 )
             if not gctx.registry.check_hold_capable(name):
-                # CS-026 rule 3: hold capability is declared in the registry
+                # §? rule 3: hold capability is declared in the registry
                 # (docs/06 §5). An undeclared hold is an implementation error.
                 logger.error(
                     "check %r returned hold but is not declared holdCapable "
-                    "(CS-026); resolving fail-closed", name,
+                    "; resolving fail-closed", name,
                 )
                 return failed(
                     gate,
@@ -224,7 +224,7 @@ def precondition(cfg: Any, gctx: GateContext) -> GateResult:
     if isinstance(cfg, dict) and "from" in cfg:
         return check_from_states(cfg["from"], gctx)
     if isinstance(cfg, dict):
-        # CS-044: what this gate reads is verified BEFORE its checks run. A gate
+        # what this gate reads is verified BEFORE its checks run. A gate
         # whose rule set is three weeks past review is not in a position to
         # decide anything, and saying so is more useful than a confident answer
         # computed from stale content.
@@ -330,7 +330,7 @@ def disclosure(cfg: Any, gctx: GateContext) -> GateResult:
     is not permitted. The ``when:`` (e.g. sensitivity == restricted) is evaluated
     by the engine; reaching here means the result is sensitive.
 
-    ``maxClassification`` (CS-024) compares the action's declared
+    ``maxClassification`` compares the action's declared
     ``resultSensitivity`` against a ceiling, by the registry's DECLARED
     classification order (built-in ``public < internal < confidential <
     restricted``; a domain's substituted labels are ordered by their value-set
@@ -346,7 +346,7 @@ def disclosure(cfg: Any, gctx: GateContext) -> GateResult:
 
 def _classification_check(ceiling_ref: Any, gctx: GateContext) -> GateResult | None:
     """FAIL when the action's sensitivity exceeds the ceiling or either label is
-    outside the declared order (fail closed, CS-024); ``None`` to fall through to
+    outside the declared order (fail closed); ``None`` to fall through to
     the sink check."""
     ceiling = ceiling_ref
     if not isinstance(ceiling, str):
@@ -397,9 +397,9 @@ def _disclosure_decide(cfg: Any, sink: str | None, withheld: str | None = None) 
 
 # --- 13. emissionControl -------------------------------------------------
 def emission_control(cfg: Any, gctx: GateContext) -> GateResult:
-    # spec §7.13 / CS-011: the gate's check list is spelled ``checks:``. The
+    # spec §7.13 / the gate's check list is spelled ``checks:``. The
     # previous read of a ``precondition:`` key (never legal syntax) silently
-    # skipped every declared check — fixed in v0.3 alongside CS-026; the legacy
+    # skipped every declared check — fixed in v0.3 alongside §?; the legacy
     # key is still honoured so no deployed config loosens.
     checks: list[Any] = []
     if isinstance(cfg, dict):
@@ -430,7 +430,7 @@ def require_explanation(cfg: Any, gctx: GateContext) -> GateResult:
     return failed("requireExplanation", "action carries no recorded rationale")
 
 
-# --- 15. requireMatch (v0.3 CS-032/033/036) --------------------------------
+# --- 15. requireMatch (v0.3) --------------------------------
 _MATCH = "requireMatch"
 _OBLIGATION_NS = "obligation"
 
@@ -453,7 +453,7 @@ class _StringClause:
 
 @dataclass(frozen=True)
 class _ToleranceClause:
-    """A structured tolerance conjunct (CS-033): ``field`` (record-relative)
+    """A structured tolerance conjunct: ``field`` (record-relative)
     must equal ``matches`` (intent side) within ``pct`` percent of the
     obligation-side value or ``abs_`` in the field's unit; 0 means exact."""
 
@@ -505,7 +505,7 @@ def _refs_obligation(op: Any) -> bool:
 
 
 def _intent_fields(expr_paths: list[Path]) -> tuple[str, ...]:
-    """The intent-side namespace paths a clause compares (CS-030: what
+    """The intent-side namespace paths a clause compares (what
     ``code+fields`` visibility may reveal)."""
     return tuple(
         ".".join(p.parts)
@@ -515,7 +515,7 @@ def _intent_fields(expr_paths: list[Path]) -> tuple[str, ...]:
 
 
 def _parse_within(raw: Any) -> tuple[float | None, float | None]:
-    """``within`` (CS-033): ``"N%"`` relative or a non-negative absolute
+    """``within``: ``"N%"`` relative or a non-negative absolute
     number. Raises ``ValueError`` on any other shape (fail closed)."""
     if isinstance(raw, str) and raw.endswith("%"):
         return float(raw[:-1]), None
@@ -578,7 +578,7 @@ def _check_tolerance(
     fields = (clause.matches,)
     record_side = lookup_field(ob.fields, clause.field)
     if record_side is MISSING or record_side is None:
-        # CS-032 semantics 4: an obligation path absent or null on the matched
+        # §? semantics 4: an obligation path absent or null on the matched
         # record fails the gate closed.
         return failed(
             _MATCH, f"fail-closed: obligation.{clause.field} absent/null on matched record",
@@ -606,14 +606,14 @@ def _check_tolerance(
 
 
 def require_match(cfg: Any, gctx: GateContext) -> GateResult:
-    """Gate 15 (spec §7.16, v0.3 CS-032/033/036): the intent must correspond to
+    """Gate 15 (spec §7.16, v0.3 §?): the intent must correspond to
     exactly one open obligation in a declared registry, within declared
     tolerance. Deterministic at decision time: the gateway derives a typed
     selector from the ``match`` conjunction's equality clauses, queries the
     adapter, and decides on the candidate count — 0 ⇒ ``onNoMatch``, >1 ⇒
     ``onAmbiguous`` (never auto-selects), 1 ⇒ the full conjunction plus
     tolerance and ``provenance`` evaluate against the RE-READ record only
-    (CS-036: agent-supplied copies of obligation data are never match inputs;
+    (agent-supplied copies of obligation data are never match inputs;
     a ``data.*`` pointer is just another equality clause — it narrows the
     query, never substitutes for it)."""
     if not isinstance(cfg, dict):
@@ -703,14 +703,14 @@ def require_match(cfg: Any, gctx: GateContext) -> GateResult:
         )
 
     ob = candidates[0]
-    # A PASS additionally carries the consumption PLAN (CS-035): the staging
+    # A PASS additionally carries the consumption PLAN: the staging
     # commit reads consume/capability from here to reserve the matched ref
     # before the commit returns. Deny/hold evidence stays lineage-only.
     evidence = {
         "registry": reg_name, "refs": [ob.ref], "candidates": 1,
         "consume": consume, "capability": decl.capability.value,
     }
-    # CS-036 by construction: the ``obligation`` namespace is populated
+    # §? by construction: the ``obligation`` namespace is populated
     # exclusively from the adapter's response — a forged copy in ``data.*``
     # is just another intent field and changes nothing.
     ext_ctx = EvalContext(
@@ -732,7 +732,7 @@ def require_match(cfg: Any, gctx: GateContext) -> GateResult:
             ok = evaluate(clause.expr, ext_ctx)
         except (MissingValueError, ConditionRuntimeError) as exc:
             # an ``obligation.*`` path absent on the matched record lands here
-            # (CS-032 semantics 4) — fail closed, like any resolution error.
+            # (§? semantics 4) — fail closed, like any resolution error.
             return failed(
                 _MATCH, f"fail-closed: {exc}", evidence=evidence,
                 fields=clause.intent_fields,
