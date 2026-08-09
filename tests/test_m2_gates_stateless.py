@@ -1,4 +1,4 @@
-"""M2 — the stateless gates (RFC §7, design §6). Acceptance C1, C3, C4, C6, C7.
+"""M2 — the stateless gates (spec §7, design §6). Acceptance C1, C3, C4, C6, C7.
 
 Each gate is exercised in isolation through ``gate_ctx``. A dependency failure
 (missing field, hook timeout) must resolve to **fail-closed FAIL**, never an

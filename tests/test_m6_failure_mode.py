@@ -1,4 +1,4 @@
-"""M6 — failure mode (RFC §10, design §12) and acceptance **F3**.
+"""M6 — failure mode (spec §10, design §12) and acceptance **F3**.
 
 A dependency failure (registry, scope resolver, contentCheck hook, kill store, or
 the **outbox/audit DB**) must never bubble into an implicit allow (invariant 7).
@@ -120,7 +120,7 @@ def test_connector_unavailable_closed_denies() -> None:
 
 
 def test_connector_unavailable_open_allows() -> None:
-    # RFC §10: open ⇒ a low-stakes dependency outage is allowed through.
+    # spec §10: open ⇒ a low-stakes dependency outage is allowed through.
     doc = {"agent": "support", "defaults": {"failureMode": "open"},
            "allow": [{"observe": ["read"]}]}
     result = _enforce(doc, resource="Customer", action="read",

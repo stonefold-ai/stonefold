@@ -10,7 +10,7 @@ steps the dispatch worker deterministically, and exposes what happened
 (effects that left, audit records written).
 
 Determinism is a driver obligation: ``set_clock`` must control every
-time-based decision (the RFC already mandates an injected clock), and
+time-based decision (the specification already mandates an injected clock), and
 ``dispatch_once`` must run the staged-effect worker synchronously to
 completion. A driver that cannot satisfy an obligation omits the matching
 capability and the dependent checks are SKIPPED — never silently passed.
@@ -31,26 +31,26 @@ CAP_KILL = "kill"  # kill/lift orders
 CAP_AUDIT = "audit"  # audit() returns the decision log
 CAP_CLOCK = "clock"  # set_clock controls time-based gates
 CAP_DISPATCH_FAILURE = "dispatch-failure-injection"  # inject_dispatch_failure()
-# v0.4 CS-017: decision TTL + volatile-gate re-validation are wired, with the
+# v0.2 CS-017: decision TTL + volatile-gate re-validation are wired, with the
 # REQUIRED TCK freshness config — default TTL 24 hours, irreversible TTL 30
 # minutes (fixture semantics, like the registered functions in docs/12 §3) —
 # and update_named_set() can change a named set between decision and dispatch.
 CAP_FRESHNESS = "freshness"
-# v0.4 CS-018: the scope predicate is re-asserted at dispatch (either declared
+# v0.2 CS-018: the scope predicate is re-asserted at dispatch (either declared
 # form — transactional or window pre-dispatch re-resolve; the TCK observes only
 # the outcome: the effect does not land and the settle reason is "scope-lost").
 CAP_SCOPE_REASSERT = "scope-reassert"
-# v0.5 CS-023: multi-operation SIF intents are decided atomically —
+# v0.2 CS-023: multi-operation SIF intents are decided atomically —
 # ``submit_batch`` submits one batch and reports the batch verdict plus the
 # per-operation results.
 CAP_BATCH = "batch"
-# v0.5 CS-020: connector digest pinning is verified at policy load and at
+# v0.2 CS-020: connector digest pinning is verified at policy load and at
 # dispatch. ``connector_digest``/``tamper_connector`` let the TCK pin the real
 # artifact and then simulate its supply-chain replacement; a dispatch-time
 # mismatch MUST settle with reason ``connector-digest-mismatch`` (normative,
-# like the v0.4 settle reasons).
+# like the v0.2 settle reasons).
 CAP_DIGEST = "digest-pinning"
-# v0.6 CS-026/027/028: three-valued precondition checks with multi-hold release
+# v0.3 CS-026/027/028: three-valued precondition checks with multi-hold release
 # contracts and active held-row expiry. ``resolve`` releases ONE named gate's
 # contract (a resolver identity, distinct from ``approve``'s credit-everything
 # form); ``sweep_holds`` steps the expiry sweep like ``dispatch_once``. The
@@ -59,31 +59,31 @@ CAP_DIGEST = "digest-pinning"
 # TTLs): NO deployment default resolver role is configured — a gate that names
 # no ``resolvers:`` therefore has an unsatisfiable release contract (J7).
 CAP_HOLD = "hold-precondition"
-# v0.6 CS-029/030: deny/hold results carry a machine-readable ``reason_code``
+# v0.3 CS-029/030: deny/hold results carry a machine-readable ``reason_code``
 # and ``retry_class``, and ``agent_view`` renders EXACTLY what the agent
 # received (post-redaction) so the kit can assert what leaked and what didn't.
 CAP_FEEDBACK = "feedback"
-# v0.6 CS-032–CS-036: ``requireMatch`` with the reservation lifecycle. The
+# v0.3 CS-032–CS-036: ``requireMatch`` with the reservation lifecycle. The
 # driver registers a mock obligation-registry adapter with the REQUIRED
 # semantics (docs/12 §3) behind the fixture's declared registry;
 # ``seed_obligations`` loads its records, ``set_obligation_outage`` makes it
 # unreachable. The ``no-match`` refusal and ``stale-guard:requireMatch`` settle
 # reason are normative for drivers claiming this.
 CAP_OBLIGATION = "obligation"
-# v0.6.1 CS-041: the standard ``dispositionIsDeclared`` check, and a registry
+# v0.3 CS-041: the standard ``dispositionIsDeclared`` check, and a registry
 # able to declare an action's ``closure`` (docs/06 §5c). A driver claiming this
 # MUST supply the gateway's own decision history for the run — the check reads
 # what the gateway refused earlier for the same actor and correlation id, and
 # nothing else. The reason codes ``DISPOSITION_REQUIRED`` and
 # ``CLOSED_WITHOUT_THE_WORK`` are normative for drivers claiming it.
 CAP_CLOSURE = "closure"
-# v0.6.1 CS-043: item-bearing actions decided per item. A driver claiming this
+# v0.3 CS-043: item-bearing actions decided per item. A driver claiming this
 # MUST support an action declaring ``items: {field, independent}`` and MUST
 # report per-item verdicts (item, decision, reasonCode, retryClass, ticket) plus
 # the items that took effect. The envelope's decision is ALLOW only when every
 # item applied — a driver that returns ALLOW for a partial application fails O2.
 CAP_PER_ITEM = "per-item"
-# v0.6.1 CS-044: a gate may declare `reads:` against a registry-declared source,
+# v0.3 CS-044: a gate may declare `reads:` against a registry-declared source,
 # and the driver can control that source's reported age and reachability. The
 # codes SOURCE_STALE / SOURCE_UNDATED / SOURCE_UNAVAILABLE are normative for
 # drivers claiming this, in the returned verdict and in the audit record.
@@ -116,7 +116,7 @@ ALL_CAPABILITIES = frozenset(
 class LoadResult:
     """Outcome of loading a registry+policy pair. A policy with ERROR-level
     findings MUST NOT load (``ok=False``) — the gateway refuses, never falls
-    back to a permissive default (RFC §13)."""
+    back to a permissive default (spec §13)."""
 
     ok: bool
     errors: Sequence[str] = ()
@@ -127,11 +127,11 @@ class LoadResult:
 class SubmitResult:
     """Normalized outcome of one submitted operation.
 
-    ``decision`` is one of ``allow | hold | deny | halt`` (RFC §2).
+    ``decision`` is one of ``allow | hold | deny | halt`` (spec §2).
     ``ticket`` identifies a staged/held action (staging/approvals capability).
     ``rows`` carries an ``observe``'s result (already scope-filtered).
 
-    The v0.6 fields (populated by drivers claiming ``CAP_FEEDBACK``):
+    The v0.3 fields (populated by drivers claiming ``CAP_FEEDBACK``):
     ``reason_code``/``retry_class`` are the CS-029 machine-readable code and
     class on a deny/hold (``retry_class`` is ``retryable | terminal |
     escalate`` or ``None`` — a hold with no class means "wait");
@@ -147,7 +147,7 @@ class SubmitResult:
     reason_code: str = ""
     retry_class: str | None = None
     agent_view: str = ""
-    # v0.6.1 CS-043 (``per-item`` capability): one verdict per item for an
+    # v0.3 CS-043 (``per-item`` capability): one verdict per item for an
     # item-bearing action — (item, decision, reasonCode, retryClass, ticket) —
     # and the items that took effect. Empty for every other action.
     items: Sequence[Mapping[str, Any]] = ()
@@ -156,7 +156,7 @@ class SubmitResult:
 
 @dataclass(frozen=True)
 class BatchSubmitResult:
-    """Normalized outcome of one submitted batch (v0.5 CS-023).
+    """Normalized outcome of one submitted batch (v0.2 CS-023).
 
     ``decision`` is the batch verdict: the first refusing operation's
     ``deny``/``halt``, else ``hold`` when any operation held, else ``allow``.
@@ -172,18 +172,18 @@ class BatchSubmitResult:
 
 @dataclass(frozen=True)
 class AuditEntry:
-    """The normalized audit shape the TCK asserts on (a subset of RFC §11)."""
+    """The normalized audit shape the TCK asserts on (a subset of spec §11)."""
 
     decision: str  # allow | hold | deny | halt
     resource: str | None
     action: str | None
     outcome: str  # success | failure | not_executed | (impl-specific detail)
-    # The deciding rule/gate or settle reason (RFC §11) — the v0.4 reasons
+    # The deciding rule/gate or settle reason (spec §11) — the v0.2 reasons
     # ("stale-decision", "stale-guard:<gate>", "scope-lost") are normative, so
     # a driver claiming CAP_FRESHNESS / CAP_SCOPE_REASSERT MUST populate this
     # for cancelled/failed settle records. Empty otherwise is acceptable.
     reason: str = ""
-    # The machine-readable reason code the record carries (RFC §11, CS-029).
+    # The machine-readable reason code the record carries (spec §11, CS-029).
     # A driver claiming a profile whose codes are normative — CAP_CLOSURE's
     # DISPOSITION_REQUIRED / CLOSED_WITHOUT_THE_WORK — MUST populate it, so the
     # kit can assert that the *record* says why, not only the returned verdict.
@@ -299,14 +299,14 @@ class ConformanceDriver(Protocol):
     def update_named_set(self, name: str, values: Sequence[str]) -> None:
         """Replace a registry named set's values at runtime — simulates a
         sanctions-list update landing between decision and dispatch, so the
-        TCK can prove volatile gates are re-validated at claim (v0.4 CS-017).
+        TCK can prove volatile gates are re-validated at claim (v0.2 CS-017).
         (CAP_FRESHNESS)"""
         ...
 
     def submit_batch(
         self, actor: TckActor, session_id: str, ops: Sequence[Operation]
     ) -> BatchSubmitResult:
-        """Submit one multi-operation SIF batch as ``actor`` (v0.5 CS-023) —
+        """Submit one multi-operation SIF batch as ``actor`` (v0.2 CS-023) —
         decided atomically, same identity rule as ``submit``. (CAP_BATCH)"""
         ...
 
@@ -326,7 +326,7 @@ class ConformanceDriver(Protocol):
 
     def resolve(self, ticket: str, resolver_id: str, gate: str) -> bool:
         """Credit ``resolver_id`` against the held row's ``gate`` release
-        contract ONLY (v0.6 CS-027) — a resolver releasing a precondition/match
+        contract ONLY (v0.3 CS-027) — a resolver releasing a precondition/match
         hold, distinct from ``approve``'s credit-everything form. ``False``
         when refused (unknown gate, self-release on a distinct-from-actor
         contract). The row promotes only when EVERY contract is satisfied.
@@ -334,7 +334,7 @@ class ConformanceDriver(Protocol):
         ...
 
     def sweep_holds(self) -> int:
-        """Synchronously run the held-row expiry sweep (v0.6 CS-028) — the
+        """Synchronously run the held-row expiry sweep (v0.3 CS-028) — the
         deadline arithmetic MUST run on the injected clock (``set_clock``), the
         same clock that anchored the staging TTL. Returns how many rows were
         acted on. (CAP_HOLD)"""

@@ -1,4 +1,4 @@
-"""M0 — registry resolution unit tests (design §2; RFC §12 step 1; plan M0 task 3).
+"""M0 — registry resolution unit tests (design §2; spec §12 step 1; plan M0 task 3).
 
 Known names resolve to a typed ResolvedAction; unknown names raise
 UnknownActionError (which the pipeline turns into a default DENY).

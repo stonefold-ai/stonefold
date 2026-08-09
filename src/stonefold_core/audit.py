@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Audit sink protocol and the in-memory implementation (RFC §11, design §11).
+"""Audit sink protocol and the in-memory implementation (spec §11, design §11).
 
 Every evaluated action — allowed, held, denied, or halted — produces exactly one
 append-only record. The pipeline calls ``write`` from its terminal/hold paths.
@@ -56,7 +56,7 @@ class InMemoryAuditSink:
         self.records.append(record)
 
     def by_correlation(self, correlation_id: str) -> list[AuditRecord]:
-        """Replay one agent run as an ordered query (RFC §11)."""
+        """Replay one agent run as an ordered query (spec §11)."""
         return [r for r in self.records if r.correlationId == correlation_id]
 
     def all_records(self) -> list[AuditRecord]:

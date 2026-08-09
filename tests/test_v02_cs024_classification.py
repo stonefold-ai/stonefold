@@ -1,10 +1,10 @@
-"""v0.5 CS-024 — classification ordering for ``disclosure`` (RFC §7.12; registry §4).
+"""v0.2 CS-024 — classification ordering for ``disclosure`` (spec §7.12; registry §4).
 
 ``disclosure.maxClassification`` compares by the classification set's DECLARED
 order: the built-in ``resultSensitivity`` values are ordered ``public < internal
 < confidential < restricted``; a domain substituting its own labels declares
 them as an ordered value set (order is list position, lowest first). A value
-missing from the declared order makes the gate fail closed (RFC §8).
+missing from the declared order makes the gate fail closed (spec §8).
 """
 
 from __future__ import annotations

@@ -1,4 +1,4 @@
-"""M5 — kill-switch core matching (design §8.2, RFC §9).
+"""M5 — kill-switch core matching (design §8.2, spec §9).
 
 Unit-tests the pure ``stonefold_core.kill`` value types: scope matching for the four
 scopes (GLOBAL / AGENT / SESSION / ACTION_CLASS), the optional §8 predicate, the

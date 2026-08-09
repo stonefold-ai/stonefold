@@ -1,4 +1,4 @@
-"""M6 — transports and interception coverage (design §0, §1; RFC §3).
+"""M6 — transports and interception coverage (design §0, §1; spec §3).
 
 Both transports must drive the *same* pipeline (the chokepoint, design §0): the
 ``submit_intent`` endpoint and the MCP proxy each end in the identical ``enforce``

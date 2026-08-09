@@ -129,7 +129,7 @@ class InMemoryOutboxStore:
                 )
                 continue
             if stale_check is not None and (stale := stale_check(row)) is not None:
-                # stale inside the claim (v0.4 CS-017) ⇒ CANCELLED + audited, in
+                # stale inside the claim (v0.2 CS-017) ⇒ CANCELLED + audited, in
                 # this same (logical) transaction; keep scanning for a fresh row.
                 cancelled = row.model_copy(
                     update={"state": PendingState.CANCELLED, "reason": stale, "updated_at": _now()}

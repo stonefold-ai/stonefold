@@ -156,7 +156,7 @@ def emit_stubs(plan: StubPlan) -> str:
     for connector in plan.connectors:
         blocks.append(_connector_block(connector))
     if plan.scope_predicates:
-        blocks.append("# --- scope predicates (RFC sec. 6.3; docs/06 sec. 6) ---")
+        blocks.append("# --- scope predicates (spec sec. 6.3; docs/06 sec. 6) ---")
         for name, actor_attr in plan.scope_predicates:
             blocks.append(_scope_block(name, actor_attr))
     if plan.precondition_checks:
@@ -225,7 +225,7 @@ def _scope_block(name: str, actor_attr: str) -> str:
     lines = [
         f"class {cls}:",
         f'    """Scope predicate {name!r} -- reads actor.{actor_attr}. Over-governed default:',
-        "    selects NOTHING until implemented (an empty scope must never widen, RFC sec. 6.3).",
+        "    selects NOTHING until implemented (an empty scope must never widen, spec sec. 6.3).",
         f"    Consider stonefold_core.scope.AttributeScope({name!r}, <column>, <actor_attr>) instead.",
         '    """',
         "",

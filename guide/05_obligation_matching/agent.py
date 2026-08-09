@@ -1,7 +1,7 @@
 """THE AGENT — the agent developer's file. No Stonefold imports; one port.
 Any program can make these calls — an LLM loop, a batch job, a plain script.
 
-This example is about the AGENT'S LOOP: v0.6 makes every refusal carry a
+This example is about the AGENT'S LOOP: v0.3 makes every refusal carry a
 machine-readable ``reasonCode`` and a ``retryClass``, so your program knows
 what to do next without parsing prose:
 

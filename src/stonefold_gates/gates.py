@@ -1,15 +1,15 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The fifteen deterministic gates (RFC §7, design §6).
+"""The fifteen deterministic gates (spec §7, design §6).
 
 Each is ``(cfg, GateContext) -> GateResult``. Stateless gates compute in-memory;
 the four counter gates (``rate``/``quota``/``quantityCap``/``spendLimit``) read a
 ``CounterStore``; ``contentCheck`` calls a registered hook; ``requireMatch``
-(v0.6 CS-032) queries a declared obligation registry. A *dependency* failure
+(v0.3 CS-032) queries a declared obligation registry. A *dependency* failure
 (missing field, store down, hook timeout, registry unreachable) is turned into
 **fail-closed FAIL** here — never a raised exception and never a silent pass
 (CLAUDE.md, design §10/§12).
 
-``failureMode: open`` (RFC §10) flips the dependency-failure cases to pass, at
+``failureMode: open`` (spec §10) flips the dependency-failure cases to pass, at
 two deliberately different strictnesses: the obligation-registry outage
 additionally applies the **irreversible floor** (``should_fail_closed``) because
 §7.16 semantics 4 mandates it, like the kill store (CS-007); the content-hook
@@ -121,7 +121,7 @@ def denylist(cfg: Any, gctx: GateContext) -> GateResult:
 
 # --- 6. precondition (named checks + transition from-states) -------------
 def check_from_states(from_states: Any, gctx: GateContext) -> GateResult:
-    """The built-in transition guard (RFC §7.6): the target's current state MUST
+    """The built-in transition guard (spec §7.6): the target's current state MUST
     be one of the declared ``from`` states. Unknown state ⇒ fail-closed."""
     current = gctx.env.resource.get("currentState")
     if current is None:
@@ -134,8 +134,8 @@ def check_from_states(from_states: Any, gctx: GateContext) -> GateResult:
 
 def _run_named_check(name: str, gctx: GateContext) -> CheckResult:
     """Run a registered precondition check, normalised to the three-valued
-    ``CheckResult`` (RFC §7.6, CS-026). A plain-``bool`` check stays valid.
-    POC convention (STONEFOLD-AMBIGUITY, RFC §7.6): with no registered
+    ``CheckResult`` (spec §7.6, CS-026). A plain-``bool`` check stays valid.
+    POC convention (STONEFOLD-AMBIGUITY, spec §7.6): with no registered
     implementation the check passes iff the call carries a boolean flag of the
     same name set ``true`` — deterministic and test-drivable; a real deployment
     registers code here."""
@@ -336,7 +336,7 @@ def disclosure(cfg: Any, gctx: GateContext) -> GateResult:
     restricted``; a domain's substituted labels are ordered by their value-set
     position). The ceiling is a literal label or a condition path (e.g.
     ``actor.clearance``); either side missing from the declared order fails
-    closed (RFC §8)."""
+    closed (spec §8)."""
     if isinstance(cfg, dict) and cfg.get("maxClassification") is not None:
         verdict = _classification_check(cfg["maxClassification"], gctx)
         if verdict is not None:
@@ -397,9 +397,9 @@ def _disclosure_decide(cfg: Any, sink: str | None, withheld: str | None = None) 
 
 # --- 13. emissionControl -------------------------------------------------
 def emission_control(cfg: Any, gctx: GateContext) -> GateResult:
-    # RFC §7.13 / CS-011: the gate's check list is spelled ``checks:``. The
+    # spec §7.13 / CS-011: the gate's check list is spelled ``checks:``. The
     # previous read of a ``precondition:`` key (never legal syntax) silently
-    # skipped every declared check — fixed in v0.6 alongside CS-026; the legacy
+    # skipped every declared check — fixed in v0.3 alongside CS-026; the legacy
     # key is still honoured so no deployed config loosens.
     checks: list[Any] = []
     if isinstance(cfg, dict):
@@ -430,7 +430,7 @@ def require_explanation(cfg: Any, gctx: GateContext) -> GateResult:
     return failed("requireExplanation", "action carries no recorded rationale")
 
 
-# --- 15. requireMatch (v0.6 CS-032/033/036) --------------------------------
+# --- 15. requireMatch (v0.3 CS-032/033/036) --------------------------------
 _MATCH = "requireMatch"
 _OBLIGATION_NS = "obligation"
 
@@ -440,7 +440,7 @@ class _StringClause:
     """One parsed §8-grammar conjunct of ``match``/``provenance``. ``eq`` is
     set when the clause is selector-eligible — ``obligation.X == <intent-side>``
     — carrying the record-relative field and the intent-side operand to resolve
-    at decision time (RFC §7.16 semantics 1). Every string clause, selector or
+    at decision time (spec §7.16 semantics 1). Every string clause, selector or
     not, is re-evaluated against the matched record (defence in depth: an
     adapter returning a non-matching record still fails closed)."""
 
@@ -562,7 +562,7 @@ def _parse_clause(raw: Any, *, provenance: bool) -> "_StringClause | _ToleranceC
 
 def _registry_unavailable(reg: str, detail: str, gctx: GateContext) -> GateResult:
     """An unreachable/unregistered obligation registry is a dependency failure
-    (RFC §10): ``failureMode`` decides, with the irreversible floor —
+    (spec §10): ``failureMode`` decides, with the irreversible floor —
     an irreversible effect MUST resolve closed (§7.16 semantics 4)."""
     if should_fail_closed(gctx.resolved, gctx.failure_mode):
         return failed(_MATCH, f"fail-closed: obligation registry {reg!r} unavailable: {detail}")
@@ -606,7 +606,7 @@ def _check_tolerance(
 
 
 def require_match(cfg: Any, gctx: GateContext) -> GateResult:
-    """Gate 15 (RFC §7.16, v0.6 CS-032/033/036): the intent must correspond to
+    """Gate 15 (spec §7.16, v0.3 CS-032/033/036): the intent must correspond to
     exactly one open obligation in a declared registry, within declared
     tolerance. Deterministic at decision time: the gateway derives a typed
     selector from the ``match`` conjunction's equality clauses, queries the
@@ -625,7 +625,7 @@ def require_match(cfg: Any, gctx: GateContext) -> GateResult:
     if cfg.get("onAmbiguous") == "allow":
         # illegal value (§13 rule 17); a policy that somehow loaded with it must
         # not make the gateway auto-select among candidates.
-        return failed(_MATCH, "fail-closed: onAmbiguous: allow is illegal (RFC §7.16)")
+        return failed(_MATCH, "fail-closed: onAmbiguous: allow is illegal (spec §7.16)")
     decl = gctx.registry.obligation_registry(reg_name)
     if decl is None:
         return failed(_MATCH, f"fail-closed: unknown obligation registry {reg_name!r}")
@@ -654,7 +654,7 @@ def require_match(cfg: Any, gctx: GateContext) -> GateResult:
     # The typed selector: match-conjunction equality clauses made concrete by
     # resolving their intent side now (provenance never narrows the query — it
     # binds the matched record's counterparty to the intent's evidence AFTER
-    # identification, RFC §7.16).
+    # identification, spec §7.16).
     selector: list[EqConstraint] = []
     for clause in clauses:
         if isinstance(clause, _StringClause) and clause.eq is not None and not clause.provenance:

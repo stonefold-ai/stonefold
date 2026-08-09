@@ -38,7 +38,7 @@ def target_is_active(ctx: GateContext) -> bool:
 
 
 def inventory_available(ctx: GateContext) -> "bool | CheckResult":
-    """PRECONDITION CHECK, three-valued (v0.6) — pass, fail, or HOLD.
+    """PRECONDITION CHECK, three-valued (v0.3) — pass, fail, or HOLD.
 
     A hold is for judgment-shaped ambiguity: the data was read fine and the
     honest answer is "a human should look at this". A hold MUST carry a

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 """L1–L5 (profile ``match``) and M1–M5 (profile ``consume``) — obligation
-matching and the reservation lifecycle (v0.6 CS-032–CS-036).
+matching and the reservation lifecycle (v0.3 CS-032–CS-036).
 
 An intent must correspond to exactly one open obligation, read back from the
 registry the gateway queries — never from the agent's copy; the matched line
@@ -244,7 +244,7 @@ def m4_no_double_consume(driver: ConformanceDriver) -> None:
 def m5_lost_reservation_cancels_at_claim(driver: ConformanceDriver) -> None:
     # CS-035's dispatch-time liveness check, through its one black-box window:
     # the adapter loses the reservation out-of-band (its own orphan-expiry TTL,
-    # RFC §12 — ``seed_obligations`` models it by clearing reservation state),
+    # spec §12 — ``seed_obligations`` models it by clearing reservation state),
     # a second intent legitimately re-reserves the freed line, and the FIRST
     # intent's claim must then find its reservation gone and cancel with the
     # normative ``stale-guard:requireMatch`` — never dispatch a payment whose

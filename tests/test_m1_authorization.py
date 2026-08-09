@@ -1,4 +1,4 @@
-"""M1 — authorization (RFC §6.2, design §3/§4). Acceptance A1, A2, A3."""
+"""M1 — authorization (spec §6.2, design §3/§4). Acceptance A1, A2, A3."""
 
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ def _enforce(policy: CompiledPolicy, resource: str, action: str) -> Decision:
         audit=audit,
         policy=policy,
     )
-    # exactly one audit record per evaluation (RFC §11)
+    # exactly one audit record per evaluation (spec §11)
     assert len(audit.records) == 1
     assert audit.records[0].decision is result.decision
     return result.decision
@@ -105,7 +105,7 @@ def test_a3_gate_keys_action_and_kind() -> None:
     assert set(merged) == {"rate", "spendLimit"}  # AND-combined
 
 
-# --- specificity ranking of the matcher (RFC §6.2 rule 4) ---
+# --- specificity ranking of the matcher (spec §6.2 rule 4) ---
 def test_matcher_specificity_ranking() -> None:
     m = KindMatcher()
     m.add(Kind.EFFECT, "*")

@@ -1,14 +1,14 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The typed policy document model (RFC §6 top-level keys).
+"""The typed policy document model (spec §6 top-level keys).
 
 This is the *parsed* policy — one step before the compiled matcher (see
 ``compiler.py``). Structural validity (shapes, enums) is enforced here by
-pydantic; cross-references and semantic rules (RFC §13) are checked by the
+pydantic; cross-references and semantic rules (spec §13) are checked by the
 linter; deny-wins/most-specific authorization is the compiler's job.
 
 Gate *configs* are kept as raw mappings at this layer (``gates`` /
 ``standing.enables``); the typed gate models and the gate engine arrive in M2.
-The linter reads the raw gate configs to apply RFC §13 checks.
+The linter reads the raw gate configs to apply spec §13 checks.
 """
 
 from __future__ import annotations
@@ -48,7 +48,7 @@ class Defaults(BaseModel):
 
 
 class Standing(BaseModel):
-    """A context-conditioned authorization (RFC §7.15)."""
+    """A context-conditioned authorization (spec §7.15)."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -58,7 +58,7 @@ class Standing(BaseModel):
 
 
 class Policy(BaseModel):
-    """A parsed Stele policy document (RFC §6)."""
+    """A parsed Stele policy document (spec §6)."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -77,7 +77,7 @@ class Policy(BaseModel):
 
     @property
     def effective_killable(self) -> bool:
-        """RFC §9: killable SHOULD default to true for non-trivial agents."""
+        """spec §9: killable SHOULD default to true for non-trivial agents."""
         if self.killable is not None:
             return self.killable
         if self.defaults.killable is not None:

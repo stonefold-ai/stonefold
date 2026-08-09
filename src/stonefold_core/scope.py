@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Scope injection — enforcement *below the model* (RFC §6.3, design §5).
+"""Scope injection — enforcement *below the model* (spec §6.3, design §5).
 
 The agent's intent carries **no** scope; the gateway derives a named, registered
 ``ScopePredicate`` from the *actor's* identity (from the session, never the
@@ -52,7 +52,7 @@ class AttributeScope:
     """The POC scope predicate: a single attribute of the row/target must equal a
     value derived from the actor (its id or a named claim).
 
-    STONEFOLD-AMBIGUITY (RFC §6.3): the registry declares predicate *names* only; their
+    STONEFOLD-AMBIGUITY (spec §6.3): the registry declares predicate *names* only; their
     column/claim binding is a gateway concern. These bindings are the gateway's
     registered implementations — a real deployment plugs richer predicates (an
     OPA/IAM seam) behind the same ``ScopePredicate`` protocol.
@@ -69,7 +69,7 @@ class AttributeScope:
 
     def is_empty(self, actor: "Actor") -> bool:
         """The actor resolves to no scope ⇒ matching actions return empty / are
-        refused, never widened (RFC §6.3)."""
+        refused, never widened (spec §6.3)."""
         return self.actor_value(actor) is None
 
     def matches(self, attrs: Mapping[str, Any], actor: "Actor") -> bool:
@@ -90,7 +90,7 @@ class AttributeScope:
 
 class ScopeRegistry:
     """The gateway's registered scope predicates, keyed by the name a policy
-    references (RFC §6.3: predicates are registered, not free expressions)."""
+    references (spec §6.3: predicates are registered, not free expressions)."""
 
     def __init__(self, predicates: Mapping[str, ScopePredicate]) -> None:
         self._predicates = dict(predicates)

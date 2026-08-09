@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Typed dependency results and the fail-closed resolution (RFC §10, design §12).
+"""Typed dependency results and the fail-closed resolution (spec §10, design §12).
 
 A *dependency failure* is concretely the registry, a scope resolver, a
 ``contentCheck`` hook, the kill store, or the outbox/audit DB being unavailable or
@@ -13,7 +13,7 @@ not be assumed absent).
 
 This module is pure (no I/O, no framework) — part of the trust kernel.
 
-STONEFOLD-AMBIGUITY (RFC §10): the RFC permits ``failureMode`` to be overridden *per
+STONEFOLD-AMBIGUITY (spec §10): the specification permits ``failureMode`` to be overridden *per
 kind/action*; the pinned policy schema (``schema/stele.schema.json``) only carries
 ``defaults.failureMode``, so this POC resolves the mode at the defaults
 granularity. Per-action override is a schema extension deferred past the concept
@@ -68,7 +68,7 @@ def should_fail_closed(
     resolved: ResolvedAction | None, failure_mode: FailureMode
 ) -> bool:
     """Decide whether a dependency failure denies/halts (``True``) or is allowed
-    through (``False``), per RFC §10.
+    through (``False``), per spec §10.
 
     The irreversible floor wins over ``failureMode``: an irreversible effect is
     denied/halted on *any* dependency failure (design §8.9/§12, invariant 7).

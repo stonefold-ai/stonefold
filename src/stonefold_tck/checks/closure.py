@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""N1–N4 — closure accountability (v0.6.1 CS-041; profile ``closure``).
+"""N1–N4 — closure accountability (v0.3 CS-041; profile ``closure``).
 
 The failure under test: a gate refuses the work, and the actor then closes the
 item as done. The refusal becomes invisible — the queue is empty and the managed

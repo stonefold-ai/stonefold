@@ -5,7 +5,7 @@ Three operator surfaces over the durable stores — all read/transition the same
 ``audit_log`` and ``pending_actions`` the pipeline writes:
 
 * ``GET  /admin/trace/{correlationId}`` — the live trace: intent → decision →
-  effect for one agent run (the audit replay, RFC §11).
+  effect for one agent run (the audit replay, spec §11).
 * ``GET  /admin/approvals`` — the approvals inbox: rows held ``PENDING_APPROVAL``.
 * ``POST /admin/approvals/{id}/approve|reject`` — a human releases or rejects a
   held action (design §7; dual-auth rejects self-approval).
@@ -72,7 +72,7 @@ def reason_code_stats(records: list[AuditRecord]) -> list[dict[str, Any]]:
 
 class ApproverBody(BaseModel):
     approver: str
-    # v0.6 (CS-027): target one release contract by its gate key (e.g.
+    # v0.3 (CS-027): target one release contract by its gate key (e.g.
     # "precondition"); None credits every contract the identity may satisfy.
     gate: str | None = None
 

@@ -1,4 +1,4 @@
-"""v0.6.1 CS-043 — per-item verdicts for item-bearing actions (RFC §12).
+"""v0.3 CS-043 — per-item verdicts for item-bearing actions (spec §12).
 
 The failure being closed: one action carries twenty worklist items, thirteen of
 which need a human. The gateway can allow the call or refuse it, so refusing it

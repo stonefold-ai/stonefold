@@ -57,7 +57,7 @@ class SubmitIntentBody(BaseModel):
 
 class SubmitBatchBody(BaseModel):
     """The SIF wire form (SIF §5): ``{"operations": [...]}``. Decided atomically
-    per RFC §12 / CS-023 — any DENY/HALT refuses the whole batch before anything
+    per spec §12 / CS-023 — any DENY/HALT refuses the whole batch before anything
     commits or stages."""
 
     operations: list[SubmitIntentBody] = Field(min_length=1)
@@ -74,7 +74,7 @@ class McpCallBody(BaseModel):
 def _render(result: Any) -> dict[str, Any]:
     """One operation's result in the wire shape (shared by single and batch).
 
-    ``reasonCode``/``retryClass`` are the v0.6 (CS-029) convergence signal —
+    ``reasonCode``/``retryClass`` are the v0.3 (CS-029) convergence signal —
     an HTTP agent needs them to tell fix-and-resubmit from give-up; the result
     arriving here is already the redacted agent view (CS-030)."""
     body: dict[str, Any] = {

@@ -2,7 +2,7 @@
 
 The most common misconception about this design is that it's "a safe way to let an AI use a database." It isn't. A database is **one connector**. The same five action kinds and the same Stele gates govern email, files, devices, cloud infrastructure, payments, external services — anything an agent can act on or about.
 
-This companion shows that range. It is illustrative, not normative — the format is in [`00-RFC-sif-intent-format.md`](00-RFC-sif-intent-format.md), the policy language in [`01-RFC-agent-control-policy.md`](01-RFC-agent-control-policy.md).
+This companion shows that range. It is illustrative, not normative — the format is in [`00-sif-wire-format.md`](00-sif-wire-format.md), the policy language in [`01-stele-policy-language.md`](01-stele-policy-language.md).
 
 ## The one recipe (every domain follows it)
 

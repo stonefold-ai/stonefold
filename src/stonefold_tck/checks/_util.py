@@ -40,7 +40,7 @@ def setup(
                               {"id": "O2", "currentState": "confirmed"}])
         driver.seed("Payment", [{"id": "P1", "tenant": "t1"}, {"id": "P2", "tenant": "t2"}])
         driver.seed("Sealed", [{"id": "S1", "secret": "the-secret"}])
-        # v0.6.1 (CS-044): R-1 passes tck.flagSet, so the `reads` checks isolate
+        # v0.3 (CS-044): R-1 passes tck.flagSet, so the `reads` checks isolate
         # the source's trustworthiness from the gate's own check.
         driver.seed("Result", [{"id": "R-1", "flag": True}, {"id": "R-2", "flag": False}])
         driver.seed(

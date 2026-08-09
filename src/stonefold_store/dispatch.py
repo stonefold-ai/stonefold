@@ -11,7 +11,7 @@ While a dispatch is in flight it is recorded in the ``InFlightRegistry`` so a ki
 can abort a cancellable call (design §8.5); a connector that aborts raises
 ``ConnectorCancelled`` and the row settles ``CANCELLED``. A ``FAILED`` *irreversible*
 effect with a declared compensation auto-stages the compensating effect
-(design §9, RFC §8.5).
+(design §9, spec §8.5).
 
 The worker depends only on ``stonefold_core`` protocols (``OutboxStore``,
 ``ConnectorRegistry``, ``Registry``, ``KillStore``) — the concretes are injected.
@@ -59,7 +59,7 @@ logger = logging.getLogger("stonefold.dispatch")
 
 
 def _result_refs_of(result: ConnectorResult) -> list[str]:
-    """The downstream id(s) of a settled effect (RFC §11 ``resultRefs``, CS-009):
+    """The downstream id(s) of a settled effect (spec §11 ``resultRefs``, CS-009):
     the connector's explicit ``result_refs``, else ``[receipt['id']]`` if present,
     else ``[]``. The handle(s) an external system uses to locate/compensate it; a
     list because one dispatch may fan out to several records."""
@@ -102,9 +102,9 @@ class DispatchWorker:
         # CS-018 scope no-race, opt-in like freshness: with a resolver the worker
         # re-asserts the scope predicate at dispatch — inside the effect's own
         # transaction for a transactional connector, via a pre-dispatch target
-        # re-resolve for a window connector. ``None`` = v0.3 behaviour.
+        # re-resolve for a window connector. ``None`` = v0.2 behaviour.
         self._scopes = scopes
-        # v0.6 (CS-035): the obligation-registry adapters — the worker consumes
+        # v0.3 (CS-035): the obligation-registry adapters — the worker consumes
         # a row's reservation at successful settle and releases it on any
         # terminal non-success (the reconcile sweep below is the guarantee).
         self._obligations: dict[str, ObligationRegistry] = dict(obligations or {})
@@ -119,7 +119,7 @@ class DispatchWorker:
         return self._kill.matches(KillTarget.from_pending(row)) is not None
 
     def _stale_check(self, row: PendingAction) -> str | None:
-        # Decision freshness inside the claim (v0.4 CS-017), after the kill check:
+        # Decision freshness inside the claim (v0.2 CS-017), after the kill check:
         # TTL first, then the volatile-gate re-run. The worker is I/O-layer code,
         # so a wall clock is the default; tests/gateways inject their own.
         now = self._clock() if self._clock is not None else datetime.now(timezone.utc)
@@ -132,7 +132,7 @@ class DispatchWorker:
         return None
 
     def sweep_expired_holds(self) -> int:
-        """Expire lapsed held rows (v0.6 CS-028) — run with the worker's loop.
+        """Expire lapsed held rows (v0.3 CS-028) — run with the worker's loop.
 
         A held row expires at the earlier of (a) its staging TTL and (b) any
         unsatisfied contract's declared ``timeout``. Expiry settles

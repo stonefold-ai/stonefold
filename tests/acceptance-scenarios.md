@@ -26,7 +26,7 @@ Translate each scenario into an automated test **before** implementing the featu
 - When the gateway loads it
 - Then startup fails (or the policy is rejected) and each violation (§13.5 error, §13.6 warn, §13.4 warn) is reported. The gateway does **not** fall back to a permissive default.
 
-**A4b — a policy naming an undeclared action refuses to load, deny included (v0.4, CS-016; RFC §13.1)**
+**A4b — a policy naming an undeclared action refuses to load, deny included (v0.2, CS-016; spec §13.1)**
 - Given a policy whose `deny` names an action the registry does not declare
 - When the gateway loads it
 - Then the linter reports an ERROR and the policy does not load (a deny of an undeclared name is almost always a typo that would otherwise silently arm itself as a no-op).
@@ -36,30 +36,30 @@ Translate each scenario into an automated test **before** implementing the featu
 - When loaded and validated against `schema/stele.schema.json`
 - Then all load and validate with no errors.
 
-**A6 — standing cannot re-enable a deny (v0.3, CS-010; RFC §13 rule 11)**
+**A6 — standing cannot re-enable a deny (v0.2, CS-010; spec §13 rule 11)**
 - Given a policy with `deny: effect:[engage]` AND a `standing` rule whose `enables` grants `effect:[engage]`
 - When the gateway loads it
 - Then the linter reports an ERROR (the standing grant is unsatisfiable — deny always wins) and the policy does not load.
 
-**A7 — ambiguous bare-name allow warns (v0.3, CS-012; RFC §13 rule 12)**
+**A7 — ambiguous bare-name allow warns (v0.2, CS-012; spec §13 rule 12)**
 - Given a registry that declares an `effect` named `exportData` on two resources, and a policy with `allow: effect:[exportData]`
 - When the policy is linted
 - Then a WARN is reported (the grant applies on every resource that declares the name); the `{ Entity: [names] }` map form lints clean.
 
-**A7b — a `'*'` grant loads but reports a warning (RFC §13.6)**
+**A7b — a `'*'` grant loads but reports a warning (spec §13.6)**
 - Given a policy with `allow: observe: '*'`
 - When the policy is linted
 - Then it loads (a `'*'` grant is legal) and a WARN is surfaced — an unbounded grant must never pass silently.
 
-**A8 — dualAuthorization quorum below two is rejected (v0.3, CS-014; RFC §13 rule 13)**
+**A8 — dualAuthorization quorum below two is rejected (v0.2, CS-014; spec §13 rule 13)**
 - Given a policy gate `dualAuthorization: { quorum: 1, approvers: role:treasury }`
 - When the gateway loads it
 - Then the linter reports an ERROR and the policy does not load.
 
-**A9 — a hold-capable check declared without reasonCodes is rejected (v0.6, CS-038; RFC §13 rule 18)**
+**A9 — a hold-capable check declared without reasonCodes is rejected (v0.3, CS-038; spec §13 rule 18)**
 - Given a registry declaring a precondition check `holdCapable: true` with no `reasonCodes`
 - When the registry+policy pair is loaded
-- Then the load is refused — every hold such a check returned would be code-less and resolve fail (RFC §7.6 rule 2), so the declaration itself is the error.
+- Then the load is refused — every hold such a check returned would be code-less and resolve fail (spec §7.6 rule 2), so the declaration itself is the error.
 
 ---
 
@@ -80,12 +80,12 @@ Translate each scenario into an automated test **before** implementing the featu
 - When enforced
 - Then those payload fields are ignored; identity comes only from the authenticated session.
 
-**B4 — scope no-race on a transactional connector (v0.4 CS-018 — implemented, `test_v04_scope_norace.py` + `test_m4_pg_integration.py`)**
+**B4 — scope no-race on a transactional connector (v0.2 CS-018 — implemented, `test_v04_scope_norace.py` + `test_m4_pg_integration.py`)**
 - Given a staged `pay` decided while the target account belonged to the actor's tenant, and a `transactional` connector
 - When the account is reassigned to another tenant before dispatch
 - Then the effect's write re-asserts the scope predicate inside its own transaction, affects zero rows, and settles `FAILED` with reason `scope-lost` — the effect never lands on un-authorized state.
 
-**B5 — residual window is declared, not hidden (v0.4 CS-018 — implemented, `test_v04_scope_norace.py`)**
+**B5 — residual window is declared, not hidden (v0.2 CS-018 — implemented, `test_v04_scope_norace.py`)**
 - Given the same reassignment race over a `window` connector (HTTP/email)
 - When the dispatch worker re-resolves the target under scope immediately before the call
 - Then the stale target is caught pre-dispatch; and the connector's declared residual window appears in the audit record.
@@ -130,9 +130,9 @@ Translate each scenario into an automated test **before** implementing the featu
 - Given `administer` with `precondition: [tck.flagSet]` and a target whose `flag` is false
 - When enforced → `DENY` (the registered check's verdict binds).
 
-**C10 — classification ordering for `disclosure` (v0.5 CS-024)**
+**C10 — classification ordering for `disclosure` (v0.2 CS-024)**
 - Given `disclosure: { maxClassification: actor.clearance }` on a `restricted` read, and the declared order `public < internal < confidential < restricted`
-- When enforced → an actor cleared `restricted` reads it; an actor cleared `internal` is `DENY`d ("exceeds"); an actor with **no** clearance claim (or a label outside the declared order, either side) is `DENY`d — fail closed (RFC §8), never open.
+- When enforced → an actor cleared `restricted` reads it; an actor cleared `internal` is `DENY`d ("exceeds"); an actor with **no** clearance claim (or a label outside the declared order, either side) is `DENY`d — fail closed (spec §8), never open.
 
 ---
 
@@ -154,12 +154,12 @@ Translate each scenario into an automated test **before** implementing the featu
 - Given an irreversible `effect` with a declared compensation that fails at the connector
 - When dispatched and it fails → a compensating effect is staged, and the failure is audited (not lost).
 
-**D5 — decision TTL cancels a stale staged effect (v0.4 CS-017 — implemented, `test_v04_freshness.py`)**
+**D5 — decision TTL cancels a stale staged effect (v0.2 CS-017 — implemented, `test_v04_freshness.py`)**
 - Given a staged irreversible effect with a short decision TTL
 - When the dispatch worker claims it after the TTL has lapsed (e.g. an approval arrives late)
 - Then the row settles `CANCELLED` with reason `stale-decision`, nothing is dispatched, the agent's ticket resolves to a recoverable refusal, and a late approval does not resurrect it.
 
-**D6 — volatile gates re-validated at dispatch (v0.4 CS-017 — implemented, `test_v04_freshness.py`)**
+**D6 — volatile gates re-validated at dispatch (v0.2 CS-017 — implemented, `test_v04_freshness.py`)**
 - Given a staged `pay` that passed the sanctions `denylist` at decision time
 - When the destination is added to the denylist before dispatch
 - Then the dispatch-time re-validation (inside the claimed transaction, after the kill re-check) settles the row `CANCELLED` with reason `stale-guard:denylist`; counters/approvals/contentCheck are NOT re-run.
@@ -199,7 +199,7 @@ Translate each scenario into an automated test **before** implementing the featu
 ## F. Audit & failure mode (M6)
 
 **F1 — every outcome is recorded**
-- For each of ALLOW / HOLD / DENY / HALT, a corresponding audit record exists with the required fields (RFC §11).
+- For each of ALLOW / HOLD / DENY / HALT, a corresponding audit record exists with the required fields (spec §11).
 
 **F2 — audit is transactional with settle**
 - Given a dispatched effect
@@ -211,7 +211,7 @@ Translate each scenario into an automated test **before** implementing the featu
 
 ---
 
-## H. Batch decision semantics (v0.5 CS-023 — RFC §12, SIF §5)
+## H. Batch decision semantics (v0.2 CS-023 — spec §12, SIF §5)
 
 **H1 — any DENY refuses the whole batch, before anything commits or stages**
 - Given a batch of [a permitted `record`, a denied `effect`]
@@ -227,11 +227,11 @@ Translate each scenario into an automated test **before** implementing the featu
 
 **H4 — a later rejection does not roll back the committed ops**
 - Given H3's committed batch with its held effect
-- When the held effect is rejected (or its TTL expires, CS-017) → the effect never dispatches, but the record op committed in H3 **remains applied** — each operation was independently authorized; `correlationId` ties them for downstream reconciliation (RFC §11).
+- When the held effect is rejected (or its TTL expires, CS-017) → the effect never dispatches, but the record op committed in H3 **remains applied** — each operation was independently authorized; `correlationId` ties them for downstream reconciliation (spec §11).
 
 ---
 
-## I. Connector digest pinning (v0.5 CS-020 — registry §5, RFC §10)
+## I. Connector digest pinning (v0.2 CS-020 — registry §5, spec §10)
 
 **I1 — a pinned digest mismatch fails closed at load**
 - Given a registry that pins a connector to a digest that does not match the loaded implementation
@@ -273,9 +273,9 @@ Real LLM agent (API key; a scripted fake-LLM mode for CI/no-key); rulebook is th
 
 **G6 — audit replay**
 - Given any gated run
-- When the audit log is read (by correlation) → every outcome (allow / hold / deny) appears as an append-only record with its reason and the RFC §11 fields.
+- When the audit log is read (by correlation) → every outcome (allow / hold / deny) appears as an append-only record with its reason and the spec §11 fields.
 
-**G7 — the obligation beats (v0.6 CS-032/CS-035; the refusal no v0.5 gate could produce)**
+**G7 — the obligation beats (v0.3 CS-032/CS-035; the refusal no v0.2 gate could produce)**
 - Given the seeded open purchase orders (one PO line per legitimate invoice) and the unmodified `payments-ops.stele.yaml` (its `requireMatch` on `pay`, `onNoMatch: hold`)
 - When the $800 Acme invoice is paid → it matches its open PO line within tolerance, passes limits **and** matching, dispatches, and the line is **consumed** (audit `consumption: consumed` with the receipt id, `obligationRefs` naming the line);
 - When the **same invoice is resubmitted** → it matches nothing (the line is spent) and **holds `no-match`** in the AP clerk's queue — never a second payment against one line;
@@ -284,7 +284,7 @@ Real LLM agent (API key; a scripted fake-LLM mode for CI/no-key); rulebook is th
 
 ---
 
-## J. The hold substrate (v0.6 CS-026/027/028/031 — RFC §7.6, §12)
+## J. The hold substrate (v0.3 CS-026/027/028/031 — spec §7.6, §12)
 
 **J1 — judgment-shaped ambiguity holds, with its reason code**
 - Given a hold-capable check whose source reads ambiguous for the target
@@ -316,7 +316,7 @@ Real LLM agent (API key; a scripted fake-LLM mode for CI/no-key); rulebook is th
 
 ---
 
-## K. The agent feedback channel (v0.6 CS-029/030 — RFC §11)
+## K. The agent feedback channel (v0.3 CS-029/030 — spec §11)
 
 **K1 — codes and retry classes**
 - Given a valueLimit refusal and a denylist refusal
@@ -332,7 +332,7 @@ Real LLM agent (API key; a scripted fake-LLM mode for CI/no-key); rulebook is th
 
 ---
 
-## L. Obligation matching (v0.6 CS-032/033/036 — RFC §7.16)
+## L. Obligation matching (v0.3 CS-032/033/036 — spec §7.16)
 
 **L1 — exactly one open obligation passes** (within declared tolerance; the effect dispatches).
 **L2 — zero candidates refuse `no-match`** (normative code) while an unrelated open line stays matchable.
@@ -342,7 +342,7 @@ Real LLM agent (API key; a scripted fake-LLM mode for CI/no-key); rulebook is th
 
 ---
 
-## M. The reservation lifecycle (v0.6 CS-035 — RFC §12)
+## M. The reservation lifecycle (v0.3 CS-035 — spec §12)
 
 **M1 — reserved with the staging commit**: a second intent against the staged-but-undispatched line refuses `no-match` (the decide→dispatch double-spend window is closed).
 **M2 — consumed with the settle**: after dispatch, the same invoice resubmitted refuses `no-match`.

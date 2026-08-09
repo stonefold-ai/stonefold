@@ -42,12 +42,12 @@ Wire protocol (all JSON; camelCase keys):
 Omit an endpoint (404/501) only if its capability is not advertised.
 (``reason`` carries the deciding rule/settle reason; required for the
 ``freshness``/``scope-reassert`` capabilities. ``/tck/update-set`` backs
-``freshness``; ``/tck/submit-batch`` backs ``batch`` (v0.5 CS-023);
+``freshness``; ``/tck/submit-batch`` backs ``batch`` (v0.2 CS-023);
 ``/tck/connector-digest`` + ``/tck/tamper-connector`` back ``digest-pinning``
-(v0.5 CS-020); ``/tck/resolve`` + ``/tck/sweep-holds`` back
+(v0.2 CS-020); ``/tck/resolve`` + ``/tck/sweep-holds`` back
 ``hold-precondition``, ``reasonCode``/``retryClass``/``agentView`` back
 ``feedback``, and ``/tck/seed-obligations`` + ``/tck/obligation-outage`` back
-``obligation`` (v0.6).)
+``obligation`` (v0.3).)
 """
 
 from __future__ import annotations

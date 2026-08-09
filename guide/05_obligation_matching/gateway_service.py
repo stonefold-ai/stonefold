@@ -1,6 +1,6 @@
 """THE GATEWAY SERVICE — owned by the platform/infra engineer.
 
-Example 04's full machine, plus the v0.6 obligation wiring. One adapter
+Example 04's full machine, plus the v0.3 obligation wiring. One adapter
 instance (the function developer's erp_adapter.py) is handed to THREE
 consumers, because the obligation's lifecycle spans all three:
 

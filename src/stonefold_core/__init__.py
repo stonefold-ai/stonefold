@@ -199,7 +199,7 @@ __all__ = [
     "FallbackAuditSink",
     "build_record",
     "obligation_refs",
-    # obligation registries (v0.6 CS-032/034/036)
+    # obligation registries (v0.3 CS-032/034/036)
     "MISSING",
     "Capability",
     "ConsumeOutcome",
@@ -216,7 +216,7 @@ __all__ = [
     "claim_evidence",
     "lookup_field",
     "values_equal",
-    # failure mode (RFC §10, design §12)
+    # failure mode (spec §10, design §12)
     "Ok",
     "Unavailable",
     "guard",
@@ -271,7 +271,7 @@ __all__ = [
     "UnknownTicketError",
     "cancellation_record",
     "hold_dedupe_key",
-    # decision freshness (v0.4 CS-017)
+    # decision freshness (v0.2 CS-017)
     "FreshnessConfig",
     "DispatchRevalidator",
     "VOLATILE_GATES",
@@ -290,7 +290,7 @@ __all__ = [
     "ConnectorRegistry",
     "ConnectorResult",
     "Connectors",
-    # scope no-race (v0.4 CS-018)
+    # scope no-race (v0.2 CS-018)
     "SCOPE_LOST",
     "ScopeCapability",
     "ScopeLostError",

@@ -27,7 +27,7 @@ _HEADER = """\
 # TODO(review): every kind and attribute below is a machine guess. A human
 # MUST review and complete this file before it governs anything:
 #   1. fix each action's kind (observe/assess/record/effect/transition);
-#   2. assign governance attributes (RFC 01 sec. 5) -- danger is declared,
+#   2. assign governance attributes (spec 01 sec. 5) -- danger is declared,
 #      never assumed (docs/06 sec. 4); confirm every suggested reversibility;
 #   3. declare from/to states for every transition;
 #   4. add connectors/dataSource, scopePredicates, preconditionChecks, hooks,
@@ -53,7 +53,7 @@ def _action_lines(action: DraftAction, indent: str) -> list[str]:
     if not action.certain:
         kind_comment = f"   # TODO(review): kind guessed from verb {action.verb!r} -- confirm"
     elif action.kind == "transition":
-        kind_comment = "   # TODO(review): declare from/to states (RFC sec. 4.5)"
+        kind_comment = "   # TODO(review): declare from/to states (spec sec. 4.5)"
     lines.append(f"{indent}  kind: {action.kind}{kind_comment}")
     if action.suggested_reversibility:
         lines.append(

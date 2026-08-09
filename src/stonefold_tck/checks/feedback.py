@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""K1–K3 — the agent feedback channel (v0.6 CS-029/030; profile ``feedback``).
+"""K1–K3 — the agent feedback channel (v0.3 CS-029/030; profile ``feedback``).
 
 A deny/hold is a convergence signal: it carries a machine-readable code and a
 retry class. Visibility is a declared choice — the default ``code+fields``

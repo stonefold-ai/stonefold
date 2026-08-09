@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""O1–O4 — per-item verdicts (v0.6.1 CS-043; profile ``per-item``).
+"""O1–O4 — per-item verdicts (v0.3 CS-043; profile ``per-item``).
 
 The failure under test: one action carries twenty items, thirteen of which need a
 human. A gateway that can only allow or refuse the call takes the seven
@@ -139,7 +139,7 @@ def o4_refusals_are_in_the_record(driver: ConformanceDriver) -> None:
     expect(
         len(refusals) == 2,
         f"{len(refusals)} audit records for 2 refused items — each item is its own "
-        "decision and RFC §11 wants a record per decision",
+        "decision and spec §11 wants a record per decision",
     )
     applied = [
         a for a in driver.audit()

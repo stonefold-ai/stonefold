@@ -1,4 +1,4 @@
-# 05 — Obligation matching (v0.6): in bounds is not the same as owed
+# 05 — Obligation matching (v0.3): in bounds is not the same as owed
 
 **The question this example answers:** every gate so far bounds damage. None
 can catch the payment that is under every limit and corresponds to
@@ -136,7 +136,7 @@ driver: one line, one payment, ever
 
 ## What to notice
 
-1. **The second `pay 800` is the v0.6 moment.** Same vendor, same amount,
+1. **The second `pay 800` is the v0.3 moment.** Same vendor, same amount,
    under every limit — refused, because the order line is *spent*. No
    constant-comparing gate can express that; a relation to an external
    record can.

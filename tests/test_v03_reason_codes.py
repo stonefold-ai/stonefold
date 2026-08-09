@@ -1,4 +1,4 @@
-"""v0.6 reason codes + retry classes — CS-029 (RFC §11).
+"""v0.3 reason codes + retry classes — CS-029 (spec §11).
 
 Every deny/hold carries a machine-readable code with a declared retry class:
 ``retryable`` (fix the intent, resubmit) | ``terminal`` (stop) | ``escalate``

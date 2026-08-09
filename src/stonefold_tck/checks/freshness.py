@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
-"""FRESHNESS profile — v0.4 timing guarantees (RFC §12 CS-017, §6.3 CS-018).
+"""FRESHNESS profile — v0.2 timing guarantees (spec §12 CS-017, §6.3 CS-018).
 
 A driver claiming ``CAP_FRESHNESS`` MUST run with the REQUIRED TCK freshness
 config: default decision TTL **24 hours**, irreversible TTL **30 minutes**
-(``stonefold_tck.driver``). The v0.4 settle reasons asserted here — ``stale-decision``,
-``stale-guard:<gate>``, ``scope-lost`` — are normative (RFC §12/§6.3), so the
+(``stonefold_tck.driver``). The v0.2 settle reasons asserted here — ``stale-decision``,
+``stale-guard:<gate>``, ``scope-lost`` — are normative (spec §12/§6.3), so the
 checks compare them exactly.
 
 Deliberately not checked black-box: the *declared residual window* of a window
@@ -66,7 +66,7 @@ def d5_expired_decision(driver: ConformanceDriver) -> None:
            f"the stale cancel was not audited deny/cancelled, got {last.decision}/{last.outcome}")
     expect(last.reason == "stale-decision",
            f"the settle reason is {last.reason!r} instead of the normative "
-           f"'stale-decision' (RFC §12)")
+           f"'stale-decision' (spec §12)")
 
 
 @check("D5b", "a late approval does not resurrect an expired decision",
@@ -107,7 +107,7 @@ def d6_volatile_revalidation(driver: ConformanceDriver) -> None:
            f"the stale-guard cancel was not audited, got {last.decision}/{last.outcome}")
     expect(last.reason == "stale-guard:denylist",
            f"the settle reason is {last.reason!r} instead of the normative "
-           f"'stale-guard:denylist' (RFC §12)")
+           f"'stale-guard:denylist' (spec §12)")
 
     again = submit(driver, pay(100, country="SK"))
     expect_decision(again, "deny", "a fresh submission after the set update")
@@ -153,10 +153,10 @@ def b4_scope_no_race(driver: ConformanceDriver) -> None:
     driver.seed("Payment", [{"id": "P1", "tenant": "t2"}, {"id": "P2", "tenant": "t2"}])
     driver.dispatch_once()
     expect(effects_of(driver, "pay") == 0,
-           "the effect landed on un-authorized state (RFC §6.3)")
+           "the effect landed on un-authorized state (spec §6.3)")
     last = _last_audit(driver)
     expect(last.decision == "deny" and last.outcome == "failure",
            f"the scope failure was not audited, got {last.decision}/{last.outcome}")
     expect(last.reason == "scope-lost",
            f"the settle reason is {last.reason!r} instead of the normative "
-           f"'scope-lost' (RFC §6.3)")
+           f"'scope-lost' (spec §6.3)")

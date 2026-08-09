@@ -87,5 +87,5 @@ def test_audit_records_allow_and_hold(bundle: APBundle, provider: LLMProvider) -
     records = bundle.audit_reader.by_correlation("inbox")
     decisions = {r.decision.value for r in records}
     assert "allow" in decisions and "hold" in decisions
-    for r in records:  # every record carries the required RFC §11 fields
+    for r in records:  # every record carries the required spec §11 fields
         assert r.resource and r.action and r.decision and r.timestamp

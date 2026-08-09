@@ -1,4 +1,4 @@
-"""M5 — the kill check in the enforcement pipeline (RFC §9/§12 step 5, design §8.3).
+"""M5 — the kill check in the enforcement pipeline (spec §9/§12 step 5, design §8.3).
 
 Acceptance **E1** (a kill turns subsequent actions into audited ``HALT``, and
 retries keep HALTing) and **E5** (kill store unreachable ⇒ fail closed for an

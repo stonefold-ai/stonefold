@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The standard closure check (RFC §7.6, v0.6.1 CS-041).
+"""The standard closure check (spec §7.6, v0.3 CS-041).
 
 **The failure this exists for.** A gate refuses the work — the payment is held,
 the mandate change denied — and the actor then closes the item as done. The

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The model registry (design §2, RFC §2/§12 step 1).
+"""The model registry (design §2, spec §2/§12 step 1).
 
 The registry is the declared catalogue of resources and actions the gateway
 knows about — loaded once at startup into an indexed in-memory structure.
@@ -9,7 +9,7 @@ before any policy runs. This module is pure (no I/O beyond reading a provided
 mapping) and is part of the trust kernel.
 
 The registry also declares the *named* extension points the frozen vocabulary
-hangs off (RFC §13.1): scope predicates, content-check hooks, precondition
+hangs off (spec §13.1): scope predicates, content-check hooks, precondition
 checks, named sets, and disclosure sinks. They are parsed here so M1's linter
 can check that every name a policy references exists.
 """
@@ -36,7 +36,7 @@ from stonefold_core.obligation import ObligationRegistryDecl
 class UnknownActionError(Exception):
     """Raised when a ``RawCall`` names a resource or action not in the registry.
 
-    Per RFC §12 step 1, the pipeline turns this into a DENY (rule
+    Per spec §12 step 1, the pipeline turns this into a DENY (rule
     ``unknown-action``) and audits it.
     """
 
@@ -149,7 +149,7 @@ class ItemsDef(BaseModel):
 
 class ActionDef(BaseModel):
     """A declared action: its kind, governance attributes, and (for a
-    transition) its legal from-states (RFC §3–§5, §4.5)."""
+    transition) its legal from-states (spec §3–§5, §4.5)."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -165,7 +165,7 @@ class ActionDef(BaseModel):
     operativeForce: OperativeForce = OperativeForce.NONE
     resultSensitivity: str = "internal"
     explainability: Explainability = Explainability.NONE
-    # Legal source states for a TRANSITION action (RFC §4.5). Accepts the YAML
+    # Legal source states for a TRANSITION action (spec §4.5). Accepts the YAML
     # key ``from`` (a Python keyword) via alias.
     from_states: tuple[str, ...] = Field(default=(), alias="from")
     # Per-action connector override; falls back to the resource's connector.
@@ -242,7 +242,7 @@ class ResourceDef(BaseModel):
 
 
 class PreconditionCheckDecl(BaseModel):
-    """One declared precondition check (docs/06 §5, v0.6 CS-026/CS-029).
+    """One declared precondition check (docs/06 §5, v0.3 CS-026/CS-029).
 
     The bare-name form declares a two-valued check whose codes default
     ``terminal``; the object form additionally declares hold capability and the
@@ -282,7 +282,7 @@ class RegistryFile(BaseModel):
     scopePredicates: tuple[str, ...] = ()
     contentHooks: tuple[str, ...] = ()
     preconditionChecks: tuple[str, ...] = ()
-    # v0.6 (CS-026/CS-029): the full declarations behind the name list — the
+    # v0.3 (CS-026/CS-029): the full declarations behind the name list — the
     # loader accepts each ``preconditionChecks`` item as a bare name or an
     # object (``{name, holdCapable, reasonCodes}``) and splits them here, the
     # CS-020 ``connector_digests`` pattern. Every declared check has an entry
@@ -292,7 +292,7 @@ class RegistryFile(BaseModel):
     # CS-044: the sources a gate may declare that it reads (docs/06 §5e).
     sources: dict[str, SourceDecl] = Field(default_factory=dict)
     sinks: tuple[str, ...] = ()
-    # v0.6 (CS-034): the systems of record ``requireMatch`` matches against
+    # v0.3 (CS-034): the systems of record ``requireMatch`` matches against
     # (docs/06 §5b). A declared ``digest`` pins the adapter connector's artifact
     # — merged into ``connector_digests`` below so CS-020's load/dispatch
     # verification covers obligation adapters with no extra machinery.
@@ -301,7 +301,7 @@ class RegistryFile(BaseModel):
     )
     # CS-024: the DECLARED ORDER of classification labels (lowest first) that
     # ``disclosure.maxClassification`` compares by. The default is the built-in
-    # ``resultSensitivity`` order (RFC §7.12); a domain substituting its own
+    # ``resultSensitivity`` order (spec §7.12); a domain substituting its own
     # labels MUST declare them as an ordered value set (docs/06 §4 — order is
     # list position). A label missing from the order makes the gate fail closed.
     classifications: tuple[str, ...] = (
@@ -363,7 +363,7 @@ class RegistryFile(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def _split_precondition_decls(cls, data: Any) -> Any:
-        """Normalise ``preconditionChecks`` items (bare name | object, v0.6
+        """Normalise ``preconditionChecks`` items (bare name | object, v0.3
         CS-029) into the name tuple plus a ``precondition_decls`` map. Every
         check gets a declaration; bare names get the two-valued default."""
         if not isinstance(data, dict):
@@ -451,12 +451,12 @@ class InMemoryRegistry:
         return name in self._data.preconditionChecks
 
     def precondition_decl(self, name: str) -> PreconditionCheckDecl | None:
-        """The full declaration behind a check name (v0.6 CS-029); ``None`` for
+        """The full declaration behind a check name (v0.3 CS-029); ``None`` for
         an undeclared name."""
         return self._data.precondition_decls.get(name)
 
     def check_hold_capable(self, name: str) -> bool:
-        """Whether the check declared ``holdCapable`` (RFC §7.6 rule 3, CS-026).
+        """Whether the check declared ``holdCapable`` (spec §7.6 rule 3, CS-026).
         A hold from a check that didn't is an implementation error — the gate
         resolves it fail-closed."""
         decl = self._data.precondition_decls.get(name)
@@ -474,7 +474,7 @@ class InMemoryRegistry:
         return name in self._data.obligationRegistries
 
     def obligation_registry(self, name: str) -> ObligationRegistryDecl | None:
-        """The declaration behind an obligation registry name (v0.6 CS-034);
+        """The declaration behind an obligation registry name (v0.3 CS-034);
         ``None`` for an undeclared name — the ``requireMatch`` gate treats that
         as fail-closed and §13 rule 14 rejects it at load."""
         return self._data.obligationRegistries.get(name)
@@ -495,7 +495,7 @@ class InMemoryRegistry:
     def classification_rank(self, label: str) -> int | None:
         """The label's position in the declared classification order (CS-024),
         lowest first — or ``None`` for a label not in the order, which the
-        ``disclosure`` gate treats as fail-closed (RFC §8 runtime resolution)."""
+        ``disclosure`` gate treats as fail-closed (spec §8 runtime resolution)."""
         try:
             return self._data.classifications.index(label)
         except ValueError:

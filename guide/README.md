@@ -13,7 +13,7 @@ and complete files. Every example's `main.py` is executed by the test suite
 on every commit (`tests/test_guide_examples.py`), so the guide cannot drift
 from the code it teaches.
 
-<a href="architecture.svg"><img src="architecture.svg" alt="How the pieces fit: the agent's only path is a typed submit_intent over HTTP into the deterministic gateway (resolve, authorize, scope, gates, kill, stage, audit); gates call your registered checks/hooks/predicates; allowed effects stage in the outbox and a dispatch worker sends them through your connectors, with the operator holding approvals and the kill switch; v0.6 adds the obligation registry the gateway queries, reserves, consumes and releases; everything lands in the append-only audit log" width="1080"></a>
+<a href="architecture.svg"><img src="architecture.svg" alt="How the pieces fit: the agent's only path is a typed submit_intent over HTTP into the deterministic gateway (resolve, authorize, scope, gates, kill, stage, audit); gates call your registered checks/hooks/predicates; allowed effects stage in the outbox and a dispatch worker sends them through your connectors, with the operator holding approvals and the kill switch; v0.3 adds the obligation registry the gateway queries, reserves, consumes and releases; everything lands in the append-only audit log" width="1080"></a>
 
 <sub>Click the diagram to open it full size.</sub>
 
@@ -86,9 +86,9 @@ install from the checkout. The `spec/` submodule must be populated
 |---|---|---|
 | [01 — Hello, gateway](01_hello_gateway/README.md) | the registry, the simplest policy, default deny, the audit — the gateway's *inside* (no agent here, on purpose) |
 | [02 — Connect YOUR agent](02_connect_an_agent/README.md) | the one HTTP call that lives in your agent, the tool schema, identity from the transport — the real service on a real port |
-| [03 — Registered functions](03_registered_functions/README.md) | the code the gateway calls: scope predicates, content hooks, precondition checks (incl. the v0.6 three-valued *hold*) |
+| [03 — Registered functions](03_registered_functions/README.md) | the code the gateway calls: scope predicates, content hooks, precondition checks (incl. the v0.3 three-valued *hold*) |
 | [04 — The full machine](04_the_full_machine/README.md) | Postgres outbox + Redis counters, the dispatch worker, approvals and the kill switch over the operator API |
-| [05 — Obligation matching](05_obligation_matching/README.md) | v0.6: the ERP adapter, `requireMatch`, reserve→consume→release, and the agent loop that converges on `retryClass` |
+| [05 — Obligation matching](05_obligation_matching/README.md) | v0.3: the ERP adapter, `requireMatch`, reserve→consume→release, and the agent loop that converges on `retryClass` |
 | [06 — Keep your tools](06_keep_your_tools/README.md) | interception mode: your existing agent, unchanged — a reviewed mapping table translates its old tool calls into declared actions; unmapped tools are denied |
 
 Read them in order the first time; each README states which files changed
@@ -111,12 +111,12 @@ skim survives contact with the prose. (The full glossary is
 | **settle** | the dispatch worker's final write after the effect executed: outcome + audit, in one transaction |
 | **fail closed** | any dependency failure is treated as a deny/halt, never as a pass |
 | **`reasonCode` / `retryClass`** | machine-readable refusal feedback: which rule refused, and whether the agent should fix-and-resubmit (`retryable`), stop (`terminal`), or surface to a human on its side (`escalate`) |
-| **obligation** | an external record (e.g. a purchase order line) a payment must match and spend — v0.6, example 05 |
+| **obligation** | an external record (e.g. a purchase order line) a payment must match and spend — v0.3, example 05 |
 
 ## Where to go next
 
 - **`docs/02-implementation-design.md`** — how the pipeline works inside.
-- **`spec/docs/01-RFC-agent-control-policy.md`** — Stele, normatively: all
+- **`spec/docs/01-stele-policy-language.md`** — Stele, normatively: all
   fifteen gates, the condition language, the linter rules.
 - **`spec/examples/*.stele.yaml`** — five worked policies (payments,
   clinical, legal, support, defence) that load and lint clean.

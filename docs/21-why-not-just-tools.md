@@ -198,7 +198,7 @@ indirection is the cost to count, not the latency.
 ## 6. What it does not do
 
 The gateway bounds reach; it does not supply judgment. An action that is wrong but in
-bounds will execute. Policy can shrink that space — v0.6 can require that a payment
+bounds will execute. Policy can shrink that space — v0.3 can require that a payment
 match an open purchase-order line within tolerance before it dispatches — and holds
 route genuinely ambiguous cases to a human, but "permitted" never means "correct".
 Connectors and the gateway itself are trusted code; the guarantee is that intents
@@ -207,7 +207,7 @@ a layer like this makes agents safe is overselling. What it makes them is bounde
 auditable, and stoppable, which is what lets a responsible person sign off on removing
 the human from the loop at all.
 
-Status, plainly: the intent format is a v1.0 spec and Stele a v0.6 policy spec, both evolving
+Status, plainly: the intent format is a v1.0 spec and Stele a v0.3 policy spec, both evolving
 in the open under Apache-2.0, with a Python reference implementation, a runnable
 real-LLM demo, and a conformance test kit so other implementations can certify
 independently. It's a serious effort and an early one, currently driven by one person.
@@ -240,5 +240,5 @@ blocking risks, who signs) · [`docs/10-positioning-policy-engines.md`](10-posit
 (why OPA/Cedar/IAM alone don't cover this, and how they compose with it) ·
 [`spec/docs/17-interception-mapping.md`](https://github.com/stonefold-ai/spec/blob/main/docs/17-interception-mapping.md)
 (how mapping ordinary tool calls works, and its limits) ·
-[`spec/docs/00-RFC-sif-intent-format.md`](https://github.com/stonefold-ai/spec/blob/main/docs/00-RFC-sif-intent-format.md)
+[`spec/docs/00-sif-wire-format.md`](https://github.com/stonefold-ai/spec/blob/main/docs/00-sif-wire-format.md)
 (the intent format itself: the five action kinds and the operation shape).

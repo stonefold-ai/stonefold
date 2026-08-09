@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""J1–J7 — the hold substrate (v0.6 CS-026/027/028/031; profile ``hold-precondition``).
+"""J1–J7 — the hold substrate (v0.3 CS-026/027/028/031; profile ``hold-precondition``).
 
 A hold-capable check's judgment-shaped ambiguity suspends the intent for a
 human; a code-less hold, a check outage, and a hold with no resolvable release
@@ -197,7 +197,7 @@ def j5_outage_fails_never_holds(driver: ConformanceDriver) -> None:
 def j6_duplicate_holds_collapse(driver: ConformanceDriver) -> None:
     # CS-031: the same question asked twice within the REQUIRED TCK dedupe
     # window (one hour) is one queue item — the agent gets the SAME ticket,
-    # and each attempt is still audited. CS-040 (v0.6.1) sharpens the
+    # and each attempt is still audited. CS-040 (v0.3) sharpens the
     # identity: a DIFFERENT question (a different target here) must NOT
     # collapse — over-collapsing loses a question.
     setup(driver, policy=POLICY_HOLD, seed_world=False)

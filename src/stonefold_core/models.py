@@ -27,7 +27,7 @@ from stonefold_core.enums import (
 
 
 class Attributes(BaseModel):
-    """Declared, read-only governance facts about an action (RFC §5).
+    """Declared, read-only governance facts about an action (spec §5).
 
     Conditions reference these (e.g. ``action.reversibility == irreversible``).
     They are declared on the action in the registry and are immutable to the
@@ -40,7 +40,7 @@ class Attributes(BaseModel):
     reversibility: Reversibility = Reversibility.REVERSIBLE
     emission: Emission = Emission.NONE
     operativeForce: OperativeForce = OperativeForce.NONE
-    # resultSensitivity is an open value set (RFC §5: "or a domain classification
+    # resultSensitivity is an open value set (spec §5: "or a domain classification
     # label"), so it stays a plain string rather than an enum.
     resultSensitivity: str = "internal"
     explainability: Explainability = Explainability.NONE
@@ -51,7 +51,7 @@ class RawCall(BaseModel):
 
     NOTE the deliberate absence of any ``actor``/``owner``/``tenant`` field: the
     agent supplies *what* it wants to do (resource, action, data) but never *who*
-    it is. Identity is injected by the gateway from the session (RFC §6.3,
+    it is. Identity is injected by the gateway from the session (spec §6.3,
     invariant 3). If ``data`` happens to contain such fields they are treated as
     opaque parameters and never used for scope.
     """
@@ -64,7 +64,7 @@ class RawCall(BaseModel):
 
 
 class Compensation(BaseModel):
-    """A declared compensating effect (RFC §4.4, design §8.5/§9): the action to
+    """A declared compensating effect (spec §4.4, design §8.5/§9): the action to
     auto-stage if an *irreversible* effect fails at dispatch — e.g. ``refund`` for
     a ``pay``. Names a resource+action the registry knows."""
 
@@ -79,7 +79,7 @@ class ResolvedAction(BaseModel):
     """An attempted action after registry resolution (design §2).
 
     Unknown names never reach this type — they short-circuit to DENY in
-    ``Registry.resolve`` (RFC §12 step 1).
+    ``Registry.resolve`` (spec §12 step 1).
     """
 
     model_config = ConfigDict(frozen=True)
@@ -94,7 +94,7 @@ class ResolvedAction(BaseModel):
     # resolution so the load-time and dispatch-time checks compare against the same
     # value that was in force when the action was staged. ``None`` ⇒ not pinned.
     connector_digest: str | None = None
-    # Registry-declared legal from-states for a TRANSITION action (RFC §4.5).
+    # Registry-declared legal from-states for a TRANSITION action (spec §4.5).
     # Empty for non-transitions. The built-in transition precondition (M2) uses
     # this; it is a MUST-hold check, not optional policy.
     from_states: tuple[str, ...] = ()
@@ -108,7 +108,7 @@ class ResolvedAction(BaseModel):
 
 
 class Actor(BaseModel):
-    """The end principal the agent acts for (RFC §2, design §2).
+    """The end principal the agent acts for (spec §2, design §2).
 
     Constructed by the gateway from the authenticated session/transport, *never*
     from the agent payload (invariant 3). Drives ``scope`` and approvals.
@@ -133,11 +133,11 @@ class Session(BaseModel):
 class GateResult(BaseModel):
     """The result of evaluating one gate (design §2).
 
-    v0.6 (CS-026/CS-029): a deny/hold additionally carries a machine-readable
+    v0.3 (CS-026/CS-029): a deny/hold additionally carries a machine-readable
     ``code``; ``source`` names the registered check/hook that produced the
     verdict (empty for the gate's own logic); ``evidence`` is optional
     check-supplied context for the human resolving a hold. All additive —
-    pre-v0.6 records validate unchanged.
+    pre-v0.3 records validate unchanged.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -148,11 +148,11 @@ class GateResult(BaseModel):
     code: str = ""
     source: str = ""
     evidence: dict[str, Any] | None = None
-    # v0.6 CS-029: the code's declared retry class (check-declared, else the
+    # v0.3 CS-029: the code's declared retry class (check-declared, else the
     # gate's built-in default assigned by the engine). ``None`` on PASS and on
     # approval-shaped holds (the agent's move there is to wait).
     retry_class: RetryClass | None = None
-    # v0.6 CS-030: which INTENT field(s) the comparison judged (e.g.
+    # v0.3 CS-030: which INTENT field(s) the comparison judged (e.g.
     # ``data.amount``) — what ``code+fields`` visibility may reveal. Never
     # carries record-side values; those live only in ``reason``/``evidence``.
     fields: tuple[str, ...] = ()
@@ -186,11 +186,11 @@ class EvalResult(BaseModel):
     decision: Decision
     rule: str
     gates: tuple[GateResult, ...] = ()
-    # v0.6 CS-029: the machine-readable reason code + retry class for a
+    # v0.3 CS-029: the machine-readable reason code + retry class for a
     # deny/hold — the agent's convergence signal. Empty/None on ALLOW.
     reason_code: str = ""
     retry_class: RetryClass | None = None
-    # v0.6 CS-030: the visibility level the deciding action's policy declares
+    # v0.3 CS-030: the visibility level the deciding action's policy declares
     # (stamped by the pipeline; the TRANSPORT applies it via ``agent_view`` —
     # the pipeline's own result, and hence the audit, is always full).
     feedback: FeedbackLevel = FeedbackLevel.CODE_FIELDS
@@ -199,7 +199,7 @@ class EvalResult(BaseModel):
     # The connector result on an executed ALLOW (rows for an observe, a receipt
     # for a record/transition). ``None`` for refusals and not-yet-executed effects.
     output: Any | None = None
-    # Human-readable description of the scope applied below the model (RFC §11).
+    # Human-readable description of the scope applied below the model (spec §11).
     scope_applied: tuple[str, ...] = ()
     # CS-043: one verdict per item for an item-bearing action, and the items
     # that actually took effect. Empty for every other action.
@@ -220,12 +220,12 @@ class EvalResult(BaseModel):
 
 
 class BatchResult(BaseModel):
-    """The terminal verdict of one ``enforce_batch`` call (RFC §12, CS-023).
+    """The terminal verdict of one ``enforce_batch`` call (spec §12, CS-023).
 
     A SIF batch is decided atomically: every operation is decided first, then
     the batch either commits as a whole or is refused as a whole. ``results``
     carries one ``EvalResult`` per operation, in submission order — each backed
-    by its own audit record (RFC §11).
+    by its own audit record (spec §11).
     """
 
     model_config = ConfigDict(frozen=True)
@@ -241,10 +241,10 @@ class BatchResult(BaseModel):
 
 
 class AuditRecord(BaseModel):
-    """One append-only audit record (RFC §11).
+    """One append-only audit record (spec §11).
 
     Written for *every* evaluated action — allowed, held, denied, or halted.
-    Fields mirror the RFC §11 "required at full" table; values not yet known at
+    Fields mirror the spec §11 "required at full" table; values not yet known at
     write time (e.g. ``outcome`` for a refusal) take their conservative default.
     """
 
@@ -259,11 +259,11 @@ class AuditRecord(BaseModel):
     scopeApplied: list[str] = Field(default_factory=list)
     gates: list[GateResult] = Field(default_factory=list)
     decision: Decision = Decision.DENY
-    # The deciding rule/gate or settle reason (RFC §11: the decision is recorded
+    # The deciding rule/gate or settle reason (spec §11: the decision is recorded
     # "with the deciding rule/gate") — e.g. "gate:denylist", "stale-decision",
     # "scope-lost", "dispatch".
     rule: str | None = None
-    # v0.6 CS-029: the machine-readable code + retry class of a deny/hold —
+    # v0.3 CS-029: the machine-readable code + retry class of a deny/hold —
     # what the agent was told (subject to CS-030 visibility; the audit always
     # carries it). Empty/None on ALLOW.
     reasonCode: str = ""
@@ -271,19 +271,19 @@ class AuditRecord(BaseModel):
     approval: dict[str, Any] | None = None
     # Connector result: "success" | "failure" | "not_executed".
     outcome: str = "not_executed"
-    # RFC §11 (CS-009): the downstream identifier(s) of an executed/settled effect's
+    # spec §11 (CS-009): the downstream identifier(s) of an executed/settled effect's
     # result — the connector-returned id(s) of the created/changed record(s), the
     # handle/lineage key an external system uses to locate/reconcile/compensate it.
     # A *list* because one action may fan out to several records (a payment + its
     # ledger entry); empty for refusals, holds, and non-effect actions.
     resultRefs: list[str] = Field(default_factory=list)
-    # v0.6 (CS-037): the ENTITLEMENT-side lineage — which declared obligation
+    # v0.3 (CS-037): the ENTITLEMENT-side lineage — which declared obligation
     # registry was matched, the matched/candidate obligation ref(s), and the
     # candidate count (1, 0, or n>1 for a held-ambiguous decision).
     # ``resultRefs`` locate what the effect produced; ``obligationRefs`` locate
     # what entitled it. ``None`` when no ``requireMatch`` gate ran.
     obligationRefs: dict[str, Any] | None = None
-    # v0.6 (CS-037): the reservation lifecycle outcome for the matched
+    # v0.3 (CS-037): the reservation lifecycle outcome for the matched
     # obligation — ``reserved`` (staging record), ``consumed`` + receipt id
     # (successful settle; ``window`` capability surfaced), or ``released``
     # (terminal non-success). ``None`` when nothing was reserved.

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Reason-code retry classification (RFC §11, v0.6 CS-029).
+"""Reason-code retry classification (spec §11, v0.3 CS-029).
 
 One home for the normative classes: which built-in gate refusals are
 ``retryable``, which structural/settle reasons carry which class, and the
@@ -14,7 +14,7 @@ from stonefold_core.enums import Decision, Outcome, RetryClass
 from stonefold_core.models import GateResult
 
 # Built-in gate refusals whose defect is in the INTENT — fix it and resubmit
-# (RFC §11: valueLimit, rate, quota, quantityCap, spendLimit, window,
+# (spec §11: valueLimit, rate, quota, quantityCap, spendLimit, window,
 # contentCheck, requireExplanation). Everything else defaults terminal:
 # allowlist/denylist, disclosure, precondition (per check code where declared),
 # the transition from-states guard, and any gate not listed.
@@ -31,7 +31,7 @@ RETRYABLE_GATES: frozenset[str] = frozenset(
     }
 )
 
-# Structural decision/settle reasons with a declared class (RFC §11). Reasons
+# Structural decision/settle reasons with a declared class (spec §11). Reasons
 # absent from this table — including dependency failures like
 # ``outbox-unavailable`` — default terminal: an outage is not an intent defect,
 # and the safe direction is to stop retrying.
@@ -43,7 +43,7 @@ _EXACT: dict[str, RetryClass] = {
     "scope-denied": RetryClass.TERMINAL,
     "scope-unavailable": RetryClass.TERMINAL,
     "scope-lost": RetryClass.TERMINAL,
-    # v0.6 CS-035: the matched obligation was reserved/consumed by another
+    # v0.3 CS-035: the matched obligation was reserved/consumed by another
     # intent between decision and staging — this line is spoken for; nothing
     # about resubmitting the same intent can fix it.
     "no-match": RetryClass.TERMINAL,
@@ -61,7 +61,7 @@ _PREFIXES: tuple[tuple[str, RetryClass], ...] = (
 
 
 def gate_class(gate: str) -> RetryClass:
-    """The default class for a built-in gate's refusal (RFC §11, CS-029)."""
+    """The default class for a built-in gate's refusal (spec §11, CS-029)."""
     return RetryClass.RETRYABLE if gate in RETRYABLE_GATES else RetryClass.TERMINAL
 
 
@@ -103,7 +103,7 @@ def classify(
             if deciding.outcome is Outcome.HOLD:
                 # A hold with no declared class carries none: a gateway hold
                 # queues operator-side and the agent's move is to WAIT, which
-                # none of the three classes means (RFC §11). Check-declared
+                # none of the three classes means (spec §11). Check-declared
                 # classes took the branch above; this covers approval-shaped
                 # holds and the ``requireMatch`` gate's own holds alike.
                 return code, None

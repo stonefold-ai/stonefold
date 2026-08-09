@@ -87,7 +87,7 @@ def authoring_to_compact(authoring: Mapping[str, Any]) -> dict[str, Any]:
                 compact[attr] = value
             # ``data``/``label``/``closure`` are declared identically in both
             # dialects and were previously dropped here, so an authoring-format
-            # registry silently lost its field shapes (and, from v0.6.1, its
+            # registry silently lost its field shapes (and, from v0.3, its
             # closure vocabulary — which the standard check reads).
             for key in ("from", "compensation", "connector", "data", "label",
                         "closure", "items"):
@@ -116,7 +116,7 @@ def authoring_to_compact(authoring: Mapping[str, Any]) -> dict[str, Any]:
             if isinstance(decl, Mapping) and decl.get("digest") is not None
         },
         "scopePredicates": list(authoring.get("scopePredicates") or []),
-        # v0.6 CS-029: the object form (name/holdCapable/reasonCodes) is the
+        # v0.3 CS-029: the object form (name/holdCapable/reasonCodes) is the
         # same in both dialects — pass items through untouched.
         "preconditionChecks": list(authoring.get("preconditionChecks") or []),
         "contentHooks": list(authoring.get("hooks") or []),
@@ -125,9 +125,9 @@ def authoring_to_compact(authoring: Mapping[str, Any]) -> dict[str, Any]:
             name: list(spec.get("values") or [])
             for name, spec in dict(authoring.get("namedSets") or {}).items()
         },
-        # v0.6 CS-034: the declaration shape is shared between the dialects.
+        # v0.3 CS-034: the declaration shape is shared between the dialects.
         "obligationRegistries": dict(authoring.get("obligationRegistries") or {}),
-        # v0.6.1 CS-044: same shape in both dialects — pass through untouched.
+        # v0.3 CS-044: same shape in both dialects — pass through untouched.
         "sources": dict(authoring.get("sources") or {}),
         "resources": resources,
     }
@@ -324,7 +324,7 @@ class ReferenceDriver:
         self._world = _FailableConnector()
         connectors = Connectors({"tck-data": self._world, "tck-effects": self._world})
         self._connectors = connectors
-        # v0.6 (CS-034): one mock adapter per declared obligation registry —
+        # v0.3 (CS-034): one mock adapter per declared obligation registry —
         # the docs/12 §3 fixture semantics (line.state moves with the lifecycle).
         self._sources: dict[str, _SettableSource] = {
             name: _SettableSource(lambda: self._now)
@@ -344,7 +344,7 @@ class ReferenceDriver:
                 "tck.codelessHold": _codeless_hold,
             },
             obligations=self._obligations,
-            # v0.6.1 (CS-041): a driver claiming CAP_CLOSURE must supply the
+            # v0.3 (CS-041): a driver claiming CAP_CLOSURE must supply the
             # gateway's own decision history — what it refused earlier for the
             # same actor and run, read from its own audit and nothing else.
             history=AuditDecisionHistory(self._audit),
@@ -363,9 +363,9 @@ class ReferenceDriver:
             outbox=self._outbox,
             kill=self._kill,
             env_factory=self._env_factory,
-            freshness=_TCK_FRESHNESS,  # v0.4 CS-017: TTL stamped at staging
-            obligations=self._obligations,  # v0.6 CS-035: reserve at staging
-            # v0.6 CS-031: the REQUIRED TCK dedupe window — one hour, like the
+            freshness=_TCK_FRESHNESS,  # v0.2 CS-017: TTL stamped at staging
+            obligations=self._obligations,  # v0.3 CS-035: reserve at staging
+            # v0.3 CS-031: the REQUIRED TCK dedupe window — one hour, like the
             # freshness TTLs a fixture semantics the J6 check counts on.
             dedupe_window_s=3600.0,
             agent=policy.agent,
@@ -380,7 +380,7 @@ class ReferenceDriver:
             )
         except DigestMismatchError as exc:
             return LoadResult(ok=False, errors=[str(exc)])
-        # v0.4 wiring: the worker re-checks TTL + volatile gates inside the
+        # v0.2 wiring: the worker re-checks TTL + volatile gates inside the
         # claim (CS-017) and re-asserts scope at dispatch (CS-018).
         self._worker = DispatchWorker(
             self._outbox,
@@ -390,7 +390,7 @@ class ReferenceDriver:
             clock=self._worker_clock,
             revalidate=self._make_revalidator(engine, policy),
             scopes=scopes,
-            obligations=self._obligations,  # v0.6 CS-035: consume/release
+            obligations=self._obligations,  # v0.3 CS-035: consume/release
         )
         return LoadResult(ok=True, warnings=warnings)
 
@@ -450,7 +450,7 @@ class ReferenceDriver:
             reason_code=result.reason_code,
             retry_class=result.retry_class.value if result.retry_class else None,
             agent_view=json.dumps(result.model_dump(mode="json"), default=str),
-            # v0.6.1 CS-043: per-item verdicts, in submission order
+            # v0.3 CS-043: per-item verdicts, in submission order
             items=[
                 {"item": v.item, "decision": v.decision.value, "reasonCode": v.reason_code,
                  "retryClass": v.retry_class.value if v.retry_class else None,

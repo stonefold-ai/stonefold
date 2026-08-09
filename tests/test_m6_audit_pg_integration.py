@@ -1,4 +1,4 @@
-"""M6 — durable audit against **real Postgres** (RFC §11, design §11; invariant 6).
+"""M6 — durable audit against **real Postgres** (spec §11, design §11; invariant 6).
 
 Two acceptance properties that only a real RDBMS can demonstrate:
 

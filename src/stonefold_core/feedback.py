@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Agent feedback visibility (RFC §11, v0.6 CS-030).
+"""Agent feedback visibility (spec §11, v0.3 CS-030).
 
 What the *agent* receives on a deny/hold is a declared choice — ``code`` |
 ``code+fields`` (default) | ``code+evidence`` — applied by the TRANSPORT on the

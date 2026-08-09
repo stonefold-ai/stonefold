@@ -1,6 +1,6 @@
 # THE REGISTRY — platform/policy team artifact.
 #
-# New here (v0.6): an OBLIGATION REGISTRY declaration — the system of record
+# New here (v0.3): an OBLIGATION REGISTRY declaration — the system of record
 # payments must correspond to. The schema is a MATCH SURFACE, not a domain
 # model: declare only the fields policies compare and consume. The adapter
 # behind the connector is the function developer's code (erp_adapter.py).

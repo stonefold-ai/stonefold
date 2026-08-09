@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The enforcement pipeline (RFC §12, design §3).
+"""The enforcement pipeline (spec §12, design §3).
 
 This is the spine: one ``enforce`` call per attempted action, always ending in an
 audited terminal decision. The function is **pure and total** — no LLM, no
 nondeterminism inside the decision logic (invariant 1).
 
 The pipeline is split into two phases so a SIF batch can be decided atomically
-(RFC §12, CS-023):
+(spec §12, CS-023):
 
 * ``_decide`` runs steps 1–5 (resolve → authorize → scope → gates → kill) and
   produces the operation's verdict **without committing anything** — no staging,
@@ -91,14 +91,14 @@ class _Decided:
     outcome: str = "not_executed"  # audit outcome if refused terminal
     gate_results: tuple[GateResult, ...] = ()
     approval: ApprovalSpec | None = None
-    # v0.6 (CS-027): one release contract per holding gate; all must be satisfied.
+    # v0.3 (CS-027): one release contract per holding gate; all must be satisfied.
     releases: tuple[ReleaseContract, ...] = ()
     scope_pred: ScopePredicate | None = None
     scope_applied: tuple[str, ...] = ()
-    # v0.6 (CS-030): the policy-declared agent-feedback level, stamped on the
+    # v0.3 (CS-030): the policy-declared agent-feedback level, stamped on the
     # EvalResult so the transport can redact the return path.
     feedback: FeedbackLevel = FeedbackLevel.CODE_FIELDS
-    # v0.6 (CS-035): a reservation taken by the BATCH pre-pass, so the commit
+    # v0.3 (CS-035): a reservation taken by the BATCH pre-pass, so the commit
     # phase uses it instead of reserving again. ``None`` in the single-op path
     # (the commit reserves itself, just before staging).
     claim: ObligationClaim | None = None
@@ -125,13 +125,13 @@ def enforce(
 ) -> EvalResult:
     """Evaluate one attempted action to a terminal, audited decision.
 
-    Every return path writes exactly one audit record (RFC §11) via
-    ``_terminal``. The stages run in the strict RFC §12 order, stopping at the
+    Every return path writes exactly one audit record (spec §11) via
+    ``_terminal``. The stages run in the strict spec §12 order, stopping at the
     first terminal verdict. Stages whose dependency is not injected are skipped:
     no ``gates`` ⇒ authorization alone decides (M1); no ``connectors`` ⇒ an
     allowed non-effect is not executed (M2 behaviour). ``obligations`` supplies
     the obligation-registry adapters the commit phase reserves/consumes from
-    (v0.6 CS-035) — the same map the gate engine matches against.
+    (v0.3 CS-035) — the same map the gate engine matches against.
     """
 
     agent_name = policy.agent if policy is not None else agent
@@ -171,7 +171,7 @@ def _items_declaration(registry: Registry, call: RawCall) -> Any | None:
     Resolution is an O(1) lookup and ``_decide`` resolves again per item; paying
     it twice is cheaper than widening the ``Registry`` protocol every consumer
     implements. An unknown name resolves to ``None`` here and reaches the normal
-    path, which is what turns it into the audited DENY (RFC §12 step 1).
+    path, which is what turns it into the audited DENY (spec §12 step 1).
     """
     try:
         resolved = registry.resolve(call)
@@ -390,7 +390,7 @@ def enforce_batch(
     dedupe_window_s: float | None = None,
     agent: str = "unknown",
 ) -> BatchResult:
-    """Evaluate a SIF batch atomically (RFC §12, CS-023; SIF §5).
+    """Evaluate a SIF batch atomically (spec §12, CS-023; SIF §5).
 
     Every operation is decided first (steps 1–5, each getting its own audit
     record); any DENY or HALT refuses the **whole batch** before anything
@@ -460,7 +460,7 @@ def enforce_batch(
             ),
         )
 
-    # Reservation pre-pass (v0.6 CS-035, CS-023 composition): every operation
+    # Reservation pre-pass (v0.3 CS-035, CS-023 composition): every operation
     # that matched a consumable obligation reserves it BEFORE anything commits;
     # a refused reservation refuses the whole batch and releases every
     # reservation taken for it — no partial claim survives a refused batch.
@@ -512,7 +512,7 @@ def enforce_batch(
     # staging — the in-memory reference approximates that shared transaction by
     # committing sequentially after the all-operations decision above; the
     # SQL-class connector binds them in one database transaction.
-    # STONEFOLD-AMBIGUITY: RFC §12/CS-023 defines batch atomicity for the
+    # STONEFOLD-AMBIGUITY: spec §12/CS-023 defines batch atomicity for the
     # *decision*; a dependency failure mid-commit (outbox/connector down after
     # earlier operations committed) is governed per-operation by §10 and is not
     # rolled back here.
@@ -561,11 +561,11 @@ def _decide(
     agent_name: str,
     failure_mode: FailureMode,
 ) -> _Decided:
-    """Steps 1–5 for one operation (RFC §12) — the verdict, nothing committed."""
+    """Steps 1–5 for one operation (spec §12) — the verdict, nothing committed."""
 
-    # 1. RESOLVE (RFC §12 step 1) — done *first* so every terminal record, even a
+    # 1. RESOLVE (spec §12 step 1) — done *first* so every terminal record, even a
     # halt or a refusal, carries the resolved kind/resource/action the audit
-    # requires (RFC §11). An unknown name short-circuits to DENY before any policy
+    # requires (spec §11). An unknown name short-circuits to DENY before any policy
     # runs.
     resolved: ResolvedAction | None
     try:
@@ -597,7 +597,7 @@ def _decide(
     # on every decision from here down so the transport can redact the return.
     fb = policy.feedback_for(resolved)
 
-    # 2. AUTHORIZE — RFC §6.2: deny-wins → default-deny → allow.
+    # 2. AUTHORIZE — spec §6.2: deny-wins → default-deny → allow.
     authz = policy.authorize(resolved)
     if not authz.allowed:
         return _Decided(call, resolved, Decision.DENY, authz.rule, feedback=fb)
@@ -632,7 +632,7 @@ def _decide(
                         scope_applied=scope_applied, feedback=fb,
                     )
 
-    # 4. GATES — evaluate the matching gates (RFC §7/§12 step 4). Any FAIL ⇒
+    # 4. GATES — evaluate the matching gates (spec §7/§12 step 4). Any FAIL ⇒
     # DENY (short-circuited before approvals); else any HOLD ⇒ HOLD (staged at
     # commit).
     gate_trace: tuple[GateResult, ...] = ()
@@ -653,7 +653,7 @@ def _decide(
             )
         gate_trace = outcome.results
 
-    # 5. KILL — the chokepoint check (RFC §12 step 5, design §8.3 point 2). An
+    # 5. KILL — the chokepoint check (spec §12 step 5, design §8.3 point 2). An
     # active kill of any scope (including ACTION_CLASS, matched here on the
     # resolved kind/resource/action) turns the action into an audited HALT — a
     # distinct terminal state, never staged. An *unreadable* kill fails closed:
@@ -704,7 +704,7 @@ def _commit(
     obligations: Mapping[str, ObligationRegistry] | None = None,
     dedupe_window_s: float | None = None,
 ) -> EvalResult:
-    """Step 6/7 for one decided operation: stage/execute, then audit (RFC §12)."""
+    """Step 6/7 for one decided operation: stage/execute, then audit (spec §12)."""
 
     call, resolved = decided.call, decided.resolved
 
@@ -718,7 +718,7 @@ def _commit(
 
     assert resolved is not None  # ALLOW/HOLD always carries the resolved action
 
-    # v0.6 (CS-035): the decision matched a consumable obligation — the row to
+    # v0.3 (CS-035): the decision matched a consumable obligation — the row to
     # be staged must hold its reservation BEFORE the staging commit returns
     # (this closes the decide→dispatch double-spend window the TTL alone does
     # not). A batch pre-pass may have reserved already (``decided.claim``).
@@ -730,7 +730,7 @@ def _commit(
         ticket = None
         if outbox is not None:
             ob = outbox
-            # v0.6 (CS-031): holds that are the same question collapse — the
+            # v0.3 (CS-031): holds that are the same question collapse — the
             # same (agent, action, reason code, candidate refs) as an OPEN held
             # row within the deployment's dedupe window bumps that row's
             # attempt count instead of queueing a second item. The agent gets
@@ -880,7 +880,7 @@ def _commit(
     # below the model (design §5).
     if connectors is not None:
         # CS-020: a pinned connector whose loaded artifact no longer matches its
-        # digest is a dependency failure (RFC §10) — honour failureMode, with the
+        # digest is a dependency failure (spec §10) — honour failureMode, with the
         # irreversible floor, exactly like a connector outage below.
         if pinned_connector_mismatch(connectors, resolved):
             if should_fail_closed(resolved, failure_mode):
@@ -913,7 +913,7 @@ def _commit(
             reason="connector-unavailable",
         )
         if isinstance(executed, Unavailable):
-            # connector/dependency failure ⇒ honour failureMode (RFC §10). Closed
+            # connector/dependency failure ⇒ honour failureMode (spec §10). Closed
             # denies; open allows the read through with no output (low-stakes).
             # Either way the effect did not land — the reservation is returned.
             _release_claim(inline_claim, obligations)
@@ -1069,9 +1069,9 @@ def _staging_expiry(
     env: RequestEnv | None,
     resolved: ResolvedAction,
 ) -> datetime | None | Unavailable:
-    """The ``expires_at`` to stamp on a row being staged (v0.4 CS-017).
+    """The ``expires_at`` to stamp on a row being staged (v0.2 CS-017).
 
-    ``None`` when freshness is not configured (opt-in: pre-v0.4 behaviour).
+    ``None`` when freshness is not configured (opt-in: pre-v0.2 behaviour).
     Freshness configured but no injected clock ⇒ ``Unavailable``: the gateway
     cannot bound the decision's validity, and CS-017 requires every staged row's
     TTL to be finite — so staging fails closed unconditionally (invariant 7),
@@ -1090,12 +1090,12 @@ def _approval_audit(
     ticket: str | None,
     releases: tuple[ReleaseContract, ...] = (),
 ) -> dict[str, Any] | None:
-    """Render the release contract(s) for the audit record (RFC §11 ``approval``).
+    """Render the release contract(s) for the audit record (spec §11 ``approval``).
 
     A held action records *who* may release it and the quorum/timeout terms, with
     a ``pending`` status — the eventual approver(s)/resolver(s) and outcome are
     written when the row settles. The legacy top-level keys mirror the first
-    contract (pre-v0.6 consumers); ``releases`` lists EVERY holding gate's
+    contract (pre-v0.3 consumers); ``releases`` lists EVERY holding gate's
     contract (CS-027), each with its cause, reason code, and evidence (I7).
     ``None`` when nothing holds the action.
     """

@@ -1,4 +1,4 @@
-"""v0.4 CS-017 — decision freshness (changeset docs/RFC-changeset-v0.3-to-v0.4.md).
+"""v0.2 CS-017 — decision freshness (changeset docs/changeset-v0.1-to-v0.2.md).
 
 Acceptance D5 (decision TTL cancels a stale staged effect; a late approval does
 not resurrect it) and D6 (volatile gates re-validated at dispatch; non-volatile
@@ -186,7 +186,7 @@ def test_freshness_without_clock_fails_closed_at_staging() -> None:
 
 
 def test_no_freshness_config_means_no_expiry() -> None:
-    # v0.3 behaviour is preserved when freshness is not configured (opt-in).
+    # v0.2 behaviour is preserved when freshness is not configured (opt-in).
     h = harness({"agent": "pay", "allow": [{"effect": ["pay"]}]})
     result = h.enforce("Payment", "pay", {"amount": 1}, freshness=None)
     assert h.get(result.ticket).expires_at is None
@@ -288,7 +288,7 @@ def test_freshness_config_rejects_non_finite_ttls() -> None:
 
 def test_volatile_gate_set_is_the_specified_six() -> None:
     # CS-017 freezes the volatile/non-volatile split; a drift here is a spec
-    # bug. v0.6 CS-032 rule 3 adds requireMatch (full re-query interim; CS-035
+    # bug. v0.3 CS-032 rule 3 adds requireMatch (full re-query interim; CS-035
     # replaces it with a reservation-liveness check).
     assert VOLATILE_GATES == {
         "allowlist", "denylist", "window", "precondition", "emissionControl",

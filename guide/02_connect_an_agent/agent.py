@@ -59,8 +59,8 @@ class GatewayTool:
         #   decision   "allow" | "hold" | "deny" | "halt"
         #   output     rows/receipt on an executed read/write (else null)
         #   ticket     the staged/held action's id (effects and holds)
-        #   reasonCode machine-readable refusal code   (v0.6)
-        #   retryClass "retryable" | "terminal" | "escalate" | null (v0.6) —
+        #   reasonCode machine-readable refusal code   (v0.3)
+        #   retryClass "retryable" | "terminal" | "escalate" | null (v0.3) —
         #              fix-and-resubmit | stop | hand to a human on your side
         # Your program acts on this response; that loop is yours, and ANY
         # program can drive it — an LLM, a cron job, a plain script.

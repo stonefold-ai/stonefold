@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""P1–P4 — what a gate reads (v0.6.1 CS-044; profile ``reads``).
+"""P1–P4 — what a gate reads (v0.3 CS-044; profile ``reads``).
 
 A control that depends on content which ages works perfectly while the content is
 current, which is why the failure is found after an incident rather than before

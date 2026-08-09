@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The connector seam (design §2, §5; RFC §12 step 6).
+"""The connector seam (design §2, §5; spec §12 step 6).
 
 A connector is the *only* thing that touches an external system, and it does two
 jobs and no policy: it **executes** a resolved action (applying the injected
@@ -30,7 +30,7 @@ class ConnectorCancelled(Exception):
 
 
 # The settle reason for an effect refused because the scope predicate no longer
-# selects its target at dispatch/commit time (v0.4 CS-018, acceptance B4/B5).
+# selects its target at dispatch/commit time (v0.2 CS-018, acceptance B4/B5).
 SCOPE_LOST = "scope-lost"
 
 
@@ -111,7 +111,7 @@ class ConnectorResult(BaseModel):
     # test assert that scope was injected *below* the model (B1).
     query: str | None = None
     handle: str | None = None  # in-flight cancellation handle (M5)
-    # The downstream identifier(s) of the created/changed record(s) (RFC §11
+    # The downstream identifier(s) of the created/changed record(s) (spec §11
     # resultRefs, CS-009). A connector that creates records SHOULD set this so the
     # audit log is actionable; the dispatch worker falls back to ``[receipt["id"]]``
     # when empty. A *list* because one dispatch may fan out to several records.

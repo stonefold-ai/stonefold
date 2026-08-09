@@ -1,4 +1,4 @@
-"""v0.6.1 CS-041 — the standard closure check (RFC §7.6, registry docs/06 §5c).
+"""v0.3 CS-041 — the standard closure check (spec §7.6, registry docs/06 §5c).
 
 The failure being closed: a gate refuses the work, and the actor then closes the
 item as done. Four rules, one test each, plus the two lint directions and the

@@ -1,4 +1,4 @@
-"""M1 — `extends` composition (RFC §3.2): deny in a fragment cannot be widened.
+"""M1 — `extends` composition (spec §3.2): deny in a fragment cannot be widened.
 
 Merge rules: allow/deny/gates/scope unioned; deny always wins; composition MUST
 NOT widen a permission a fragment denied (design §4).

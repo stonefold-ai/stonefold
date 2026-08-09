@@ -97,9 +97,9 @@ def build_gateway(world: World, *, policy_path: Path = SUPPORT_POLICY) -> Gatewa
         outbox=outbox,
         kill=kill,
         env=RequestEnv(now=DEMO_NOW),
-        freshness=FreshnessConfig(),  # v0.4 CS-017: staged effects carry a TTL
+        freshness=FreshnessConfig(),  # v0.2 CS-017: staged effects carry a TTL
     )
-    # v0.4 wiring: the worker's clock must be the same fixed instant the demo
+    # v0.2 wiring: the worker's clock must be the same fixed instant the demo
     # decides at — a wall clock would see every DEMO_NOW-stamped TTL as long
     # expired. It also re-runs volatile gates (CS-017) and re-asserts scope at
     # dispatch (CS-018).

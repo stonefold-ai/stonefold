@@ -1,4 +1,4 @@
-"""M5 — the operator-facing ``KillService`` (design §8, RFC §9): issuing/lifting a
+"""M5 — the operator-facing ``KillService`` (design §8, spec §9): issuing/lifting a
 kill is itself an audited operator action, and issuing optionally fans out to the
 defense-in-depth propagation hooks (§8.7: runtime cancel, credential revoke).
 """

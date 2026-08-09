@@ -1,10 +1,10 @@
 # 09 — Mental models: a developer's guide to the Stonefold safety model
 
 *Non-normative companion.* This doc **teaches the mental model**; it does not define
-anything. Every rule lives in the RFC ([`01-RFC-agent-control-policy.md`](01-RFC-agent-control-policy.md))
+anything. Every rule lives in the specification ([`01-stele-policy-language.md`](01-stele-policy-language.md))
 and the pinned decisions in [`03-architecture-decisions.md`](03-architecture-decisions.md);
 this page links to them. If something here ever seems to *state a rule*, trust the
-RFC, not this page.
+spec, not this page.
 
 It exists because a handful of concepts — kill, halt, reversibility, compensation,
 stakes — **share words or look like one knob when they're actually two**. That's
@@ -33,7 +33,7 @@ returns one of four **verdicts**:
 
 No language model runs inside that evaluation — it's plain deterministic code.
 That's the whole product. Everything else is detail about *how* a verdict is
-reached and *what happens after* an `allow`. (RFC §1, §12.)
+reached and *what happens after* an `allow`. (spec §1, §12.)
 
 ---
 
@@ -46,7 +46,7 @@ This is the #1 confusion. "Stop" is three things at three layers:
   *outcomes*, not buttons.
 - **kill** — an **operator control** (a button/API). One human action flips a flag;
   from then on matching actions come back `halt` and nothing staged dispatches. It's
-  the *cause*; `halt` is the *effect*. (RFC §9.)
+  the *cause*; `halt` is the *effect*. (spec §9.)
 - **stopping the gateway** — killing the *enforcer process itself*. **Don't.** That
   removes the guard, not the danger — the demo's "Gateway OFF" toggle shows exactly
   this: payments hit the bank directly, nothing is checked or audited, and the kill
@@ -72,10 +72,10 @@ The trap that bit hardest. You will be tempted to use "is it reversible?" to dec
 
 - **Reversibility** = *can this be undone?* (`reversible` / `compensable` /
   `irreversible`). It's a fact about the action *type*. It drives **recovery**
-  concerns only. (RFC §5.)
+  concerns only. (spec §5.)
 - **Stakes** = *does a human need to be in the loop?* It's per-instance and lives in
   the **data** (amount, recipient, sensitivity). You express it with
-  `operativeForce`, `resultSensitivity`, and `when:` conditions on `data.*`. (RFC §7.)
+  `operativeForce`, `resultSensitivity`, and `when:` conditions on `data.*`. (spec §7.)
 
 > **You might think:** "It's irreversible, so it needs approval."
 > **Actually:** a routine internal email and an email leaking secrets to an outsider
@@ -114,7 +114,7 @@ payment to the right vendor but the wrong amount). How do you fix it?
 - A `compensation` is a **declared, in-system action the gateway can route to** —
   `refund` for a `pay`, `discontinue` for a `prescribe`. If an action is
   `compensable`, the policy **must** declare its undo action — the linter enforces
-  it (RFC §13 rule 10).
+  it (spec §13 rule 10).
 - It is **not** "anything that mitigates." A clinical antidote, a restore-from-backup,
   an ops runbook — those are out-of-band, so they do **not** count. If the only
   recovery is out-of-band, the action is simply `irreversible`.
@@ -136,7 +136,7 @@ do — "cancel my own draft"; it must not be the one to undo what it got *wrong*
 halt — is recorded, and an executed effect's record carries `resultRefs`: the
 downstream id(s) of what it created (the payment id, the ledger entry id). That's
 the handle an accountant or an external tool uses to **locate** the bad entry and
-reverse it **in the source system**. (RFC §11.)
+reverse it **in the source system**. (spec §11.)
 
 ---
 
@@ -154,7 +154,7 @@ inside other systems. The gateway never sees that cascade. So an action's
 That's deliberate scope, not a missing feature: chasing the cascade would make Stonefold a
 distributed-transaction coordinator (out of scope). The seam back is `resultRefs` +
 `correlationId` — the keys a downstream reconciler uses to trace and remediate the
-chain. (RFC §9, §11; [`03`](03-architecture-decisions.md) → "Multi-effect & cascade".)
+chain. (spec §9, §11; [`03`](03-architecture-decisions.md) → "Multi-effect & cascade".)
 
 ---
 
@@ -199,24 +199,24 @@ chain. (RFC §9, §11; [`03`](03-architecture-decisions.md) → "Multi-effect & 
 ## 8. Advanced edges (skip on a first read)
 
 Two timing subtleties, here only so they don't surprise you later. Both were
-documented-but-open boundaries through v0.3 and are **specified and built since v0.4**
+documented-but-open boundaries through v0.2 and are **specified and built since v0.2**
 (CS-017 / CS-018):
 
 - **Decision freshness.** A verdict is computed at *decision time*; a staged effect
-  dispatches later. v0.4 bounds that gap two ways: every staged effect carries a
+  dispatches later. v0.2 bounds that gap two ways: every staged effect carries a
   decision **TTL** (an expired row settles `CANCELLED`/`stale-decision` — a late
   approval cannot resurrect it), and the dispatch claim re-validates the **volatile**
   gates (allow/denylists, windows, preconditions) — a payee sanctioned between
   approval and dispatch settles `stale-guard:denylist` with nothing sent. Counters
   and approval grants are deliberately *not* re-run (that would double-count / re-ask).
-  (RFC §12, §4.4.)
+  (spec §12, §4.4.)
 - **Scope no-race (TOCTOU).** `scope-on-effect` is decided before staging, and the
-  target could change hands before the commit. v0.4 closes it where it can be closed:
+  target could change hands before the commit. v0.2 closes it where it can be closed:
   a **transactional** (SQL-class) connector re-asserts the scope predicate *inside the
   effect's own transaction* — the write lands on authorized state or not at all
   (`scope-lost`); a connector that can't carry the predicate (HTTP, email, device)
   re-resolves the target just before dispatch and its declared residual window is
-  written into the audit record — the leftover risk is priced, not hidden. (RFC §6.3.)
+  written into the audit record — the leftover risk is priced, not hidden. (spec §6.3.)
 
 See [`03`](03-architecture-decisions.md) → "Decision freshness" / "Scope no-race"
 (both marked BUILT), and `docs/02` §9.1–9.2 for the wiring.
@@ -224,5 +224,5 @@ See [`03`](03-architecture-decisions.md) → "Decision freshness" / "Scope no-ra
 ---
 
 *See also:* [`08-glossary.md`](08-glossary.md) (one-line definitions),
-[`01-RFC-…`](01-RFC-agent-control-policy.md) (the normative spec),
+[`01-stele-policy-language.md`](01-stele-policy-language.md) (the normative spec),
 [`03-architecture-decisions.md`](03-architecture-decisions.md) (the pinned decisions and their rationale).

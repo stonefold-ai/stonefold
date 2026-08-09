@@ -1,4 +1,4 @@
-"""M1 — the semantic linter (RFC §13). Acceptance A4 + per-check coverage."""
+"""M1 — the semantic linter (spec §13). Acceptance A4 + per-check coverage."""
 
 from __future__ import annotations
 
@@ -49,7 +49,7 @@ def test_unknown_resource_or_action_errors() -> None:
 
 
 def test_deny_of_undeclared_name_errors() -> None:
-    # v0.3 CS-016: rule 13.1 applies to deny too — "you deny things that exist".
+    # v0.2 CS-016: rule 13.1 applies to deny too — "you deny things that exist".
     # A deny of an unknown name is a no-op (default-deny already refuses it) and
     # almost always a typo; it must not lint clean.
     report = _lint(
@@ -210,7 +210,7 @@ def test_payments_pay_declares_refund_compensation() -> None:
     assert not any(f.code == "13.10" for f in report.findings)
 
 
-# --- §13.11 (v0.3 CS-010, acceptance A6): standing cannot re-enable a deny ---
+# --- §13.11 (v0.2 CS-010, acceptance A6): standing cannot re-enable a deny ---
 def test_standing_deny_conflict_errors() -> None:
     report = _lint(
         {
@@ -268,7 +268,7 @@ def test_standing_conflicts_with_map_form_deny() -> None:
     )
 
 
-# --- §13.12 (v0.3 CS-012, acceptance A7): ambiguous bare-name allow warns ---
+# --- §13.12 (v0.2 CS-012, acceptance A7): ambiguous bare-name allow warns ---
 def test_ambiguous_bare_name_allow_warns() -> None:
     # the shipped registry declares an effect `exportData` on both Customer and Export
     report = _lint({"agent": "x", "allow": [{"effect": ["exportData"]}]})
@@ -287,7 +287,7 @@ def test_unique_bare_name_allow_is_ok() -> None:
     assert "13.12" not in _codes(report)
 
 
-# --- §13.13 (v0.3 CS-014, acceptance A8): dualAuthorization quorum < 2 ---
+# --- §13.13 (v0.2 CS-014, acceptance A8): dualAuthorization quorum < 2 ---
 def test_dual_authorization_quorum_below_two_errors() -> None:
     report = _lint(
         {

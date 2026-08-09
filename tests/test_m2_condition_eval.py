@@ -1,4 +1,4 @@
-"""M2 — the condition engine *evaluator* (RFC §8, design §10).
+"""M2 — the condition engine *evaluator* (spec §8, design §10).
 
 Tree-walk over the parsed AST; no eval/exec. The critical safety property
 (design §10, review note) is **fail-closed on a runtime resolution error** — a

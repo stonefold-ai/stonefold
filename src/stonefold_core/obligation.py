@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 """Obligation registries — the systems of record ``requireMatch`` matches
-against (RFC §7.16 / CS-032, docs/06 §5b / CS-034).
+against (spec §7.16 / CS-032, docs/06 §5b / CS-034).
 
 This module is pure (no I/O — trust kernel): it declares the value types that
 cross the gate↔adapter boundary, the four-operation adapter ``Protocol`` the
@@ -49,7 +49,7 @@ def lookup_field(fields: Mapping[str, Any], path: str) -> Any:
 
 
 def values_equal(a: Any, b: Any) -> bool:
-    """Equality with the condition language's numeric coercion (RFC §8): the
+    """Equality with the condition language's numeric coercion (spec §8): the
     adapter's ``Eq`` filtering and the gate's clause re-evaluation must agree,
     or a record could match the query and fail the re-check spuriously."""
     if isinstance(a, bool) or isinstance(b, bool):
@@ -173,7 +173,7 @@ class ObligationClaim(BaseModel):
     intent_id: str
 
     def audit_dict(self, state: str, *, receipt: str | None = None) -> dict[str, Any]:
-        """The RFC §11 ``consumption`` rendering (CS-037): the lifecycle state
+        """The spec §11 ``consumption`` rendering (CS-037): the lifecycle state
         (``reserved`` | ``consumed`` | ``released`` | a refusal note), the
         registry+ref lineage, and — for ``window`` registries — the declared
         capability, surfacing that consumption ran post-confirm rather than in

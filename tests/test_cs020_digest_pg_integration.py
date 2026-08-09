@@ -2,7 +2,7 @@
 
 The dispatch check is the one that guards a *staged* effect: the durable
 ``pending_actions`` row carries the pinned digest, and the worker refuses to
-dispatch through a connector whose loaded artifact no longer matches it (RFC §10,
+dispatch through a connector whose loaded artifact no longer matches it (spec §10,
 fail closed). Confirms the refusal is durable — the row settles FAILED with the
 mismatch reason and the settle audit lands in the same transaction — while a
 matching pin dispatches normally. Skipped when psycopg / testcontainers / Docker
