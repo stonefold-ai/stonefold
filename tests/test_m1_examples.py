@@ -27,15 +27,10 @@ def test_a5_example_loads_and_validates(path: Path) -> None:
     )
 
 
-def test_all_eight_examples_present() -> None:
+def test_the_examples_are_the_tested_estates() -> None:
     names = {p.name for p in valid_example_paths()}
     assert names == {
-        "support-assistant.stele.yaml",
-        "ward-nurse.stele.yaml",
-        "track-operator.stele.yaml",
         "payments-ops.stele.yaml",
-        "legal-matter.stele.yaml",
-        "vehicle-controller.stele.yaml",
         "platform-ops.stele.yaml",
         "worklist.stele.yaml",
     }

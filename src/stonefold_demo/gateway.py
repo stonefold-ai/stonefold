@@ -37,7 +37,9 @@ from stonefold_demo.world import World
 _ROOT = Path(__file__).resolve().parents[2]
 _REGISTRY = _ROOT / "spec" / "registry" / "stonefold-registry.yaml"
 _SCHEMA = _ROOT / "spec" / "schema" / "stele.schema.json"
-SUPPORT_POLICY = _ROOT / "spec" / "examples" / "support-assistant.stele.yaml"
+# The demo policy lives with the demo: the spec's examples are tested estates
+# only, and this support-assistant scenario is a scripted walkthrough, not one.
+SUPPORT_POLICY = Path(__file__).resolve().parent / "support-assistant.stele.yaml"
 
 # The gateway injects the clock that time-based gates (rate/window) read — never
 # the agent. A *fixed* instant keeps the demo deterministic (invariant 1): a real
