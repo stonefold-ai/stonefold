@@ -748,10 +748,17 @@ class TestLinterRules:
 
     def test_example_fixtures_lint_clean_under_the_new_rules(self) -> None:
         import yaml
-        from tests.conftest import EXAMPLES
+        from tests.conftest import EXAMPLES, FIXTURES
 
-        for name in ("payments-ops.stele.yaml", "ward-nurse.stele.yaml"):
-            with (EXAMPLES / name).open("r", encoding="utf-8") as fh:
+        # payments-ops ships in the spec's examples; ward-nurse is kept here as
+        # test data (its requireMatch prescription block exercises these rules)
+        # since the spec's examples are tested estates only.
+        paths = (
+            EXAMPLES / "payments-ops.stele.yaml",
+            FIXTURES / "ward-nurse.stele.yaml",
+        )
+        for path in paths:
+            with path.open("r", encoding="utf-8") as fh:
                 data = yaml.safe_load(fh)
             report = validate_only(data, full_registry(), schema=load_schema())
-            assert not report.has_errors, f"{name}: {report.format()}"
+            assert not report.has_errors, f"{path.name}: {report.format()}"
