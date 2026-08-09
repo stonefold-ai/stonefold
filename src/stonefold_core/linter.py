@@ -175,7 +175,53 @@ def lint(policy: Policy, registry: InMemoryRegistry) -> LintReport:
     _check_per_item_threshold_without_aggregate(policy, registry, report)
     _check_closure_declaration(policy, registry, report)
     _check_item_declaration(policy, registry, report)
+    _check_declared_reads(policy, registry, report)
     return report
+
+
+def _check_declared_reads(
+    policy: Policy, registry: InMemoryRegistry, report: LintReport
+) -> None:
+    """§13.22 (CS-044) — what a gate says it reads.
+
+    Three checks, and the second is the one that exists because of a near-miss:
+    a gate that names a source and says nothing about the source being
+    unreachable inherits fail-closed, which is usually right and is occasionally
+    a permanent outage nobody chose. Making the author write it down is cheaper
+    than discovering it in production.
+    """
+    declared = set(registry.file.sources)
+    for resource, action, adef in _allowed_action_defs(policy, registry):
+        gates = _merged_gates(policy, resource, action, adef.kind)
+        for gate, cfg in gates.items():
+            if not isinstance(cfg, dict):
+                continue
+            reads = cfg.get("reads")
+            if not isinstance(reads, list) or not reads:
+                continue
+            for entry in reads:
+                name = entry if isinstance(entry, str) else str((entry or {}).get("source", ""))
+                if name and name not in declared:
+                    report.add(
+                        "13.22", Severity.ERROR,
+                        f"{resource}.{action} gate {gate}: reads {name!r}, which the "
+                        f"registry does not declare in `sources` (docs/06 §5e)",
+                    )
+                if isinstance(entry, dict) and entry.get("onStale") == "allow":
+                    report.add(
+                        "13.22", Severity.WARN,
+                        f"{resource}.{action} gate {gate}: onStale: allow on {name!r} — "
+                        f"the gate will keep deciding from content past its own review "
+                        f"date, which is how a control becomes decoration",
+                    )
+            if "onUnavailable" not in cfg:
+                report.add(
+                    "13.22", Severity.WARN,
+                    f"{resource}.{action} gate {gate}: declares `reads` and no "
+                    f"`onUnavailable` — it inherits deny, so a source that is "
+                    f"permanently unreachable makes this action permanently "
+                    f"impossible. Declare the choice",
+                )
 
 
 def _check_item_declaration(

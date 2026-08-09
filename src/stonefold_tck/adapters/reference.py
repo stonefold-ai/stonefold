@@ -12,7 +12,7 @@ dialects").
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -127,6 +127,8 @@ def authoring_to_compact(authoring: Mapping[str, Any]) -> dict[str, Any]:
         },
         # v0.6 CS-034: the declaration shape is shared between the dialects.
         "obligationRegistries": dict(authoring.get("obligationRegistries") or {}),
+        # v0.6.1 CS-044: same shape in both dialects — pass through untouched.
+        "sources": dict(authoring.get("sources") or {}),
         "resources": resources,
     }
 
@@ -151,6 +153,30 @@ def _item_allowed(gctx: GateContext) -> CheckResult:
         return check_fail("tck-item-blocked")
     return (check_fail("tck-item-blocked") if str(ids[0]) in _BLOCKED_ITEMS
             else CheckResult(Outcome.PASS))
+
+
+class _SettableSource:
+    """docs/12 §3 fixture semantics for CS-044: a source whose reported age and
+    reachability the kit controls. ``age_days = None`` is reachable-but-undated,
+    which the spec distinguishes from fresh."""
+
+    def __init__(self, clock: Callable[[], datetime | None]) -> None:
+        self._clock = clock
+        self.age_days: float | None = 1.0
+        self.outage = False
+
+    def as_of(self) -> datetime | None:
+        if self.outage:
+            raise RuntimeError("source unreachable (TCK-injected)")
+        if self.age_days is None:
+            return None
+        now = self._clock()
+        if now is None:
+            # No clock pinned: the kit's own fixtures always pin one, so this is a
+            # harness bug rather than a policy case. Report undated rather than
+            # inventing a date — the gateway decides what undated means.
+            return None
+        return now - timedelta(days=self.age_days)
 
 
 def _tck_scope_registry() -> ScopeRegistry:
@@ -300,6 +326,10 @@ class ReferenceDriver:
         self._connectors = connectors
         # v0.6 (CS-034): one mock adapter per declared obligation registry —
         # the docs/12 §3 fixture semantics (line.state moves with the lifecycle).
+        self._sources: dict[str, _SettableSource] = {
+            name: _SettableSource(lambda: self._now)
+            for name in registry.file.sources
+        }
         self._obligations = {
             name: _FailableObligationRegistry()
             for name in registry.obligation_registries
@@ -318,6 +348,8 @@ class ReferenceDriver:
             # gateway's own decision history — what it refused earlier for the
             # same actor and run, read from its own audit and nothing else.
             history=AuditDecisionHistory(self._audit),
+            # CS-044: one settable source per declared name (docs/12 §3).
+            sources=self._sources,
         )
         self._registry = registry
         scopes = make_scope_resolver(policy, _tck_scope_registry())
@@ -512,6 +544,12 @@ class ReferenceDriver:
         self, registry: str, records: Mapping[str, Mapping[str, Any]]
     ) -> None:
         self._obligations[registry].reset(records)
+
+    def set_source_age(self, source: str, days: float | None) -> None:
+        self._sources[source].age_days = days
+
+    def set_source_outage(self, source: str, active: bool) -> None:
+        self._sources[source].outage = active
 
     def set_obligation_outage(self, registry: str, active: bool) -> None:
         self._obligations[registry].outage = active

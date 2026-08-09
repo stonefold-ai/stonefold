@@ -83,6 +83,11 @@ CAP_CLOSURE = "closure"
 # the items that took effect. The envelope's decision is ALLOW only when every
 # item applied — a driver that returns ALLOW for a partial application fails O2.
 CAP_PER_ITEM = "per-item"
+# v0.6.1 CS-044: a gate may declare `reads:` against a registry-declared source,
+# and the driver can control that source's reported age and reachability. The
+# codes SOURCE_STALE / SOURCE_UNDATED / SOURCE_UNAVAILABLE are normative for
+# drivers claiming this, in the returned verdict and in the audit record.
+CAP_READS = "reads"
 
 ALL_CAPABILITIES = frozenset(
     {
@@ -102,6 +107,7 @@ ALL_CAPABILITIES = frozenset(
         CAP_OBLIGATION,
         CAP_CLOSURE,
         CAP_PER_ITEM,
+        CAP_READS,
     }
 )
 
@@ -342,6 +348,17 @@ class ConformanceDriver(Protocol):
         analogue of ``seed``. Replaces the adapter's prior records and clears
         its reservation state. (CAP_OBLIGATION)"""
         ...
+
+    def set_source_age(self, source: str, days: float | None) -> None:
+        """Make a declared source report content this many days old (CS-044;
+        ``reads`` capability). ``None`` means reachable but UNDATED, which is not
+        the same as fresh."""
+        raise NotImplementedError
+
+    def set_source_outage(self, source: str, active: bool) -> None:
+        """Make a declared source unreadable / restore it (CS-044; ``reads``
+        capability)."""
+        raise NotImplementedError
 
     def set_obligation_outage(self, registry: str, active: bool) -> None:
         """Make the obligation registry's adapter unreachable (every operation

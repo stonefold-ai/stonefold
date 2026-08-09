@@ -13,6 +13,7 @@ from typing import Any
 from stonefold_tck import ALL_PROFILES, run_conformance
 from stonefold_tck.adapters.http_harness import create_tck_harness
 from stonefold_tck.adapters.reference import ReferenceDriver
+from stonefold_tck.fixtures import TCK_REGISTRY
 from stonefold_tck.http_driver import HttpDriver
 
 
@@ -44,3 +45,39 @@ def test_wire_binding_certifies_end_to_end() -> None:
     report = run_conformance(driver, implementation=driver.implementation_name())
     assert not report.failures, "\n" + report.render()
     assert set(report.certified_profiles()) == set(ALL_PROFILES), "\n" + report.render()
+
+
+def test_the_dialect_bridge_carries_every_registry_field() -> None:
+    """A guard against a gap that has now bitten four times.
+
+    ``authoring_to_compact`` translates the spec's authoring registry into the
+    loader's compact dialect, and each time a field was added to the registry
+    model — per-action ``data``, ``label``, ``closure``, ``items``, and top-level
+    ``sources`` — the bridge silently dropped it. Silently is the problem: the
+    registry loads, the declaration is simply absent, and whatever reads it
+    behaves as though nobody declared anything.
+
+    So this test fails when a field is added to ``RegistryFile`` and not carried,
+    which is cheaper than finding out from a gate that never fired.
+    """
+    from stonefold_core.registry import RegistryFile
+    from stonefold_tck.adapters.reference import authoring_to_compact
+    import yaml as _yaml
+
+    bridged = authoring_to_compact(_yaml.safe_load(TCK_REGISTRY))
+
+    # Fields the authoring dialect deliberately cannot express, with the reason.
+    not_in_authoring = {
+        # split out of `preconditionChecks` by the loader, not authored separately
+        "precondition_decls",
+        # authored as `valueSets.resultSensitivity`, bridged as `classifications`
+        "classifications",
+        # authored inside `connectors:` as a per-connector `digest`
+        "connector_digests",
+    }
+    expected = set(RegistryFile.model_fields) - not_in_authoring
+    missing = sorted(expected - set(bridged))
+    assert not missing, (
+        f"authoring_to_compact drops {missing} — a registry in the spec's own "
+        f"authoring format would silently lose {missing} on the way to the loader"
+    )

@@ -190,6 +190,17 @@ def create_tck_harness(driver: ConformanceDriver, *, implementation: str) -> Fas
         driver.seed_obligations(str(body["registry"]), dict(body["records"]))
         return {}
 
+    @app.post("/tck/source-age")
+    def source_age(body: dict[str, Any]) -> dict[str, Any]:
+        days = body.get("days")
+        driver.set_source_age(str(body["source"]), None if days is None else float(days))
+        return {}
+
+    @app.post("/tck/source-outage")
+    def source_outage(body: dict[str, Any]) -> dict[str, Any]:
+        driver.set_source_outage(str(body["source"]), bool(body["active"]))
+        return {}
+
     @app.post("/tck/obligation-outage")
     def obligation_outage(body: dict[str, Any]) -> dict[str, Any]:
         driver.set_obligation_outage(str(body["registry"]), bool(body["active"]))

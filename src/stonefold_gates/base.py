@@ -109,6 +109,10 @@ class GateContext:
     # wired no history — a control that needs it then fails closed under §10
     # rather than passing on an unverifiable claim.
     history: "DecisionHistory | None" = None
+    # v0.6.1 (CS-044): the registered source adapters, keyed by declared source
+    # name — what a gate's ``reads:`` resolves against. A declared source with no
+    # adapter here is unreadable, never fresh.
+    sources: Mapping[str, Any] = field(default_factory=dict)
 
 
 GateFn = Callable[[Any, GateContext], GateResult]

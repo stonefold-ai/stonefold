@@ -25,6 +25,8 @@ Wire protocol (all JSON; camelCase keys):
 | POST   | /tck/resolve                    | {ticket, resolverId, gate} → {accepted: bool} |
 | POST   | /tck/sweep-holds                | {} → {handled: int} |
 | POST   | /tck/seed-obligations           | {registry, records: {ref: fields}} → {} |
+| POST   | /tck/source-age                 | {source, days: float|null} → {} |
+| POST   | /tck/source-outage              | {source, active: bool} → {} |
 | POST   | /tck/obligation-outage          | {registry, active: bool} → {} |
 | POST   | /tck/dispatch                   | {} → {settled: int} |
 | GET    | /tck/effects                    | → {effects: [{resource, action, data}]} |
@@ -292,6 +294,12 @@ class HttpDriver:
             {"registry": registry,
              "records": {ref: dict(fields) for ref, fields in records.items()}},
         )
+
+    def set_source_age(self, source: str, days: float | None) -> None:
+        self._call("POST", "/tck/source-age", {"source": source, "days": days})
+
+    def set_source_outage(self, source: str, active: bool) -> None:
+        self._call("POST", "/tck/source-outage", {"source": source, "active": active})
 
     def set_obligation_outage(self, registry: str, active: bool) -> None:
         self._call(

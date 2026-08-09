@@ -67,6 +67,15 @@ preconditionChecks:
     reasonCodes:
       DISPOSITION_REQUIRED:    retryable
       CLOSED_WITHOUT_THE_WORK: escalate
+# v0.6.1 (CS-044): sources a gate may declare it reads. The driver controls their
+# reported age and reachability (set_source_age / set_source_outage).
+sources:
+  critical-analyte-list:
+    kind: ruleSet
+    label: "Analytes requiring same-day review"
+  unread-list:
+    kind: ruleSet
+
 hooks:              [ tck.rejectMarker ]
 sinks:              [ tckSink ]
 
@@ -171,6 +180,21 @@ entities:
           field: itemIds
           independent: true
           maxItems: 100
+
+  # v0.6.1 (CS-044): the action whose gate declares what it reads. `flag` is read
+  # by tck.flagSet, so P1 can show the gate's own check running once the source is
+  # trustworthy.
+  Result:
+    dataSource: tck-data
+    properties:
+      id:   { type: string }
+      flag: { type: boolean }
+    actions:
+      dismiss:
+        kind: record
+        connector: tck-data
+        data:
+          resultId: { type: string, required: true }
 
   Email:
     dataSource: tck-data
@@ -488,3 +512,25 @@ gates:
 
 #: The items ``tck.itemAllowed`` refuses (docs/12 §3 fixture semantics).
 BLOCKED_ITEMS = ("Q-BLOCKED", "Q-ALSO-BLOCKED")
+
+
+# P1–P4 (CS-044): a gate that names what it reads. `onUnavailable: hold` is the
+# declared choice, so P4 can assert that an unavailable guard queues for a human.
+POLICY_READS = """\
+apiVersion: stele/v0.1
+agent: tck-agent
+defaults: { failureMode: closed, audit: full }
+killable: true
+allow:
+  - record: [dismiss]
+gates:
+  dismiss:
+    precondition:
+      checks: [tck.flagSet]
+      reads:
+        - source: critical-analyte-list
+          freshness: 30d
+          onStale: hold
+      onUnavailable: hold
+      resolvers: role:tck-resolver
+"""

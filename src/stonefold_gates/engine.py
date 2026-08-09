@@ -116,6 +116,7 @@ class DefaultGateEngine:
         preconditions: Mapping[str, PreconditionCheck] | None = None,
         obligations: Mapping[str, ObligationRegistry] | None = None,
         history: DecisionHistory | None = None,
+        sources: Mapping[str, Any] | None = None,
         default_resolver_role: str | None = None,
     ) -> None:
         self.registry = registry
@@ -131,6 +132,8 @@ class DefaultGateEngine:
         # The gateway's own record of this run, for the closure check. ``None``
         # ⇒ a completion claim cannot be verified and fails closed (§10).
         self.history = history
+        # CS-044: source adapters, keyed by declared name (docs/06 §5e).
+        self.sources: dict[str, Any] = dict(sources or {})
         # v0.6 (CS-034): obligation-registry adapters, keyed by declared
         # registry name. A ``requireMatch`` whose registry has no adapter here
         # is a dependency failure at evaluation time (RFC §10).
@@ -160,6 +163,7 @@ class DefaultGateEngine:
             hooks=self.hooks,
             preconditions=self.preconditions,
             history=self.history,
+            sources=self.sources,
             failure_mode=policy.policy.defaults.failureMode,
             agent=policy.agent,
             obligations=self.obligations,

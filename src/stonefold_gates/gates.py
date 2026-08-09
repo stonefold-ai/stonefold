@@ -63,6 +63,7 @@ from stonefold_gates.base import (
     window_seconds,
 )
 from stonefold_gates.content import HookError
+from stonefold_gates.reads import check_reads, parse_reads
 
 logger = logging.getLogger("stonefold.gates")
 
@@ -223,6 +224,21 @@ def precondition(cfg: Any, gctx: GateContext) -> GateResult:
     if isinstance(cfg, dict) and "from" in cfg:
         return check_from_states(cfg["from"], gctx)
     if isinstance(cfg, dict):
+        # CS-044: what this gate reads is verified BEFORE its checks run. A gate
+        # whose rule set is three weeks past review is not in a position to
+        # decide anything, and saying so is more useful than a confident answer
+        # computed from stale content.
+        untrusted = check_reads(
+            parse_reads(cfg.get("reads")), str(cfg.get("onUnavailable", "deny")), gctx
+        )
+        if untrusted is not None:
+            if untrusted.outcome is Outcome.HOLD:
+                return held("precondition", f"source not trustworthy: {untrusted.code}",
+                            code=untrusted.code, evidence=untrusted.evidence,
+                            retry_class=RetryClass.ESCALATE)
+            return failed("precondition", f"source not trustworthy: {untrusted.code}",
+                          code=untrusted.code, evidence=untrusted.evidence,
+                          retry_class=RetryClass.ESCALATE)
         names = list(cfg.get("checks", []))
     else:
         names = cfg if isinstance(cfg, list) else [cfg]

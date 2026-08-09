@@ -96,6 +96,28 @@ class ClosureDef(BaseModel):
     claimsCompletion: tuple[str, ...] = ()
 
 
+class SourceDecl(BaseModel):
+    """Something a control reads, declared by name (docs/06 §5e, CS-044).
+
+    A rule set that ages (a critical-analyte list, a sanctions list, a tariff
+    table), a record in another system, or a fact the deployment maintains. The
+    declaration exists so a gate can *name* what it depends on, which makes the
+    dependency data rather than a comment — and a policy whose dependencies are
+    data can be inspected without being run.
+
+    ``derivedFrom`` names the actions a ``fact`` is maintained from. It is
+    documentation in this version and the anchor for a later coverage rule: a
+    fact derived from an action the gateway does not see is a fact it cannot
+    maintain.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    kind: str = "ruleSet"          # ruleSet | record | fact
+    label: str = ""
+    derivedFrom: tuple[str, ...] = ()
+
+
 class ItemsDef(BaseModel):
     """An action that carries a list of items in one field (CS-043, docs/06 §5d).
 
@@ -267,6 +289,8 @@ class RegistryFile(BaseModel):
     # (bare names get the two-valued default).
     precondition_decls: dict[str, PreconditionCheckDecl] = Field(default_factory=dict)
     sets: dict[str, tuple[str, ...]] = Field(default_factory=dict)
+    # CS-044: the sources a gate may declare that it reads (docs/06 §5e).
+    sources: dict[str, SourceDecl] = Field(default_factory=dict)
     sinks: tuple[str, ...] = ()
     # v0.6 (CS-034): the systems of record ``requireMatch`` matches against
     # (docs/06 §5b). A declared ``digest`` pins the adapter connector's artifact
