@@ -87,7 +87,7 @@ def main() -> None:
 
         # BEAT 3 — the SAME invoice again: the line is spent, nothing
         # matches, and the class says TERMINAL (stop resubmitting). This is
-        # the refusal no pre-v0.6 gate could produce.
+        # the refusal no pre-v0.3 gate could produce.
         again = agent.pay(tool, 800.0)
         assert again["decision"] == "deny"
         assert again["reasonCode"] == "no-match"

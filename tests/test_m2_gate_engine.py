@@ -1,4 +1,4 @@
-"""M2 — the gate engine wired through the pipeline (RFC §7/§12 step 4, design §6).
+"""M2 — the gate engine wired through the pipeline (spec §7/§12 step 4, design §6).
 
 Covers AND-combination, the FAIL⇒DENY / HOLD⇒HOLD precedence, the ordering
 guarantee (a cheap FAIL short-circuits *before* an approval HOLD is ever raised),
@@ -140,7 +140,7 @@ def test_kind_and_action_gates_combine() -> None:
 
 
 def test_builtin_transition_from_states_without_explicit_gate() -> None:
-    # RFC §7.6: a transition always re-checks its declared from-states, even with
+    # spec §7.6: a transition always re-checks its declared from-states, even with
     # no precondition gate in the policy.
     doc = {"agent": "legal", "allow": [{"transition": {"Matter": ["engage"]}}]}
     denied, _ = run(doc, "Matter", "engage", env=RequestEnv(resource={"currentState": "active"}))

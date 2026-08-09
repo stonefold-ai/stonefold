@@ -27,7 +27,7 @@ def records_from_jsonl(path: Path) -> list[AuditRecord]:
 
 
 def records_from_postgres(conn: Any, *, table: str = "audit_log") -> list[AuditRecord]:
-    """Read every audit record in write order (append-only; RFC §11). ``conn`` is a
+    """Read every audit record in write order (append-only; spec §11). ``conn`` is a
     live ``psycopg`` connection. A read-only ``SELECT`` — the exporter never mutates
     the log."""
     with conn.cursor() as cur:

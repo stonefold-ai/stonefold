@@ -1,5 +1,5 @@
-"""v0.6 obligation matching — CS-032/033/034/036/037/038 (changeset
-docs/RFC-changeset-v0.5-to-v0.6.md; RFC §7.16, §13 rules 14–17, §11
+"""v0.3 obligation matching — CS-032/033/034/036/037/038 (changeset
+docs/changeset-v0.2-to-v0.2.md; spec §7.16, §13 rules 14–17, §11
 ``obligationRefs``).
 
 Decision-time matching only (Phase 5): typed selector → candidate count →
@@ -59,7 +59,7 @@ CFG_FRESHNESS = FreshnessConfig(
 
 PO_REGISTRY = "erp.purchase_orders"
 
-# One open purchase order with one unconsumed $800 line (the RFC §14.4 beat).
+# One open purchase order with one unconsumed $800 line (the spec §14.4 beat).
 PO_FIELDS: dict[str, Any] = {
     "vendorId": "V-77",
     "state": "open",
@@ -512,7 +512,7 @@ class TestEndToEnd:
         result = h.enforce()
         assert result.decision is Decision.HOLD
         assert result.reason_code == "no-match"
-        assert result.retry_class is None  # a gateway hold means WAIT (RFC §11)
+        assert result.retry_class is None  # a gateway hold means WAIT (spec §11)
         assert result.ticket is not None
         row = h.outbox.get(result.ticket)
         assert row is not None and row.state is PendingState.PENDING_APPROVAL
@@ -581,7 +581,7 @@ class TestEndToEnd:
 
 
 # ==========================================================================
-# CS-040 (v0.6.1) — the hold dedupe identity is the QUESTION, not the code
+# CS-040 (v0.3) — the hold dedupe identity is the QUESTION, not the code
 # ==========================================================================
 class TestDedupeSharpness:
     def _pay(self, h: Harness, vendor: str, amount: float, session: str) -> Any:
@@ -597,7 +597,7 @@ class TestDedupeSharpness:
         )
 
     def test_distinct_unmatched_intents_never_collapse(self) -> None:
-        # v0.6's key over-collapsed here: with zero candidates the refs are
+        # v0.3's key over-collapsed here: with zero candidates the refs are
         # empty, so every no-match hold on one action shared a key. CS-040
         # identifies a zero-candidate hold by what the intent CLAIMED — its
         # compared field values — so two different vendors' unmatched invoices

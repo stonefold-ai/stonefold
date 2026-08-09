@@ -1,4 +1,4 @@
-"""v0.5 CS-023 — batch decision semantics (RFC §12; SIF §5).
+"""v0.2 CS-023 — batch decision semantics (spec §12; SIF §5).
 
 Acceptance H1–H4: a SIF batch is decided atomically — every operation is
 decided first (each with its own audit record); any DENY/HALT refuses the whole
@@ -106,7 +106,7 @@ def test_h1_deny_refuses_batch_before_anything_commits_or_stages() -> None:
     assert h.outbox.list_by_state(PendingState.PENDING_APPROVAL) == []
     assert h.world.effects == []
 
-    # every operation carries its own audit record (RFC §11)
+    # every operation carries its own audit record (spec §11)
     assert len(h.audit.records) == 2
     first, second = h.audit.records
     assert first.decision is Decision.ALLOW and first.outcome == BATCH_REFUSED

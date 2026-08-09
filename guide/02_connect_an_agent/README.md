@@ -85,7 +85,7 @@ worse.
 is `src/stonefold_ap_demo/agent.py`.)
 
 **1c — read the refusals.** `submit_intent` returns the decision *and* the
-v0.6 feedback channel:
+v0.3 feedback channel:
 
 ```json
 {"decision": "deny", "reasonCode": "no-match", "retryClass": "terminal", ...}

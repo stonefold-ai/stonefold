@@ -30,7 +30,7 @@ ACCOUNTS: list[dict[str, Any]] = [
 
 # --- known payees ------------------------------------------------------------
 # ``domain`` is the vendor's billing domain — the provenance evidence the
-# policy's ``requireMatch.provenance`` binds the matched PO to (RFC §7.16).
+# policy's ``requireMatch.provenance`` binds the matched PO to (spec §7.16).
 PAYEES: list[dict[str, Any]] = [
     {"id": "PE-ACME-SUP", "tenant_id": DEMO_TENANT, "name": "Acme Supplies Ltd",
      "iban": "GB29ACME0000011111", "country": "GB", "created_days_ago": 420,
@@ -45,7 +45,7 @@ PAYEES: list[dict[str, Any]] = [
      "domain": "initech.example"},
 ]
 
-# --- open purchase orders (the OBLIGATIONS, v0.6 CS-032/CS-034) ---------------
+# --- open purchase orders (the OBLIGATIONS, v0.3 CS-032/CS-034) ---------------
 # The system of record `requireMatch` matches payments against: an invoice is
 # payable only against an open, unconsumed PO line from the same vendor within
 # tolerance. One PO per legitimate inbox invoice; the fraudulent invoice has —

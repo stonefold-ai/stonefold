@@ -1,4 +1,4 @@
-"""M3 — the scope abstraction (RFC §6.3, design §5). Pure unit tests: predicate
+"""M3 — the scope abstraction (spec §6.3, design §5). Pure unit tests: predicate
 membership, the realised SQL/HTTP forms, the empty-scope rule, and resolution
 from a policy's ``scope`` block."""
 
@@ -42,7 +42,7 @@ def test_query_param_for_http() -> None:
 
 
 def test_empty_scope_selects_nothing_never_widens() -> None:
-    # actor missing the claim ⇒ empty set: matches nothing, SQL is 1=0 (RFC §6.3).
+    # actor missing the claim ⇒ empty set: matches nothing, SQL is 1=0 (spec §6.3).
     scope = AttributeScope("tenantOf", "tenant_id", "tenant")
     actor = Actor(id="a")  # no tenant claim
     assert scope.is_empty(actor) is True

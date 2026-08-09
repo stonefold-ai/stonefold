@@ -33,8 +33,8 @@ def _pay(bundle: APBundle, data: dict[str, object], *, actor: str = AP_OPERATOR,
 
 
 def _acme_800() -> dict[str, object]:
-    # vendorId + sourceDomain are the v0.6 requireMatch inputs: the payment
-    # must correspond to the vendor's open purchase order (RFC §7.16).
+    # vendorId + sourceDomain are the v0.3 requireMatch inputs: the payment
+    # must correspond to the vendor's open purchase order (spec §7.16).
     return {"payeeId": "PE-ACME-SUP", "accountId": "ACME-OPS", "amount": 800.0,
             "currency": "USD", "destinationCountry": "GB", "invoiceId": "INV-1001",
             "vendorId": "PE-ACME-SUP", "sourceDomain": "acme.example"}
@@ -55,7 +55,7 @@ def test_g1_happy_path_pays(bundle: APBundle) -> None:
 
 
 def test_g1_resubmitted_invoice_holds_after_consumption(bundle: APBundle) -> None:
-    # the RFC §14.4 beat no v0.5 gate could produce: the paid invoice's PO line
+    # the spec §14.4 beat no v0.2 gate could produce: the paid invoice's PO line
     # is consumed, so the SAME invoice resubmitted matches nothing and lands in
     # the AP clerk's queue (onNoMatch: hold) instead of paying twice.
     assert _pay(bundle, _acme_800()).decision is Decision.ALLOW
@@ -116,7 +116,7 @@ def test_g2_attack_new_payee_wire_denied(bundle: APBundle) -> None:
               "accountId": "ACME-OPS"}
     result = _pay(bundle, attack)
     assert result.decision is Decision.DENY
-    # v0.6: the fraudulent invoice is refused by *matching* — it corresponds to
+    # v0.3: the fraudulent invoice is refused by *matching* — it corresponds to
     # no purchase order (it does not even carry the fields to match one). The
     # new-payee cooling-off precondition remains behind it as defence in depth.
     assert "requireMatch" in result.rule
@@ -198,7 +198,7 @@ def test_e1_session_kill_halts(bundle: APBundle) -> None:
     assert after.decision is Decision.HALT
     # a different session is unaffected by the KILL — but the same invoice's PO
     # line is already claimed by the first session's staged payment, so the
-    # resubmission no-matches and holds for the AP clerk (v0.6, never a second
+    # resubmission no-matches and holds for the AP clerk (v0.3, never a second
     # payment against one line). Not HALT is the kill-scoping property.
     other = _pay(bundle, _acme_800(), session="other")
     assert other.decision is Decision.HOLD

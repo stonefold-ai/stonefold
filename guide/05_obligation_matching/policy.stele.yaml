@@ -1,4 +1,4 @@
-# THE POLICY — the v0.6 rule no earlier gate could express: a payment must
+# THE POLICY — the v0.3 rule no earlier gate could express: a payment must
 # CORRESPOND to an open purchase order, within tolerance, and paying it
 # SPENDS the order line. The match rule sits here, in the reviewed file —
 # not buried in check code.

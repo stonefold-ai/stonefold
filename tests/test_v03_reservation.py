@@ -1,4 +1,4 @@
-"""v0.6 reservation lifecycle — CS-035 (+CS-037 consumption audit; R6 orphan
+"""v0.3 reservation lifecycle — CS-035 (+CS-037 consumption audit; R6 orphan
 recovery; F5.2 clock skew; CS-023 batch composition).
 
 Obligation state tracks the staged effect's lifecycle exactly: reserve before
@@ -36,7 +36,7 @@ from stonefold_store import (
     InMemoryOutboxStore,
 )
 from tests.conftest import full_registry, load_schema
-from tests.test_v06_require_match import (
+from tests.test_v03_require_match import (
     GOOD_DATA,
     MATCH_CFG,
     PO_FIELDS,

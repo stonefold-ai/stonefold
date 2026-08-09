@@ -32,7 +32,7 @@ class Control:
     label: str       # the obligation, with its [VERIFY] marker(s)
     asks: str        # what the regulation asks — [VERIFY] preserved
     mechanism: str   # the gateway mechanism that answers it
-    where: str       # where it is specified (RFC/design)
+    where: str       # where it is specified (spec/design)
     artifact: str    # the evidence artifact this section presents
     key: str         # the evidence bucket in pack.py
 
@@ -50,7 +50,7 @@ CONTROLS: tuple[Control, ...] = (
                   "write shares the DB transaction with the effect (no effect without a "
                   "record, no record without an effect); resultRefs link records to "
                   "downstream reality",
-        where="RFC §11; CS-006",
+        where="spec §11; CS-006",
         artifact="the audit log itself: who asked, what was decided, which gate, who "
                  "approved, what executed",
         key="record_keeping",
@@ -67,7 +67,7 @@ CONTROLS: tuple[Control, ...] = (
                   "cannot release its own; kill-switch with the no-race guarantee: the stop "
                   "halts every action not yet dispatched, checked inside the same "
                   "serialized transaction that dispatches",
-        where="RFC §7.8–7.9, §9; design §8.4",
+        where="spec §7.8–7.9, §9; design §8.4",
         artifact="the approvals inbox; the halt audit records",
         key="oversight_intervene",
     ),
@@ -80,7 +80,7 @@ CONTROLS: tuple[Control, ...] = (
         mechanism="deterministic decisions with recorded reasons: no model in the "
                   "enforcement path, so every verdict is reproducible and explainable; each "
                   "record carries its deciding rule and, at audit: full, its per-gate results",
-        where="RFC §1, §7.14",
+        where="spec §1, §7.14",
         artifact="per-decision gate results at audit: full",
         key="oversight_capacity",
     ),
@@ -94,7 +94,7 @@ CONTROLS: tuple[Control, ...] = (
         mechanism="the policy file is the documented control — a short, readable, versioned "
                   "artifact stating exactly what the agent may do, signed by the compliance "
                   "officer; the audit store is the log-retention target",
-        where="RFC §1, §11",
+        where="spec §1, §11",
         artifact="the policy file in version control + the retained audit log",
         key="deployer",
     ),

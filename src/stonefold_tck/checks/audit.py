@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""AUDIT profile — every outcome recorded; effects and evidence agree (RFC §11).
+"""AUDIT profile — every outcome recorded; effects and evidence agree (spec §11).
 
 Black-box note: transactionality itself (CS-006, the audit write sharing the
 settle transaction) is not observable from outside — what IS observable is its

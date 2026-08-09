@@ -25,6 +25,8 @@ Wire protocol (all JSON; camelCase keys):
 | POST   | /tck/resolve                    | {ticket, resolverId, gate} → {accepted: bool} |
 | POST   | /tck/sweep-holds                | {} → {handled: int} |
 | POST   | /tck/seed-obligations           | {registry, records: {ref: fields}} → {} |
+| POST   | /tck/source-age                 | {source, days: float|null} → {} |
+| POST   | /tck/source-outage              | {source, active: bool} → {} |
 | POST   | /tck/obligation-outage          | {registry, active: bool} → {} |
 | POST   | /tck/dispatch                   | {} → {settled: int} |
 | GET    | /tck/effects                    | → {effects: [{resource, action, data}]} |
@@ -40,12 +42,12 @@ Wire protocol (all JSON; camelCase keys):
 Omit an endpoint (404/501) only if its capability is not advertised.
 (``reason`` carries the deciding rule/settle reason; required for the
 ``freshness``/``scope-reassert`` capabilities. ``/tck/update-set`` backs
-``freshness``; ``/tck/submit-batch`` backs ``batch`` (v0.5 CS-023);
+``freshness``; ``/tck/submit-batch`` backs ``batch`` (v0.2 CS-023);
 ``/tck/connector-digest`` + ``/tck/tamper-connector`` back ``digest-pinning``
-(v0.5 CS-020); ``/tck/resolve`` + ``/tck/sweep-holds`` back
+(v0.2 CS-020); ``/tck/resolve`` + ``/tck/sweep-holds`` back
 ``hold-precondition``, ``reasonCode``/``retryClass``/``agentView`` back
 ``feedback``, and ``/tck/seed-obligations`` + ``/tck/obligation-outage`` back
-``obligation`` (v0.6).)
+``obligation`` (v0.3).)
 """
 
 from __future__ import annotations
@@ -80,6 +82,8 @@ def _submit_result(body: Mapping[str, Any]) -> SubmitResult:
         reason_code=str(body.get("reasonCode", "") or ""),
         retry_class=None if retry is None else str(retry),
         agent_view=str(body.get("agentView", "") or ""),
+        items=[dict(v) for v in (body.get("items") or [])],
+        applied=[str(i) for i in (body.get("applied") or [])],
     )
 
 
@@ -290,6 +294,12 @@ class HttpDriver:
             {"registry": registry,
              "records": {ref: dict(fields) for ref, fields in records.items()}},
         )
+
+    def set_source_age(self, source: str, days: float | None) -> None:
+        self._call("POST", "/tck/source-age", {"source": source, "days": days})
+
+    def set_source_outage(self, source: str, active: bool) -> None:
+        self._call("POST", "/tck/source-outage", {"source": source, "active": active})
 
     def set_obligation_outage(self, registry: str, active: bool) -> None:
         self._call(

@@ -117,7 +117,7 @@ def create_app(bundle: APBundle, *, default_provider: str = "auto") -> FastAPI:
     ) -> list[dict[str, Any]]:
         """The audit log — the gateway's record so a human/external tool can *find*
         what the agent did (and the ``resultRefs`` handles to reconcile/compensate it
-        downstream; RFC §11). Optional filters narrow the hunt; the gateway does not
+        downstream; spec §11). Optional filters narrow the hunt; the gateway does not
         perform the reversal itself (boundary note, §11)."""
         records = bundle.audit_records()
 

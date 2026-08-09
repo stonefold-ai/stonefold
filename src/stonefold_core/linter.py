@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The semantic linter (RFC §13) — the rule-1..18 validation checks.
+"""The semantic linter (spec §13) — the rule-1..18 validation checks.
 
 A policy that produces any ERROR-severity finding MUST NOT load: the gateway
 refuses to start rather than fall back to a permissive default (design §4 review
 note — a silently-degraded control plane is how a gateway fails open by
 accident). WARN findings are reported but do not block loading; INFO findings
-(v0.6, rule 15's deployment-check pointer) are purely advisory.
+(v0.3, rule 15's deployment-check pointer) are purely advisory.
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ from stonefold_core.registry import (
 _SENSITIVE_FLOOR = frozenset({"public", "internal"})
 
 # The extra read-only namespace legal ONLY inside requireMatch match/provenance
-# clauses (RFC §8 note, v0.6 CS-036).
+# clauses (spec §8 note, v0.3 CS-036).
 _OBLIGATION_NS = frozenset({"obligation"})
 
 
@@ -174,7 +174,83 @@ def lint(policy: Policy, registry: InMemoryRegistry) -> LintReport:
     _check_consume_none_irreversible(policy, registry, report)
     _check_per_item_threshold_without_aggregate(policy, registry, report)
     _check_closure_declaration(policy, registry, report)
+    _check_item_declaration(policy, registry, report)
+    _check_declared_reads(policy, registry, report)
     return report
+
+
+def _check_declared_reads(
+    policy: Policy, registry: InMemoryRegistry, report: LintReport
+) -> None:
+    """§13.22 (CS-044) — what a gate says it reads.
+
+    Three checks, and the second is the one that exists because of a near-miss:
+    a gate that names a source and says nothing about the source being
+    unreachable inherits fail-closed, which is usually right and is occasionally
+    a permanent outage nobody chose. Making the author write it down is cheaper
+    than discovering it in production.
+    """
+    declared = set(registry.file.sources)
+    for resource, action, adef in _allowed_action_defs(policy, registry):
+        gates = _merged_gates(policy, resource, action, adef.kind)
+        for gate, cfg in gates.items():
+            if not isinstance(cfg, dict):
+                continue
+            reads = cfg.get("reads")
+            if not isinstance(reads, list) or not reads:
+                continue
+            for entry in reads:
+                name = entry if isinstance(entry, str) else str((entry or {}).get("source", ""))
+                if name and name not in declared:
+                    report.add(
+                        "13.22", Severity.ERROR,
+                        f"{resource}.{action} gate {gate}: reads {name!r}, which the "
+                        f"registry does not declare in `sources` (docs/06 §5e)",
+                    )
+                if isinstance(entry, dict) and entry.get("onStale") == "allow":
+                    report.add(
+                        "13.22", Severity.WARN,
+                        f"{resource}.{action} gate {gate}: onStale: allow on {name!r} — "
+                        f"the gate will keep deciding from content past its own review "
+                        f"date, which is how a control becomes decoration",
+                    )
+            if "onUnavailable" not in cfg:
+                report.add(
+                    "13.22", Severity.WARN,
+                    f"{resource}.{action} gate {gate}: declares `reads` and no "
+                    f"`onUnavailable` — it inherits deny, so a source that is "
+                    f"permanently unreachable makes this action permanently "
+                    f"impossible. Declare the choice",
+                )
+
+
+def _check_item_declaration(
+    policy: Policy, registry: InMemoryRegistry, report: LintReport
+) -> None:
+    """§13.21 (CS-043) — the item-bearing declaration's two checkable mistakes.
+
+    A misspelled ``field`` is silent at runtime: the call simply never fans out,
+    so the gate the author thought they had written does not exist. And an
+    unbounded fan-out turns one call into as many gate evaluations as the actor
+    cares to ask for, which is a denial-of-service the policy could have bounded.
+    """
+    for resource, action, adef in _allowed_action_defs(policy, registry):
+        declared = adef.items
+        if declared is None:
+            continue
+        if adef.data is not None and declared.field not in adef.data:
+            report.add(
+                "13.21", Severity.ERROR,
+                f"{resource}.{action}: items.field {declared.field!r} is not a "
+                f"declared data field — the action would never fan out, so any "
+                f"per-item gate on it is inert",
+            )
+        if declared.independent and declared.maxItems is None:
+            report.add(
+                "13.21", Severity.WARN,
+                f"{resource}.{action}: fans out per item with no maxItems — one "
+                f"call becomes as many gate evaluations as the actor sends",
+            )
 
 
 # Aggregate gates that bound total spend/rate/volume over a window, as opposed
@@ -265,7 +341,7 @@ def _check_closure_declaration(
 def _check_hold_capable_resolvers(
     policy: Policy, registry: InMemoryRegistry, report: LintReport
 ) -> None:
-    """§13.18 (v0.6, CS-038) — a hold-capable check gated with no ``resolvers:``
+    """§13.18 (v0.3, CS-038) — a hold-capable check gated with no ``resolvers:``
     ⇒ warn: its holds release under the deployment's default resolver role, and
     are refused ``hold-unresolvable`` if none is configured. (The other half of
     rule 18 — ``holdCapable`` without ``reasonCodes`` — is a registry load
@@ -323,7 +399,7 @@ def _clause_obligation_paths(clause: str) -> list[str]:
 def _check_require_match(
     policy: Policy, registry: InMemoryRegistry, report: LintReport
 ) -> None:
-    """§13.14 + §13.17 (v0.6, CS-038) — ``requireMatch`` typing: the registry
+    """§13.14 + §13.17 (v0.3, CS-038) — ``requireMatch`` typing: the registry
     is declared; every ``obligation.*`` path in ``match``/``provenance``/
     ``consume`` exists in its declared schema; a tolerance clause applies to a
     numeric/money field; clause strings parse under the ``obligation``
@@ -437,7 +513,7 @@ def _matched_registry_connectors(
 def _check_creation_execution_separation(
     policy: Policy, registry: InMemoryRegistry, report: LintReport
 ) -> None:
-    """§13.15 (v0.6, CS-038) — the governed agent must not author its own
+    """§13.15 (v0.3, CS-038) — the governed agent must not author its own
     obligations. ERROR where the overlap is statically visible: the policy
     allows a ``record``/``effect``/``transition`` on a resource backed by the
     same connector as an obligation registry it matches against. Otherwise
@@ -475,7 +551,7 @@ def _check_creation_execution_separation(
 def _check_consume_none_irreversible(
     policy: Policy, registry: InMemoryRegistry, report: LintReport
 ) -> None:
-    """§13.16 (v0.6, CS-038) — ``consume: none`` on an irreversible effect ⇒
+    """§13.16 (v0.3, CS-038) — ``consume: none`` on an irreversible effect ⇒
     WARN: verification without consumption leaves the double-spend window open
     in the decide→dispatch gap."""
     for rname, aname, adef in _allowed_action_defs(policy, registry):
@@ -540,7 +616,7 @@ def _check_names_exist(
 
     # scope: resource keys + named predicate values. A predicate value may be a
     # bare name (`assignedToCurrentUser`) or a call form (`inWard(actor.ward)`)
-    # — RFC §6.3. Only the *name* (before any `(`) is registered.
+    # — spec §6.3. Only the *name* (before any `(`) is registered.
     for rname, pred in policy.scope.items():
         if rname not in known_resources:
             report.add("13.1", Severity.ERROR, f"scope on unknown resource {rname!r}")
@@ -663,7 +739,7 @@ def _check_irreversible_unguarded(
     policy: Policy, registry: InMemoryRegistry, report: LintReport
 ) -> None:
     """§13.4 — irreversible allowed action with no approval/dual-auth/
-    precondition/requireMatch (rule 4 as amended by v0.6 CS-038: a matched
+    precondition/requireMatch (rule 4 as amended by v0.3 CS-038: a matched
     obligation is a satisfying guard)."""
     guards = {"requireApproval", "dualAuthorization", "precondition", "requireMatch"}
     for rname, aname, adef in _allowed_action_defs(policy, registry):
@@ -684,7 +760,7 @@ def _check_open_on_irreversible(
 ) -> None:
     """§13.5 — failureMode: open on an irreversible action ⇒ ERROR.
 
-    STONEFOLD-AMBIGUITY: the RFC allows "explicit acknowledgement" to downgrade this;
+    STONEFOLD-AMBIGUITY: the specification allows "explicit acknowledgement" to downgrade this;
     the schema has no ack field, so we always ERROR (the safer reading)."""
     if policy.defaults.failureMode is not FailureMode.OPEN:
         return
@@ -781,7 +857,7 @@ def _check_reads_disclosure(
 
 
 def _check_standing_deny_conflict(policy: Policy, report: LintReport) -> None:
-    """§13.11 (v0.3, CS-010) — an action in both ``deny`` and a ``standing``
+    """§13.11 (v0.2, CS-010) — an action in both ``deny`` and a ``standing``
     rule's ``enables`` is unsatisfiable (deny always wins, §6.2) ⇒ ERROR."""
     deny_star: set[Kind] = set()
     deny_tokens: dict[Kind, set[str]] = {}
@@ -833,7 +909,7 @@ def _check_standing_deny_conflict(policy: Policy, report: LintReport) -> None:
 def _check_ambiguous_bare_allow(
     policy: Policy, registry: InMemoryRegistry, report: LintReport
 ) -> None:
-    """§13.12 (v0.3, CS-012) — a bare action name in ``allow`` declared by more
+    """§13.12 (v0.2, CS-012) — a bare action name in ``allow`` declared by more
     than one resource applies everywhere it is declared ⇒ WARN (use the
     ``{Entity: [names]}`` map form to disambiguate)."""
     resources = registry.file.resources
@@ -861,7 +937,7 @@ def _check_ambiguous_bare_allow(
 
 
 def _check_dual_auth_quorum(policy: Policy, report: LintReport) -> None:
-    """§13.13 (v0.3, CS-014) — ``dualAuthorization`` with an explicit
+    """§13.13 (v0.2, CS-014) — ``dualAuthorization`` with an explicit
     ``quorum`` < 2 contradicts the gate's definition (§7.9) ⇒ ERROR."""
     for key, gateset in policy.gates.items():
         cfg = gateset.get("dualAuthorization")

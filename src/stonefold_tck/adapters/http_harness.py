@@ -27,6 +27,8 @@ def _submit_json(result: SubmitResult) -> dict[str, Any]:
         "reasonCode": result.reason_code,
         "retryClass": result.retry_class,
         "agentView": result.agent_view,
+        "items": [dict(v) for v in result.items],
+        "applied": list(result.applied),
     }
 
 
@@ -170,7 +172,7 @@ def create_tck_harness(driver: ConformanceDriver, *, implementation: str) -> Fas
         driver.update_named_set(str(body["name"]), [str(v) for v in body["values"]])
         return {}
 
-    # --- v0.6: hold-precondition / obligation ---------------------------------
+    # --- v0.3: hold-precondition / obligation ---------------------------------
     @app.post("/tck/resolve")
     def resolve(body: dict[str, Any]) -> dict[str, Any]:
         return {
@@ -186,6 +188,17 @@ def create_tck_harness(driver: ConformanceDriver, *, implementation: str) -> Fas
     @app.post("/tck/seed-obligations")
     def seed_obligations(body: dict[str, Any]) -> dict[str, Any]:
         driver.seed_obligations(str(body["registry"]), dict(body["records"]))
+        return {}
+
+    @app.post("/tck/source-age")
+    def source_age(body: dict[str, Any]) -> dict[str, Any]:
+        days = body.get("days")
+        driver.set_source_age(str(body["source"]), None if days is None else float(days))
+        return {}
+
+    @app.post("/tck/source-outage")
+    def source_outage(body: dict[str, Any]) -> dict[str, Any]:
+        driver.set_source_outage(str(body["source"]), bool(body["active"]))
         return {}
 
     @app.post("/tck/obligation-outage")

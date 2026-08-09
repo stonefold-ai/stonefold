@@ -1,13 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Policy compilation: allow/deny → an indexed matcher (design §4, RFC §6.2).
+"""Policy compilation: allow/deny → an indexed matcher (design §4, spec §6.2).
 
 At load the policy is compiled once into ``KindMatcher`` structures so that
 matching an attempted action is a handful of set lookups, not a YAML re-parse.
 ``CompiledPolicy`` is what the pipeline holds and queries per request:
 
-* ``authorize`` — default deny → deny-wins → most-specific allow (RFC §6.2).
+* ``authorize`` — default deny → deny-wins → most-specific allow (spec §6.2).
 * ``gate_keys_for`` — which gate configs apply (action + kind + '*', AND'd).
-* ``scope_for`` — the named scope predicate for a resource (RFC §6.3).
+* ``scope_for`` — the named scope predicate for a resource (spec §6.3).
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
 
 class MatchSpecificity(IntEnum):
-    """How specifically an allow rule matched (RFC §6.2 rule 4): a named action
+    """How specifically an allow rule matched (spec §6.2 rule 4): a named action
     beats a bare resource, which beats a kind-level ``*``."""
 
     STAR = 1
@@ -112,12 +112,12 @@ class CompiledPolicy:
         return self.policy.agent
 
     def authorize(self, a: ResolvedAction) -> AuthzResult:
-        """RFC §6.2: 1) default deny, 2) deny wins, 3) most-specific allow.
+        """spec §6.2: 1) default deny, 2) deny wins, 3) most-specific allow.
 
-        NOTE on ``standing`` (RFC §7.15): standing grants are conditional allows
+        NOTE on ``standing`` (spec §7.15): standing grants are conditional allows
         evaluated against context (M2). They are NOT applied here, so an action
         in both ``deny`` and ``standing.enables`` stays denied — deny always
-        wins (RFC §6.2). RFC v0.3 (CS-010) made this explicit: a standing-only
+        wins (spec §6.2). spec v0.2 (CS-010) made this explicit: a standing-only
         action is left out of both ``allow`` and ``deny`` (default-deny covers
         the off state), and the linter rejects the deny∩standing combination
         as unsatisfiable (§13 rule 11).
@@ -130,7 +130,7 @@ class CompiledPolicy:
         return AuthzResult(allowed=False, rule="default-deny")
 
     def gate_keys_for(self, a: ResolvedAction) -> list[str]:
-        """Gate keys that apply to ``a``, most-specific first (RFC §7: all
+        """Gate keys that apply to ``a``, most-specific first (spec §7: all
         matching gates are AND-combined). Keys may be ``Resource.action``, a
         bare action name, a kind, or ``*``."""
         candidates: list[str] = []
@@ -152,13 +152,13 @@ class CompiledPolicy:
         merged: dict[str, dict[str, Any]] = {}
         for key in self.gate_keys_for(a):
             for gate_name, cfg in self.policy.gates[key].items():
-                # Most-specific key wins on conflict (RFC §3.2 spirit: more
+                # Most-specific key wins on conflict (spec §3.2 spirit: more
                 # restrictive / more specific governs).
                 merged.setdefault(gate_name, cfg)
         return merged
 
     def feedback_for(self, a: ResolvedAction) -> FeedbackLevel:
-        """The agent-feedback visibility level for ``a`` (RFC §11, CS-030): the
+        """The agent-feedback visibility level for ``a`` (spec §11, CS-030): the
         most-specific gate set's ``feedback:`` key, else the ``code+fields``
         default."""
         from stonefold_core.feedback import DEFAULT_FEEDBACK, parse_feedback

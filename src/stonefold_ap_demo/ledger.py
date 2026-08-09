@@ -383,7 +383,7 @@ class EmailStub:
 # The new-payee cooling-off precondition (registry: payeeCoolingOffElapsed)     #
 # --------------------------------------------------------------------------- #
 def payee_cooling_off_elapsed(gctx: Any) -> bool:
-    """RFC §7.6 named check. A payee introduced *inline* (the policy only runs
+    """spec §7.6 named check. A payee introduced *inline* (the policy only runs
     this gate ``when: "exists data.newPayee"``) has, by definition, not aged the
     required cooling-off window — so the hold always applies. This deliberately
     ignores any agent-supplied ``payeeCoolingOffElapsed`` flag: an attacker must

@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
-"""DIGEST profile — connector digest pinning (v0.5 CS-020; registry §5, RFC §10).
+"""DIGEST profile — connector digest pinning (v0.2 CS-020; registry §5, spec §10).
 
 The TCK authors the pin itself: ``connector_digest`` reports the digest of the
 implementation actually loaded (computed the way the gateway verifies it), the
 check splices it into the fixture registry, and ``tamper_connector`` simulates
 the supply-chain replacement the pin defends against. The dispatch-time
 mismatch settle reason ``connector-digest-mismatch`` is normative for a driver
-claiming this capability (like the v0.4 freshness reasons).
+claiming this capability (like the v0.2 freshness reasons).
 
 Failure messages state the violation observed, not the expectation.
 """
@@ -39,7 +39,7 @@ def i1_load_time_mismatch_refuses(driver: ConformanceDriver) -> None:
     expect(
         not result.ok,
         "a registry pinning a digest the loaded connector does not match "
-        "still loaded (must fail closed, RFC §10)",
+        "still loaded (must fail closed, spec §10)",
     )
 
 

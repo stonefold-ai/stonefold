@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Decision freshness (v0.4 CS-017, changeset docs/RFC-changeset-v0.3-to-v0.4.md).
+"""Decision freshness (v0.2 CS-017, changeset docs/changeset-v0.1-to-v0.2.md).
 
 A staged effect's decision is only valid for a bounded time: every staged row
 carries an ``expires_at`` stamped at staging from deployment configuration (NOT
@@ -29,7 +29,7 @@ from stonefold_core.outbox import PendingAction
 # (the payload is frozen), rate/quota/quantityCap/spendLimit (consumed at
 # decision time — re-running double-counts), requireApproval/dualAuthorization
 # (the grant IS the release; its freshness is bounded by the TTL).
-# ``requireMatch`` (v0.6 CS-032 rule 3) is volatile as a full re-query for now;
+# ``requireMatch`` (v0.3 CS-032 rule 3) is volatile as a full re-query for now;
 # CS-035 (reservation lifecycle) replaces the dispatch-time re-run with a
 # reservation-liveness check once obligations are reserved at staging.
 VOLATILE_GATES: frozenset[str] = frozenset(

@@ -1,15 +1,15 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Connector digest pinning (CS-020, RFC change set v0.4→v0.5; docs/06 §5).
+"""Connector digest pinning (CS-020, change set v0.1→v0.2; docs/06 §5).
 
 A connector declaration MAY pin the artifact that implements it by content digest
 (``digest: "sha256:<64 hex>"`` in the registry). When a digest is declared the
 gateway MUST verify the loaded connector against it **at policy load and at
 dispatch**; a mismatch is a *dependency failure* under the policy's ``failureMode``
-(RFC §10) — fail closed by default, with an audit record. The registry already
+(spec §10) — fail closed by default, with an audit record. The registry already
 declares *what* a connector does; the digest declares *which code* is trusted to do
 it, so silently swapping a connector's implementation stops being invisible.
 
-The hashable artifact (deliberately implementation-defined by the RFC)
+The hashable artifact (deliberately implementation-defined by the specification)
 -----------------------------------------------------------------------
 The reference implementation pins **the source bytes of the Python module that
 implements the connector** — ``sha256`` over the file returned by
@@ -21,7 +21,7 @@ implements the connector** — ``sha256`` over the file returned by
   concept deliverable can demonstrate the load/dispatch check end to end;
 - a production deployment would instead pin the *built/deployed* artifact (a wheel,
   an image layer, a signed bundle) — the digest declaration is identical, only this
-  ``artifact_digest`` function changes. The RFC leaves that choice to the
+  ``artifact_digest`` function changes. The specification leaves that choice to the
   implementation; docs/06 §5 says as much.
 
 A digest that cannot be computed (a built-in, a connector with no on-disk source)
@@ -73,7 +73,7 @@ class DigestMismatch:
 class DigestMismatchError(Exception):
     """Raised at policy load when a pinned connector fails verification and the
     active ``failureMode`` is closed — the gateway MUST NOT come up trusting an
-    unverified connector (RFC §10)."""
+    unverified connector (spec §10)."""
 
     def __init__(self, mismatches: list[DigestMismatch]) -> None:
         self.mismatches = mismatches
@@ -192,7 +192,7 @@ def assert_connector_digests(
 
 
 def _load_mismatch_record(mismatch: DigestMismatch, agent: str) -> AuditRecord:
-    """A DENY audit record for a load-time digest refusal (RFC §11)."""
+    """A DENY audit record for a load-time digest refusal (spec §11)."""
     result = EvalResult(decision=Decision.DENY, rule=DIGEST_MISMATCH)
     return build_record(
         agent=agent,

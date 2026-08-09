@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The gate engine (RFC §7/§12 step 4, design §6).
+"""The gate engine (spec §7/§12 step 4, design §6).
 
 Evaluates every gate that matches an action, combined with **AND**, in
 cheapest-deterministic-first order with ``requireApproval``/``dualAuthorization``
@@ -8,7 +8,7 @@ last. The first ``FAIL`` short-circuits to DENY — so a cheap failure is found
 failures, any HOLD makes the verdict HOLD; otherwise PASS.
 
 The engine also injects the built-in transition guard: any ``transition`` action
-re-checks its declared ``from`` states (RFC §7.6) even when the policy lists no
+re-checks its declared ``from`` states (spec §7.6) even when the policy lists no
 ``precondition`` gate.
 
 This module is the concrete ``GateEngine`` the pure pipeline depends on through
@@ -57,7 +57,7 @@ _GATES: dict[str, tuple[int, GateFn]] = {
     "denylist": (15, g.denylist),
     "precondition": (20, g.precondition),
     "emissionControl": (20, g.emission_control),
-    "requireMatch": (20, g.require_match),  # v0.6 CS-032 (volatile band)
+    "requireMatch": (20, g.require_match),  # v0.3 CS-032 (volatile band)
     "disclosure": (20, g.disclosure),
     "rate": (30, g.rate),
     "quota": (30, g.quota),
@@ -116,12 +116,13 @@ class DefaultGateEngine:
         preconditions: Mapping[str, PreconditionCheck] | None = None,
         obligations: Mapping[str, ObligationRegistry] | None = None,
         history: DecisionHistory | None = None,
+        sources: Mapping[str, Any] | None = None,
         default_resolver_role: str | None = None,
     ) -> None:
         self.registry = registry
         self.counters: CounterStore = counters or InMemoryCounterStore()
         self.hooks: ContentHookRegistry = hooks or default_hooks()
-        # v0.6.1 (CS-041): the reserved-name standard checks are merged OVER the
+        # v0.3 (CS-041): the reserved-name standard checks are merged OVER the
         # integrator's map, not under it. The name carries normative semantics
         # (§7.6), so a local implementation of it would silently redefine a
         # documented guarantee.
@@ -131,9 +132,11 @@ class DefaultGateEngine:
         # The gateway's own record of this run, for the closure check. ``None``
         # ⇒ a completion claim cannot be verified and fails closed (§10).
         self.history = history
-        # v0.6 (CS-034): obligation-registry adapters, keyed by declared
+        # CS-044: source adapters, keyed by declared name (docs/06 §5e).
+        self.sources: dict[str, Any] = dict(sources or {})
+        # v0.3 (CS-034): obligation-registry adapters, keyed by declared
         # registry name. A ``requireMatch`` whose registry has no adapter here
-        # is a dependency failure at evaluation time (RFC §10).
+        # is a dependency failure at evaluation time (spec §10).
         self.obligations: dict[str, ObligationRegistry] = dict(obligations or {})
         # CS-027: the deployment's default resolver role for non-approval holds
         # whose gate declares no ``resolvers:``. ``None`` + no ``resolvers:`` on a
@@ -160,6 +163,7 @@ class DefaultGateEngine:
             hooks=self.hooks,
             preconditions=self.preconditions,
             history=self.history,
+            sources=self.sources,
             failure_mode=policy.policy.defaults.failureMode,
             agent=policy.agent,
             obligations=self.obligations,
@@ -176,7 +180,7 @@ class DefaultGateEngine:
         gctx = self._context(resolved, actor, session, policy, env)
 
         items: list[tuple[int, str, Any]] = []
-        # built-in transition guard, always (RFC §7.6) — cheapest, runs first.
+        # built-in transition guard, always (spec §7.6) — cheapest, runs first.
         if resolved.kind is Kind.TRANSITION and resolved.from_states:
             items.append((0, _TRANSITION_GUARD, {"from": list(resolved.from_states)}))
         for name, cfg in policy.gates_for(resolved).items():
@@ -230,7 +234,7 @@ class DefaultGateEngine:
         later ``requireMatch``) must name ``resolvers:`` or fall back to the
         deployment default — ``None`` means unresolvable. The legacy
         ``emissionControl`` ``holdForAuthorization`` hold (no code) keeps its
-        pre-v0.6 permissive contract for compatibility.
+        pre-v0.3 permissive contract for compatibility.
         """
         if gate in ("requireApproval", "dualAuthorization"):
             spec = _approval_spec(gate, cfg)
@@ -265,7 +269,7 @@ class DefaultGateEngine:
         *,
         claim: ObligationClaim | None = None,
     ) -> GateResult | None:
-        """Dispatch-time re-validation of the VOLATILE gates only (v0.4 CS-017).
+        """Dispatch-time re-validation of the VOLATILE gates only (v0.2 CS-017).
 
         Re-runs ``allowlist``/``denylist``/``window``/``precondition``/
         ``emissionControl`` for a claimed staged row against dispatch-time state;
@@ -274,7 +278,7 @@ class DefaultGateEngine:
         Returns the first non-PASS result (a HOLD here is treated as stale too:
         a claimed row cannot be re-suspended) or ``None`` when still fresh.
 
-        ``requireMatch`` refinement (v0.6 CS-032 rule 3 / CS-035): a row that
+        ``requireMatch`` refinement (v0.3 CS-032 rule 3 / CS-035): a row that
         holds a reservation (``claim``) is checked for **reservation liveness**
         instead of re-running the query — the reserved line's state moved to
         ``reserved``, so a re-query would spuriously no-match the row's own
@@ -301,7 +305,7 @@ class DefaultGateEngine:
         was free, so re-closing the window is safe); anything else means the
         line was lost to another intent ⇒ ``stale-guard:requireMatch``. An
         unreachable registry is a dependency failure with the irreversible
-        floor (RFC §10)."""
+        floor (spec §10)."""
         from stonefold_core.failure import should_fail_closed
 
         adapter = self.obligations.get(claim.registry)
@@ -331,7 +335,7 @@ class DefaultGateEngine:
         )
 
     def _run_one(self, name: str, cfg: Any, gctx: GateContext) -> GateResult:
-        # `when:` makes ANY gate conditional (RFC §7). A runtime resolution error
+        # `when:` makes ANY gate conditional (spec §7). A runtime resolution error
         # in the condition is fail-closed for the gate (design §10; C8), distinct
         # from the condition evaluating to false (which deactivates the gate).
         if isinstance(cfg, Mapping) and "when" in cfg:
@@ -389,8 +393,8 @@ def _approvers(cfg: Any) -> tuple[str, ...]:
 
 
 def _timeout_seconds(cfg: Any) -> float | None:
-    """Parse the gate's ``timeout`` duration (``30m``/``2h``, RFC §7.8) into
-    seconds — enforced by the held-row expiry sweep (v0.6 CS-028). Unparsable ⇒
+    """Parse the gate's ``timeout`` duration (``30m``/``2h``, spec §7.8) into
+    seconds — enforced by the held-row expiry sweep (v0.3 CS-028). Unparsable ⇒
     ``None`` (the staging TTL remains the backstop)."""
     if not isinstance(cfg, Mapping):
         return None

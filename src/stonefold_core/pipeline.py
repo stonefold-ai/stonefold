@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The enforcement pipeline (RFC §12, design §3).
+"""The enforcement pipeline (spec §12, design §3).
 
 This is the spine: one ``enforce`` call per attempted action, always ending in an
 audited terminal decision. The function is **pure and total** — no LLM, no
 nondeterminism inside the decision logic (invariant 1).
 
 The pipeline is split into two phases so a SIF batch can be decided atomically
-(RFC §12, CS-023):
+(spec §12, CS-023):
 
 * ``_decide`` runs steps 1–5 (resolve → authorize → scope → gates → kill) and
   produces the operation's verdict **without committing anything** — no staging,
@@ -24,7 +24,7 @@ does not refuse the batch).
 from __future__ import annotations
 
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any
 
@@ -44,6 +44,7 @@ from stonefold_core.models import (
     BatchResult,
     EvalResult,
     GateResult,
+    ItemVerdict,
     RawCall,
     ResolvedAction,
     Session,
@@ -90,14 +91,14 @@ class _Decided:
     outcome: str = "not_executed"  # audit outcome if refused terminal
     gate_results: tuple[GateResult, ...] = ()
     approval: ApprovalSpec | None = None
-    # v0.6 (CS-027): one release contract per holding gate; all must be satisfied.
+    # v0.3 (CS-027): one release contract per holding gate; all must be satisfied.
     releases: tuple[ReleaseContract, ...] = ()
     scope_pred: ScopePredicate | None = None
     scope_applied: tuple[str, ...] = ()
-    # v0.6 (CS-030): the policy-declared agent-feedback level, stamped on the
+    # v0.3 (CS-030): the policy-declared agent-feedback level, stamped on the
     # EvalResult so the transport can redact the return path.
     feedback: FeedbackLevel = FeedbackLevel.CODE_FIELDS
-    # v0.6 (CS-035): a reservation taken by the BATCH pre-pass, so the commit
+    # v0.3 (CS-035): a reservation taken by the BATCH pre-pass, so the commit
     # phase uses it instead of reserving again. ``None`` in the single-op path
     # (the commit reserves itself, just before staging).
     claim: ObligationClaim | None = None
@@ -124,19 +125,31 @@ def enforce(
 ) -> EvalResult:
     """Evaluate one attempted action to a terminal, audited decision.
 
-    Every return path writes exactly one audit record (RFC §11) via
-    ``_terminal``. The stages run in the strict RFC §12 order, stopping at the
+    Every return path writes exactly one audit record (spec §11) via
+    ``_terminal``. The stages run in the strict spec §12 order, stopping at the
     first terminal verdict. Stages whose dependency is not injected are skipped:
     no ``gates`` ⇒ authorization alone decides (M1); no ``connectors`` ⇒ an
     allowed non-effect is not executed (M2 behaviour). ``obligations`` supplies
     the obligation-registry adapters the commit phase reserves/consumes from
-    (v0.6 CS-035) — the same map the gate engine matches against.
+    (v0.3 CS-035) — the same map the gate engine matches against.
     """
 
     agent_name = policy.agent if policy is not None else agent
     failure_mode = (
         policy.policy.defaults.failureMode if policy is not None else FailureMode.CLOSED
     )
+    # CS-043: an action declaring independent items is decided item by item.
+    # Only here, never inside ``enforce_batch``: a SIF batch applies atomically
+    # (CS-023), so an item-bearing action inside one stays a single unit.
+    items_def = _items_declaration(registry, call)
+    if items_def is not None:
+        return _enforce_per_item(
+            call, actor, session, items_def=items_def, registry=registry, audit=audit,
+            policy=policy, gates=gates, env=env, scopes=scopes, connectors=connectors,
+            outbox=outbox, kill=kill, freshness=freshness, obligations=obligations,
+            dedupe_window_s=dedupe_window_s, agent_name=agent_name,
+            failure_mode=failure_mode,
+        )
     decided = _decide(
         call, actor, session, registry=registry, policy=policy, gates=gates,
         env=env, scopes=scopes, connectors=connectors, kill=kill,
@@ -149,6 +162,213 @@ def enforce(
         dedupe_window_s=dedupe_window_s,
     )
     return _stamp_feedback(result, decided)
+
+
+# --- CS-043: item-bearing actions ----------------------------------------
+def _items_declaration(registry: Registry, call: RawCall) -> Any | None:
+    """The action's items declaration, or ``None`` if it is not item-bearing.
+
+    Resolution is an O(1) lookup and ``_decide`` resolves again per item; paying
+    it twice is cheaper than widening the ``Registry`` protocol every consumer
+    implements. An unknown name resolves to ``None`` here and reaches the normal
+    path, which is what turns it into the audited DENY (spec §12 step 1).
+    """
+    try:
+        resolved = registry.resolve(call)
+    except UnknownActionError:
+        return None
+    declared = resolved.items
+    if declared is None or not getattr(declared, "independent", False):
+        return None
+    values = call.data.get(declared.field)
+    # A single value, or none at all, has nothing to fan out: the ordinary path
+    # decides it as one unit and says so in one record.
+    if not isinstance(values, (list, tuple)) or len(values) < 2:
+        return None
+    return declared
+
+
+def _item_key(value: Any, declared: Any) -> str:
+    """How a refusal names the item it refused.
+
+    Scalars name themselves. Objects need a declared ``key``, and without one the
+    position is all there is — which is why the linter warns about an item-bearing
+    action whose items are objects and whose key is undeclared.
+    """
+    key = getattr(declared, "key", "")
+    if key and isinstance(value, Mapping):
+        return str(value.get(key, ""))
+    return str(value)
+
+
+def _worst(decisions: Iterable[Decision]) -> Decision:
+    """The call's fate as a whole: ALLOW only if every item was applied.
+
+    The order is the refusal's finality for the actor: HALT means an operator
+    stopped it, DENY means it will not happen, HOLD means it might.
+    """
+    seen = set(decisions)
+    for decision in (Decision.HALT, Decision.DENY, Decision.HOLD):
+        if decision in seen:
+            return decision
+    return Decision.ALLOW
+
+
+def _enforce_per_item(
+    call: RawCall,
+    actor: Actor,
+    session: Session,
+    *,
+    items_def: Any,
+    registry: Registry,
+    audit: AuditSink,
+    policy: CompiledPolicy | None,
+    gates: GateEngine | None,
+    env: RequestEnv | None,
+    scopes: ScopeResolver | None,
+    connectors: ConnectorRegistry | None,
+    outbox: OutboxStore | None,
+    kill: KillStore | None,
+    freshness: FreshnessConfig | None,
+    obligations: Mapping[str, ObligationRegistry] | None,
+    dedupe_window_s: float | None,
+    agent_name: str,
+    failure_mode: FailureMode,
+) -> EvalResult:
+    """Decide an item-bearing action item by item (CS-043).
+
+    Where each part of the answer comes from, and why:
+
+    * **every gate runs per item**, which is the entire point — an aggregate gate
+      (``spendLimit``/``rate``/``quota``) now sees N increments and can cut the run
+      off at item seven, which is *these seven, not those thirteen*;
+    * **the applied items go through as one call**, because that is one transaction
+      in the managed system, and splitting it into N would misdescribe what
+      happened;
+    * **held items stage individually**, so a human releases one item rather than
+      the whole call;
+    * **refused items are each audited on their own**, because each is its own
+      decision with its own reason code, and that record is the only place the
+      refusal exists.
+    """
+    values = list(call.data[items_def.field])
+    ceiling = getattr(items_def, "maxItems", None)
+    if ceiling is not None and len(values) > ceiling:
+        # Refusing on size is honest; quietly evaluating fifty thousand items is
+        # not. One record, one reason, nothing applied.
+        return _terminal(
+            Decision.DENY, "items-over-ceiling", call, None, actor, session, audit,
+            agent_name,
+        )
+
+    decided = [
+        _decide(
+            RawCall(
+                resource=call.resource,
+                action=call.action,
+                data={**call.data, items_def.field: [value]},
+            ),
+            actor, session, registry=registry, policy=policy, gates=gates,
+            env=env, scopes=scopes, connectors=connectors, kill=kill,
+            agent_name=agent_name, failure_mode=failure_mode,
+        )
+        for value in values
+    ]
+
+    verdicts: list[ItemVerdict] = []
+    applied: list[str] = []
+    allowed: list[tuple[int, _Decided]] = []
+
+    for index, (value, d) in enumerate(zip(values, decided)):
+        name = _item_key(value, items_def)
+        if d.decision in (Decision.DENY, Decision.HALT):
+            refused = _terminal(
+                d.decision, d.rule, d.call, d.resolved, actor, session, audit,
+                agent_name, gate_results=d.gate_results,
+                scope_applied=d.scope_applied, outcome=d.outcome,
+            )
+            verdicts.append(ItemVerdict(
+                item=name, decision=refused.decision, rule=refused.rule,
+                reason_code=refused.reason_code, retry_class=refused.retry_class,
+            ))
+        elif d.decision is Decision.HOLD:
+            held = _stamp_feedback(_commit(
+                d, actor, session, audit=audit, connectors=connectors, outbox=outbox,
+                freshness=freshness, env=env, agent_name=agent_name,
+                failure_mode=failure_mode, obligations=obligations,
+                dedupe_window_s=dedupe_window_s,
+            ), d)
+            verdicts.append(ItemVerdict(
+                item=name, decision=held.decision, rule=held.rule,
+                reason_code=held.reason_code, retry_class=held.retry_class,
+                ticket=held.ticket,
+            ))
+        else:
+            allowed.append((index, d))
+            verdicts.append(ItemVerdict(item=name, decision=Decision.ALLOW, rule=d.rule))
+            applied.append(name)
+
+    merged: EvalResult | None = None
+    if allowed:
+        # One call for the allowed subset. The template is the first allowed
+        # item's verdict: the gates that ran are the same set for every item, and
+        # where a gate's *values* differed, that difference is recorded on the
+        # items it refused rather than here.
+        template = allowed[0][1]
+        subset = [values[i] for i, _ in allowed]
+        assert template.resolved is not None
+        merged_decided = replace(
+            template,
+            call=RawCall(
+                resource=call.resource,
+                action=call.action,
+                data={**call.data, items_def.field: subset},
+            ),
+            resolved=template.resolved.model_copy(
+                update={"data": {**template.resolved.data, items_def.field: subset}}
+            ),
+        )
+        merged = _stamp_feedback(_commit(
+            merged_decided, actor, session, audit=audit, connectors=connectors,
+            outbox=outbox, freshness=freshness, env=env, agent_name=agent_name,
+            failure_mode=failure_mode, obligations=obligations,
+            dedupe_window_s=dedupe_window_s,
+        ), template)
+        if merged.decision is not Decision.ALLOW:
+            # The commit phase refused what the decide phase allowed — a
+            # dispatch-time re-validation, a digest mismatch. Nothing was applied,
+            # so the items say that rather than keeping the decide-phase verdict.
+            applied = []
+            verdicts = [
+                ItemVerdict(
+                    item=v.item, decision=merged.decision, rule=merged.rule,
+                    reason_code=merged.reason_code, retry_class=merged.retry_class,
+                    ticket=merged.ticket,
+                ) if v.decision is Decision.ALLOW else v
+                for v in verdicts
+            ]
+
+    overall = _worst(v.decision for v in verdicts)
+    # The envelope carries the strongest thing that happened to the call, and the
+    # applied items by name. A reader of ``decision`` alone must not be able to
+    # conclude the whole call succeeded — CS-029's lesson, applied to a set.
+    worst = next((v for v in verdicts if v.decision is overall
+                  and v.decision is not Decision.ALLOW), None)
+    return EvalResult(
+        decision=overall,
+        rule=(worst.rule if worst is not None
+              else (merged.rule if merged is not None else "allow")),
+        gates=merged.gates if merged is not None else (),
+        reason_code=worst.reason_code if worst is not None else "",
+        retry_class=worst.retry_class if worst is not None else None,
+        feedback=(merged.feedback if merged is not None
+                  else decided[0].feedback),
+        ticket=merged.ticket if merged is not None else None,
+        output=merged.output if merged is not None else None,
+        scope_applied=merged.scope_applied if merged is not None else (),
+        items=tuple(verdicts),
+        applied=tuple(applied),
+    )
 
 
 def enforce_batch(
@@ -170,7 +390,7 @@ def enforce_batch(
     dedupe_window_s: float | None = None,
     agent: str = "unknown",
 ) -> BatchResult:
-    """Evaluate a SIF batch atomically (RFC §12, CS-023; SIF §5).
+    """Evaluate a SIF batch atomically (spec §12, CS-023; SIF §5).
 
     Every operation is decided first (steps 1–5, each getting its own audit
     record); any DENY or HALT refuses the **whole batch** before anything
@@ -240,7 +460,7 @@ def enforce_batch(
             ),
         )
 
-    # Reservation pre-pass (v0.6 CS-035, CS-023 composition): every operation
+    # Reservation pre-pass (v0.3 CS-035, CS-023 composition): every operation
     # that matched a consumable obligation reserves it BEFORE anything commits;
     # a refused reservation refuses the whole batch and releases every
     # reservation taken for it — no partial claim survives a refused batch.
@@ -292,7 +512,7 @@ def enforce_batch(
     # staging — the in-memory reference approximates that shared transaction by
     # committing sequentially after the all-operations decision above; the
     # SQL-class connector binds them in one database transaction.
-    # STONEFOLD-AMBIGUITY: RFC §12/CS-023 defines batch atomicity for the
+    # STONEFOLD-AMBIGUITY: spec §12/CS-023 defines batch atomicity for the
     # *decision*; a dependency failure mid-commit (outbox/connector down after
     # earlier operations committed) is governed per-operation by §10 and is not
     # rolled back here.
@@ -341,11 +561,11 @@ def _decide(
     agent_name: str,
     failure_mode: FailureMode,
 ) -> _Decided:
-    """Steps 1–5 for one operation (RFC §12) — the verdict, nothing committed."""
+    """Steps 1–5 for one operation (spec §12) — the verdict, nothing committed."""
 
-    # 1. RESOLVE (RFC §12 step 1) — done *first* so every terminal record, even a
+    # 1. RESOLVE (spec §12 step 1) — done *first* so every terminal record, even a
     # halt or a refusal, carries the resolved kind/resource/action the audit
-    # requires (RFC §11). An unknown name short-circuits to DENY before any policy
+    # requires (spec §11). An unknown name short-circuits to DENY before any policy
     # runs.
     resolved: ResolvedAction | None
     try:
@@ -377,7 +597,7 @@ def _decide(
     # on every decision from here down so the transport can redact the return.
     fb = policy.feedback_for(resolved)
 
-    # 2. AUTHORIZE — RFC §6.2: deny-wins → default-deny → allow.
+    # 2. AUTHORIZE — spec §6.2: deny-wins → default-deny → allow.
     authz = policy.authorize(resolved)
     if not authz.allowed:
         return _Decided(call, resolved, Decision.DENY, authz.rule, feedback=fb)
@@ -412,7 +632,7 @@ def _decide(
                         scope_applied=scope_applied, feedback=fb,
                     )
 
-    # 4. GATES — evaluate the matching gates (RFC §7/§12 step 4). Any FAIL ⇒
+    # 4. GATES — evaluate the matching gates (spec §7/§12 step 4). Any FAIL ⇒
     # DENY (short-circuited before approvals); else any HOLD ⇒ HOLD (staged at
     # commit).
     gate_trace: tuple[GateResult, ...] = ()
@@ -433,7 +653,7 @@ def _decide(
             )
         gate_trace = outcome.results
 
-    # 5. KILL — the chokepoint check (RFC §12 step 5, design §8.3 point 2). An
+    # 5. KILL — the chokepoint check (spec §12 step 5, design §8.3 point 2). An
     # active kill of any scope (including ACTION_CLASS, matched here on the
     # resolved kind/resource/action) turns the action into an audited HALT — a
     # distinct terminal state, never staged. An *unreadable* kill fails closed:
@@ -484,7 +704,7 @@ def _commit(
     obligations: Mapping[str, ObligationRegistry] | None = None,
     dedupe_window_s: float | None = None,
 ) -> EvalResult:
-    """Step 6/7 for one decided operation: stage/execute, then audit (RFC §12)."""
+    """Step 6/7 for one decided operation: stage/execute, then audit (spec §12)."""
 
     call, resolved = decided.call, decided.resolved
 
@@ -498,7 +718,7 @@ def _commit(
 
     assert resolved is not None  # ALLOW/HOLD always carries the resolved action
 
-    # v0.6 (CS-035): the decision matched a consumable obligation — the row to
+    # v0.3 (CS-035): the decision matched a consumable obligation — the row to
     # be staged must hold its reservation BEFORE the staging commit returns
     # (this closes the decide→dispatch double-spend window the TTL alone does
     # not). A batch pre-pass may have reserved already (``decided.claim``).
@@ -510,7 +730,7 @@ def _commit(
         ticket = None
         if outbox is not None:
             ob = outbox
-            # v0.6 (CS-031): holds that are the same question collapse — the
+            # v0.3 (CS-031): holds that are the same question collapse — the
             # same (agent, action, reason code, candidate refs) as an OPEN held
             # row within the deployment's dedupe window bumps that row's
             # attempt count instead of queueing a second item. The agent gets
@@ -660,7 +880,7 @@ def _commit(
     # below the model (design §5).
     if connectors is not None:
         # CS-020: a pinned connector whose loaded artifact no longer matches its
-        # digest is a dependency failure (RFC §10) — honour failureMode, with the
+        # digest is a dependency failure (spec §10) — honour failureMode, with the
         # irreversible floor, exactly like a connector outage below.
         if pinned_connector_mismatch(connectors, resolved):
             if should_fail_closed(resolved, failure_mode):
@@ -693,7 +913,7 @@ def _commit(
             reason="connector-unavailable",
         )
         if isinstance(executed, Unavailable):
-            # connector/dependency failure ⇒ honour failureMode (RFC §10). Closed
+            # connector/dependency failure ⇒ honour failureMode (spec §10). Closed
             # denies; open allows the read through with no output (low-stakes).
             # Either way the effect did not land — the reservation is returned.
             _release_claim(inline_claim, obligations)
@@ -849,9 +1069,9 @@ def _staging_expiry(
     env: RequestEnv | None,
     resolved: ResolvedAction,
 ) -> datetime | None | Unavailable:
-    """The ``expires_at`` to stamp on a row being staged (v0.4 CS-017).
+    """The ``expires_at`` to stamp on a row being staged (v0.2 CS-017).
 
-    ``None`` when freshness is not configured (opt-in: pre-v0.4 behaviour).
+    ``None`` when freshness is not configured (opt-in: pre-v0.2 behaviour).
     Freshness configured but no injected clock ⇒ ``Unavailable``: the gateway
     cannot bound the decision's validity, and CS-017 requires every staged row's
     TTL to be finite — so staging fails closed unconditionally (invariant 7),
@@ -870,12 +1090,12 @@ def _approval_audit(
     ticket: str | None,
     releases: tuple[ReleaseContract, ...] = (),
 ) -> dict[str, Any] | None:
-    """Render the release contract(s) for the audit record (RFC §11 ``approval``).
+    """Render the release contract(s) for the audit record (spec §11 ``approval``).
 
     A held action records *who* may release it and the quorum/timeout terms, with
     a ``pending`` status — the eventual approver(s)/resolver(s) and outcome are
     written when the row settles. The legacy top-level keys mirror the first
-    contract (pre-v0.6 consumers); ``releases`` lists EVERY holding gate's
+    contract (pre-v0.3 consumers); ``releases`` lists EVERY holding gate's
     contract (CS-027), each with its cause, reason code, and evidence (I7).
     ``None`` when nothing holds the action.
     """

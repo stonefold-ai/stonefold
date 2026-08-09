@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Policy loading: raw mapping → validated, compiled, ready-to-run policy.
 
-Pipeline (RFC §13, design §4): merge ``extends`` fragments → JSON-Schema
+Pipeline (spec §13, design §4): merge ``extends`` fragments → JSON-Schema
 structural validation → pydantic parse → semantic linter → compile. Any
 ERROR-severity lint finding raises ``PolicyError`` so the gateway refuses to
 start (never falls back to a permissive default).
@@ -28,9 +28,9 @@ class SchemaError(Exception):
 
 def _merge_chain(docs: list[dict[str, Any]]) -> dict[str, Any]:
     """Union allow/deny/gates/scope/standing across a fragment chain
-    (RFC §3.2). Later docs (the governed document) are applied last; deny is
+    (spec §3.2). Later docs (the governed document) are applied last; deny is
     unioned so a fragment's deny can never be widened (deny wins at authorize
-    time). STONEFOLD-AMBIGUITY: RFC §3.2 says "more-restrictive gate wins"; for this
+    time). STONEFOLD-AMBIGUITY: spec §3.2 says "more-restrictive gate wins"; for this
     PoC a later doc's gate config overrides an earlier one on the same gate."""
     out: dict[str, Any] = {}
     allow: list[Any] = []

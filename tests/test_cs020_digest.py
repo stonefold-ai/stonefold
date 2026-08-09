@@ -1,16 +1,16 @@
 """CS-020 — connector digest pinning verification.
 
-Spec: ``docs/RFC-changeset-v0.4-to-v0.5.md`` §CS-020 + ``docs/06`` §5.
+Spec: ``docs/changeset-v0.1-to-v0.2.md`` §CS-020 + ``docs/06`` §5.
 
 A connector declaration MAY pin its implementing artifact by content digest
 (``digest: "sha256:<64 hex>"``). When declared, the gateway MUST verify the loaded
 connector against the digest **at policy load and at dispatch**; a mismatch is a
-**dependency failure** under ``failureMode`` (RFC §10) — fail closed by default,
+**dependency failure** under ``failureMode`` (spec §10) — fail closed by default,
 audited. When no digest is declared, nothing changes (the overwhelming majority of
 registries): these tests pin that "no digest ⇒ no check" regression too.
 
 The reference implementation hashes the connector module's source bytes
-(``stonefold_core.digest``); the RFC deliberately leaves artifact identity to the
+(``stonefold_core.digest``); the specification deliberately leaves artifact identity to the
 implementation, so tests compute the *expected* digest from the artifact under test
 rather than hard-coding a hex value.
 """
@@ -218,7 +218,7 @@ def test_enforce_observe_digest_mismatch_closed_denies() -> None:
 
 def test_enforce_observe_digest_mismatch_open_allows() -> None:
     # A read is low-stakes: under failureMode open a digest mismatch is allowed
-    # through with no output, exactly like a connector outage (RFC §10).
+    # through with no output, exactly like a connector outage (spec §10).
     cname = _connector_of("Customer", "read")
     reg = _registry_with_digests({cname: BOGUS})
     result, _ = _observe(

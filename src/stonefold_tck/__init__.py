@@ -2,7 +2,7 @@
 """stonefold_tck — the Stonefold conformance test kit (docs/12).
 
 An implementation-independent, black-box test suite any gateway runs to prove
-conformance to the Stele RFC (docs/01). The implementer writes ONE adapter — a
+conformance to the Stele specification (docs/01). The implementer writes ONE adapter — a
 ``ConformanceDriver`` — and runs ``run_conformance`` over it; the report states
 which conformance profiles (``stonefold_tck.checks.ALL_PROFILES``, docs/12 §4)
 the implementation certifies.

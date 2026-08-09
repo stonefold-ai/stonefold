@@ -118,7 +118,7 @@ class FakeProvider:
                 "invoiceId": inv.get("id"),
             }
             # a legitimate invoice names its vendor and billing domain — the
-            # gateway's requireMatch gate (v0.6) matches these against the
+            # gateway's requireMatch gate (v0.3) matches these against the
             # vendor's open purchase order. The fraudulent invoice carries
             # neither, so it cannot correspond to any obligation.
             if inv.get("vendor_id"):

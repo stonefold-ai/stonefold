@@ -1,4 +1,4 @@
-"""M4 — effects, outbox, approvals (RFC §4.4, design §7/§9). Acceptance D1–D4.
+"""M4 — effects, outbox, approvals (spec §4.4, design §7/§9). Acceptance D1–D4.
 
 Driven through the in-memory outbox + dispatch worker; the Postgres
 ``SELECT … FOR UPDATE`` path is exercised in ``test_m4_pg_integration.py``.

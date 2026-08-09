@@ -1,4 +1,4 @@
-"""M0 — enforce() default-deny stub + audit (RFC §6.2 rule 1, §11, §12 step 1).
+"""M0 — enforce() default-deny stub + audit (spec §6.2 rule 1, §11, §12 step 1).
 
 M0 DoD: enforce() denies-by-default with an audit stub; unknown ⇒ DENY.
 """

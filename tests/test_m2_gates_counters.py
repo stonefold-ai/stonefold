@@ -1,4 +1,4 @@
-"""M2 — the store-backed counter gates (RFC §7.1/§7.2/§7.4/§7.11, design §6).
+"""M2 — the store-backed counter gates (spec §7.1/§7.2/§7.4/§7.11, design §6).
 
 Acceptance C2 (rate, sliding window, per target) and C5 (quantityCap, per
 subject). The same sliding-window semantics are re-verified against real Redis in

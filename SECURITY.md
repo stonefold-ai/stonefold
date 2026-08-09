@@ -12,7 +12,7 @@ email **gallas.robert@gmail.com** with the subject line `STONEFOLD SECURITY`.
 
 A useful report includes:
 
-- The affected component (module in `src/`, or the RFC section if the flaw is in the spec
+- The affected component (module in `src/`, or the specification section if the flaw is in the spec
   itself — spec-level flaws are also welcome here).
 - A reproduction. The ideal shape is an intent + policy + registry that demonstrates the
   bypass — the same shape as the scenarios in `tests/acceptance-scenarios.md`.
@@ -36,7 +36,7 @@ This is a solo-maintained project, so the promises are modest but honest:
 
 ## Scope
 
-**In scope:** anything that breaks a guarantee stated in the RFCs or `CLAUDE.md` —
+**In scope:** anything that breaks a guarantee stated in the specifications or `CLAUDE.md` —
 enforcement bypasses, scope or identity injection, kill-switch races, audit omissions,
 outbox bypasses, fail-open behavior not opted into, and spec wording that would make a
 conformant implementation exploitable.

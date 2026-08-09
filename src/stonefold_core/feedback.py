@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Agent feedback visibility (RFC §11, v0.6 CS-030).
+"""Agent feedback visibility (spec §11, v0.3 CS-030).
 
 What the *agent* receives on a deny/hold is a declared choice — ``code`` |
 ``code+fields`` (default) | ``code+evidence`` — applied by the TRANSPORT on the
@@ -48,7 +48,10 @@ def agent_view(result: EvalResult, level: FeedbackLevel | None = None) -> EvalRe
     is the identity; ``code+fields`` strips prose reasons and evidence from the
     gate trace; ``code`` strips the trace and the scope description entirely.
     The decision, rule, reason code, retry class, ticket, and connector output
-    always pass through — they are the loop's signal.
+    always pass through — they are the loop's signal. So do CS-043's per-item
+    verdicts: an item's identifier came from the intent, and its code and retry
+    class are the same convergence signal one level down. Nothing record-side
+    reaches them (a held item's evidence stays in the audit record).
     """
     lvl = level if level is not None else result.feedback
     if lvl is FeedbackLevel.CODE_EVIDENCE:

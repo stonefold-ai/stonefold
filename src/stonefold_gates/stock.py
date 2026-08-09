@@ -58,7 +58,7 @@ def _as_datetime(value: Any) -> datetime | None:
 
 def cooling_off_elapsed(field: str, min_age: timedelta) -> PreconditionCheck:
     """The target's ``field`` timestamp is at least ``min_age`` old — the
-    new-payee cooling-off pattern (RFC §14.4). Reads the **injected** clock
+    new-payee cooling-off pattern (spec §14.4). Reads the **injected** clock
     (``env.now``, invariant 1); missing clock, missing field, or an unparsable
     timestamp ⇒ ``False`` (fail closed)."""
 

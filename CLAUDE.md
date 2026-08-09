@@ -14,19 +14,19 @@ The **Stonefold Gateway**: a deterministic enforcement point between an AI agent
 > wording, schemas, or fixtures: commit in the spec repo, then bump the submodule pointer
 > here. The runnable TCK code is the reverse case: it lives **here**
 > (`src/stonefold_tck/`); the spec repo carries only its specification (spec/docs/12).
-1. `spec/docs/00-RFC-sif-intent-format.md` — the intent format (the five kinds + the shape an intent takes on the wire), **v1.0**. Canonical home for the kinds.
-2. `spec/docs/01-RFC-agent-control-policy.md` — Stele policy semantics (*what's allowed*), **v0.6** (changelogs at top); references the intent format for the kinds. Deltas for older builds: `spec/docs/RFC-changeset-v0.1-to-v0.2.md` through `spec/docs/RFC-changeset-v0.5-to-v0.6.md`, in order. A Change Set wins on any conflict with older wording.
+1. `spec/docs/00-sif-wire-format.md` — the intent format (the five kinds + the shape an intent takes on the wire), **v0.3**. Canonical home for the kinds.
+2. `spec/docs/01-stele-policy-language.md` — Stele policy semantics (*what's allowed*), **v0.3** (changelogs at top); references the intent format for the kinds. Deltas for older builds: `spec/docs/changeset-v0.1-to-v0.2.md`, then `spec/docs/changeset-v0.2-to-v0.3.md`. A Change Set wins on any conflict with older wording.
 3. `docs/02-implementation-design.md` — mechanism (*how*). Code snippets there are illustrative pseudocode; realise them in the pinned Python stack.
 4. `docs/03-architecture-decisions.md` — pinned stack & layout (Python: FastAPI + pydantic + Postgres + Redis).
 5. `spec/schema/sif.schema.json`, `spec/schema/stele.schema.json`, `spec/schema/registry.schema.json` — the JSON Schemas for intents, policies, and registries. Every `spec/examples/*` must validate against the matching schema.
 6. `spec/registry/stonefold-registry.yaml` (+ `spec/examples/*.registry.yaml`) — the declared vocabulary (resources, actions with their kind/attributes, states, scope predicates, named sets) a policy resolves against.
-7. `spec/examples/*.stele.yaml` — the RFC's worked policies, used as fixtures.
+7. `spec/examples/*.stele.yaml` — the specification's worked policies, used as fixtures.
 8. `docs/05-demo-spec.md` — the runnable Accounts-Payable demo spec (matches the shipped `demo/`: minimal scripted walkthrough plus the tested attack-refusal, invite-attack, and kill paths).
 9. `tests/acceptance-scenarios.md` — the acceptance bar.
 9b. `guide/README.md` + `guide/0*/` — the developer's guide: five role-separated tutorials (registry/policy YAML, functions, gateway_service, agent, operator files per directory), each `main.py` starting the real uvicorn service and driving it over HTTP; executed by `tests/test_guide_examples.py` — keep them green and in sync with any API change.
-10. `spec/docs/12-conformance-tck.md` + `src/stonefold_tck/` — the conformance test kit: how ANY gateway (any language) certifies against the RFC. The kit core imports nothing from the reference; the reference is certified by it (`tests/test_tck_reference.py`), in-process and over the wire binding.
+10. `spec/docs/12-conformance-tck.md` + `src/stonefold_tck/` — the conformance test kit: how ANY gateway (any language) certifies against the specification. The kit core imports nothing from the reference; the reference is certified by it (`tests/test_tck_reference.py`), in-process and over the wire binding.
 
-Supporting docs (context, not normative): `docs/04-domains-and-use-cases.md`, `spec/docs/06-registry-domain-model.md`, `spec/docs/07-artifacts-and-schemas.md`, `spec/docs/08-glossary.md`, `docs/09-mental-models.md`, `docs/10-positioning-policy-engines.md`, `docs/13-who-is-this-for.md` (industries & buyers), `docs/16-incremental-adoption.md`, `spec/docs/17-interception-mapping.md` (how Stonefold interprets ordinary MCP/tool calls via the declared mapping), `docs/18-obligation-checking-pattern.md` (the v0.6 obligation pattern in plain language), `docs/21-why-not-just-tools.md` (the adoption case for the gateway, addressed to a tools-work-fine reader; linked from the intent-format RFC §1), `docs/renaming.md` (the executed ACP → Stonefold/Stele rename record).
+Supporting docs (context, not normative): `docs/04-domains-and-use-cases.md`, `spec/docs/06-registry-domain-model.md`, `spec/docs/07-artifacts-and-schemas.md`, `spec/docs/08-glossary.md`, `docs/09-mental-models.md`, `docs/10-positioning-policy-engines.md`, `docs/13-who-is-this-for.md` (industries & buyers), `docs/16-incremental-adoption.md`, `spec/docs/17-interception-mapping.md` (how Stonefold interprets ordinary MCP/tool calls via the declared mapping), `docs/18-obligation-checking-pattern.md` (the v0.3 obligation pattern in plain language), `docs/21-why-not-just-tools.md` (the adoption case for the gateway, addressed to a tools-work-fine reader; linked from the intent-format spec §1), `docs/renaming.md` (the executed ACP → Stonefold/Stele rename record).
 
 ## Non-negotiable invariants (treat a violation as a P0 bug)
 1. **Deterministic enforcement.** No LLM / nondeterminism inside `enforce()`.
@@ -39,11 +39,11 @@ Supporting docs (context, not normative): `docs/04-domains-and-use-cases.md`, `s
 8. **Frozen vocabulary.** Do not add action kinds, gate types, attribute names, or condition operators. Extensions go in resources, actions, named sets, scope predicates, and hooks.
 
 ## Definition of done (every task)
-- Tests written first (from `tests/acceptance-scenarios.md` + the cited RFC section) and passing.
+- Tests written first (from `tests/acceptance-scenarios.md` + the cited spec section) and passing.
 - Full suite green, including integration tests against real Postgres + Redis (`testcontainers-python`).
 - All `spec/examples/*.stele.yaml` and `spec/examples/*.registry.yaml` still load and validate against their schemas (`spec/schema/stele.schema.json` / `spec/schema/registry.schema.json`).
-- `mypy --strict` clean; no invariant above violated; any unavoidable ambiguity marked `# STONEFOLD-AMBIGUITY:` with the RFC reference.
-- Public types/functions typed and docstring'd; a short note on which RFC sections the change implements.
+- `mypy --strict` clean; no invariant above violated; any unavoidable ambiguity marked `# STONEFOLD-AMBIGUITY:` with the specification reference.
+- Public types/functions typed and docstring'd; a short note on which spec sections the change implements.
 
 ## Build & run (pinned stack in docs/03)
 - `uv sync` (or `pip install -e ".[dev,gateway,demo]"`) — set up the environment (the fast suite starts the real service, so the `gateway`/`demo` extras are required, not optional).
@@ -66,5 +66,5 @@ Supporting docs (context, not normative): `docs/04-domains-and-use-cases.md`, `s
 - Don't put policy logic inside connectors (connectors only execute + apply the injected scope filter).
 - Don't let any tool/connector be reachable except through the gateway (interception coverage check must fail startup otherwise).
 - Don't implement a full RBAC/ABAC engine — ship the simple built-in policy + an OPA/IAM seam (protocol only).
-- Don't build orchestration/workflow features — out of scope (see RFC non-goals).
+- Don't build orchestration/workflow features — out of scope (see spec non-goals).
 - Don't use SQLite for the kill/outbox milestones — its locking won't demonstrate the no-race guarantee.

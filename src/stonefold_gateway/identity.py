@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The identity seam (CS-021, RFC change set v0.4→v0.5; docs/03 key decision 11).
+"""The identity seam (CS-021, change set v0.1→v0.2; docs/03 key decision 11).
 
 Identity — *who* the agent acts for — enters through an ``IdentityProvider`` that
 sits **ahead of the pipeline**, the same shape as the authorization seam

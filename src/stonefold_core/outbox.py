@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The outbox seam — staged effects, approvals, and the kill substrate (RFC §4.4,
+"""The outbox seam — staged effects, approvals, and the kill substrate (spec §4.4,
 design §7/§9).
 
 Every external effect is staged as a ``pending_actions`` row before anything
@@ -64,7 +64,7 @@ class ApprovalError(OutboxError):
 
 
 class SelfApprovalError(ApprovalError):
-    """The actor tried to approve its own action (RFC §7.9 dual-auth)."""
+    """The actor tried to approve its own action (spec §7.9 dual-auth)."""
 
 
 class PendingAction(BaseModel):
@@ -84,25 +84,25 @@ class PendingAction(BaseModel):
     gates: tuple[GateResult, ...] = ()
     approval: ApprovalSpec | None = None
     approvals: tuple[str, ...] = ()  # distinct approver ids recorded so far
-    # v0.6 (CS-031): how many times this same question was asked — a duplicate
+    # v0.3 (CS-031): how many times this same question was asked — a duplicate
     # hold within the deployment's dedupe window collapses into this row and
     # increments the count instead of queueing a second item.
     attempts: int = 1
-    # v0.6 (CS-027): the release contract of EVERY holding gate; the row promotes
-    # only when all are satisfied. Empty for pre-v0.6 rows — ``effective_contracts``
+    # v0.3 (CS-027): the release contract of EVERY holding gate; the row promotes
+    # only when all are satisfied. Empty for pre-v0.3 rows — ``effective_contracts``
     # synthesises the legacy single contract from ``approval`` in that case.
     releases: tuple[ReleaseContract, ...] = ()
     compensation: Compensation | None = None
-    # v0.6 (CS-035): the reservation this row holds against its matched
+    # v0.3 (CS-035): the reservation this row holds against its matched
     # obligation — reserved before the staging commit returned, liveness-checked
     # at the dispatch claim, consumed at settle, released on any terminal
     # non-success. ``None`` when no requireMatch gate matched (or consume: none).
     obligation: ObligationClaim | None = None
     result: dict[str, Any] | None = None  # connector result on settle
     reason: str | None = None  # why cancelled/failed
-    # Decision TTL (v0.4 CS-017): the staging-time expiry. A row claimed at or
+    # Decision TTL (v0.2 CS-017): the staging-time expiry. A row claimed at or
     # after this instant is cancelled ``stale-decision``. ``None`` = no expiry
-    # (freshness not configured — pre-v0.4 behaviour).
+    # (freshness not configured — pre-v0.2 behaviour).
     expires_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
@@ -114,14 +114,14 @@ class PendingAction(BaseModel):
 KillCheck = Callable[[PendingAction], bool]
 
 # The freshness check evaluated INSIDE the dispatch claim, after the kill check
-# and before the connector call (v0.4 CS-017: kill → TTL → volatile gates →
+# and before the connector call (v0.2 CS-017: kill → TTL → volatile gates →
 # connector). Returns the cancel reason (``stale-decision`` /
 # ``stale-guard:<gate>``) or ``None`` when the row may dispatch.
 StaleCheck = Callable[[PendingAction], "str | None"]
 
 
 def expired_hold_reason(gate: str) -> str:
-    """Settle reason for a held row cancelled by the expiry sweep (v0.6 CS-028) —
+    """Settle reason for a held row cancelled by the expiry sweep (v0.3 CS-028) —
     normative, like ``stale-decision``."""
     return f"expired-hold:{gate}"
 
@@ -179,7 +179,7 @@ def hold_dedupe_key(
 def effective_contracts(row: PendingAction) -> tuple[ReleaseContract, ...]:
     """The release contracts governing a held row (CS-027).
 
-    v0.6 rows carry them in ``releases``; a pre-v0.6 row synthesises the single
+    v0.3 rows carry them in ``releases``; a pre-v0.3 row synthesises the single
     legacy contract from ``approval`` (crediting its recorded ``approvals`` so an
     in-flight quorum survives an upgrade); a legacy row with no spec at all gets
     the permissive quorum-1 contract it always had.
@@ -201,7 +201,7 @@ def apply_release(
     updated row (CS-027). Pure — both stores persist the result.
 
     ``gate="precondition"`` credits only that gate's contract — a resolution is
-    recorded as (who, when, WHICH contract). ``gate=None`` is the pre-v0.6
+    recorded as (who, when, WHICH contract). ``gate=None`` is the pre-v0.3
     approval call shape: it credits the APPROVAL-SHAPED contracts only
     (``requireApproval``/``dualAuthorization``) — never a check-driven
     resolver contract, or one untargeted approval would silently release a
@@ -262,7 +262,7 @@ def apply_release(
 
 
 def releases_audit(row: PendingAction, status: str) -> "dict[str, Any] | None":
-    """The RFC §11 ``approval`` rendering of a row's release contracts (CS-027)
+    """The spec §11 ``approval`` rendering of a row's release contracts (CS-027)
     at settle time: which gates held it, who released what, reason codes and
     evidence (I7). ``None`` for rows nothing held."""
     if not row.releases:
@@ -276,7 +276,7 @@ def releases_audit(row: PendingAction, status: str) -> "dict[str, Any] | None":
 
 def cancellation_record(row: PendingAction, reason: str) -> AuditRecord:
     """The audit record for a row cancelled inside the dispatch claim (CS-017)
-    or by the held-row expiry sweep (v0.6 CS-028) — audited in the same
+    or by the held-row expiry sweep (v0.3 CS-028) — audited in the same
     transaction as the cancel, preserving the original hold reason code in the
     ``gates`` trace and the release contracts in ``approval``. Deferred import
     keeps the module import graph acyclic-by-inspection."""
@@ -386,7 +386,7 @@ class OutboxStore(Protocol):
         ...
 
     def bump_attempts(self, action_id: str) -> PendingAction:
-        """Record one more attempt at the same held question (v0.6 CS-031):
+        """Record one more attempt at the same held question (v0.3 CS-031):
         increment ``attempts`` on an open held row and return it. The audit
         record for the attempt is written by the pipeline as always."""
         ...

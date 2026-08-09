@@ -51,12 +51,12 @@ the enforcement path in this repo: `src/stonefold_core`, `src/stonefold_gates`,
 This zone is not closed; it is gated by evidence. There are two lanes.
 
 **Lane A — problems. Open to everyone, no proposal needed, and the most valuable spec
-contribution there is.** Contradictions between the RFC text, the schemas, and the
+contribution there is.** Contradictions between the specification text, the schemas, and the
 fixtures; ambiguities where two independent implementers could reasonably disagree;
 fixtures that expose an under-specified corner; attacks that break a stated guarantee
 (those go through [`SECURITY.md`](SECURITY.md), privately). Finding a real hole requires
 no alignment with the maintainer's design intent — it only requires the hole to be real.
-The spec is at v0.5 precisely because demonstrated holes are expected to reshape it
+The spec is at v0.2 precisely because demonstrated holes are expected to reshape it
 before 1.0.
 
 **Lane B — design changes. Start from a problem, not a solution.** A proposal to change
@@ -69,7 +69,7 @@ agreed problem behind it will be declined regardless of quality.
 Two standing commitments in this zone:
 
 - **The language's shape is frozen, but that is an architectural rule, not gatekeeping.**
-  No new action kinds, gate types, attribute names, or condition operators (Stele RFC
+  No new action kinds, gate types, attribute names, or condition operators (Stele specification
   §13). The designed extension points are registries: resources, actions, named sets,
   scope predicates, and hooks. Most "extend the language" ideas are registry ideas that
   didn't know where the door was — expect to be redirected there, with a sketch.
@@ -118,7 +118,7 @@ that Stonefold should block**. These are small, self-contained, verifiable by ru
 them, and they directly strengthen the project.
 
 Use the existing format: [`tests/acceptance-scenarios.md`](tests/acceptance-scenarios.md)
-— Given/When/Then, citing the governing RFC section. Check what is already covered before
+— Given/When/Then, citing the governing spec section. Check what is already covered before
 writing: prompt injection, database exfiltration, cross-tenant scope violations, and
 salami-slicing sequences all have scenarios. New classes, or sharper variants of existing
 ones, are what's missing.
@@ -134,7 +134,7 @@ An attack that *breaks* the current gateway is even more valuable — report tho
   behavior, the implementation won't be reviewed.
 - **No capability changes hidden in refactors.** A PR does one thing. Refactoring and
   behavior change in the same PR will be sent back for splitting.
-- **Declare your delta against the spec.** State which RFC sections (or `CS-nnn`
+- **Declare your delta against the spec.** State which spec sections (or `CS-nnn`
   change-set items) your change implements or touches, or state that it touches none.
 
 ## LLM-assisted contributions
@@ -165,12 +165,12 @@ make demo                      # scripted adversarial demo
 
 ## Definition of done (every PR)
 
-- Tests first, from `tests/acceptance-scenarios.md` and the cited RFC section; full suite
+- Tests first, from `tests/acceptance-scenarios.md` and the cited spec section; full suite
   green including integration.
 - All `spec/examples/*` still validate against their schemas.
 - `mypy --strict` clean; public types/functions typed and docstring'd.
-- The PR notes which RFC sections (or `CS-nnn` change-set items) it implements. Any
-  unavoidable ambiguity is marked `# STONEFOLD-AMBIGUITY:` with the RFC reference.
+- The PR notes which spec sections (or `CS-nnn` change-set items) it implements. Any
+  unavoidable ambiguity is marked `# STONEFOLD-AMBIGUITY:` with the specification reference.
 - Specs (documents, schemas, fixtures) live only in the `spec/` submodule — if your change
   needs spec wording, a schema, or a fixture to move, land it in the
   [spec repo](https://github.com/stonefold-ai/spec) first, then bump the submodule pointer.

@@ -12,7 +12,7 @@ dialects").
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -40,7 +40,7 @@ from stonefold_core.linter import PolicyError
 from stonefold_core.enums import Outcome
 from stonefold_core.models import RawCall, ResolvedAction
 from stonefold_core.scope import AttributeScope, ScopePredicate, ScopeRegistry, make_scope_resolver
-from stonefold_gates.base import CheckResult, GateContext, check_hold
+from stonefold_gates.base import CheckResult, GateContext, check_fail, check_hold
 from stonefold_gates.content import ContentHookRegistry
 from stonefold_gates.closure import AuditDecisionHistory
 from stonefold_gates.engine import DefaultGateEngine
@@ -87,9 +87,10 @@ def authoring_to_compact(authoring: Mapping[str, Any]) -> dict[str, Any]:
                 compact[attr] = value
             # ``data``/``label``/``closure`` are declared identically in both
             # dialects and were previously dropped here, so an authoring-format
-            # registry silently lost its field shapes (and, from v0.6.1, its
+            # registry silently lost its field shapes (and, from v0.3, its
             # closure vocabulary — which the standard check reads).
-            for key in ("from", "compensation", "connector", "data", "label", "closure"):
+            for key in ("from", "compensation", "connector", "data", "label",
+                        "closure", "items"):
                 if adef.get(key) is not None:
                     compact[key] = adef[key]
             actions[aname] = compact
@@ -115,7 +116,7 @@ def authoring_to_compact(authoring: Mapping[str, Any]) -> dict[str, Any]:
             if isinstance(decl, Mapping) and decl.get("digest") is not None
         },
         "scopePredicates": list(authoring.get("scopePredicates") or []),
-        # v0.6 CS-029: the object form (name/holdCapable/reasonCodes) is the
+        # v0.3 CS-029: the object form (name/holdCapable/reasonCodes) is the
         # same in both dialects — pass items through untouched.
         "preconditionChecks": list(authoring.get("preconditionChecks") or []),
         "contentHooks": list(authoring.get("hooks") or []),
@@ -124,13 +125,60 @@ def authoring_to_compact(authoring: Mapping[str, Any]) -> dict[str, Any]:
             name: list(spec.get("values") or [])
             for name, spec in dict(authoring.get("namedSets") or {}).items()
         },
-        # v0.6 CS-034: the declaration shape is shared between the dialects.
+        # v0.3 CS-034: the declaration shape is shared between the dialects.
         "obligationRegistries": dict(authoring.get("obligationRegistries") or {}),
+        # v0.3 CS-044: same shape in both dialects — pass through untouched.
+        "sources": dict(authoring.get("sources") or {}),
         "resources": resources,
     }
 
 
 # --- the TCK's required registered-function semantics (docs/12 §3) ---------
+#: docs/12 §3: the items ``tck.itemAllowed`` refuses. Mirrors
+#: ``fixtures.BLOCKED_ITEMS``; inlined so the adapter does not import fixtures.
+_BLOCKED_ITEMS = ("Q-BLOCKED", "Q-ALSO-BLOCKED")
+
+
+def _item_allowed(gctx: GateContext) -> CheckResult:
+    """CS-043 fixture semantics: refuse exactly the blocked items.
+
+    Asserts the fan-out happened by reading a single item — a driver that hands
+    this check the whole list has not implemented CS-043, and the check says so
+    rather than passing quietly.
+    """
+    ids = gctx.resolved.data.get("itemIds") or []
+    if len(ids) != 1:
+        # A driver that hands this check the whole list has not implemented the
+        # fan-out. Say so by refusing rather than passing quietly.
+        return check_fail("tck-item-blocked")
+    return (check_fail("tck-item-blocked") if str(ids[0]) in _BLOCKED_ITEMS
+            else CheckResult(Outcome.PASS))
+
+
+class _SettableSource:
+    """docs/12 §3 fixture semantics for CS-044: a source whose reported age and
+    reachability the kit controls. ``age_days = None`` is reachable-but-undated,
+    which the spec distinguishes from fresh."""
+
+    def __init__(self, clock: Callable[[], datetime | None]) -> None:
+        self._clock = clock
+        self.age_days: float | None = 1.0
+        self.outage = False
+
+    def as_of(self) -> datetime | None:
+        if self.outage:
+            raise RuntimeError("source unreachable (TCK-injected)")
+        if self.age_days is None:
+            return None
+        now = self._clock()
+        if now is None:
+            # No clock pinned: the kit's own fixtures always pin one, so this is a
+            # harness bug rather than a policy case. Report undated rather than
+            # inventing a date — the gateway decides what undated means.
+            return None
+        return now - timedelta(days=self.age_days)
+
+
 def _tck_scope_registry() -> ScopeRegistry:
     return ScopeRegistry(
         {
@@ -276,8 +324,12 @@ class ReferenceDriver:
         self._world = _FailableConnector()
         connectors = Connectors({"tck-data": self._world, "tck-effects": self._world})
         self._connectors = connectors
-        # v0.6 (CS-034): one mock adapter per declared obligation registry —
+        # v0.3 (CS-034): one mock adapter per declared obligation registry —
         # the docs/12 §3 fixture semantics (line.state moves with the lifecycle).
+        self._sources: dict[str, _SettableSource] = {
+            name: _SettableSource(lambda: self._now)
+            for name in registry.file.sources
+        }
         self._obligations = {
             name: _FailableObligationRegistry()
             for name in registry.obligation_registries
@@ -287,14 +339,17 @@ class ReferenceDriver:
             hooks=ContentHookRegistry({"tck.rejectMarker": _reject_marker}),
             preconditions={
                 "tck.flagSet": _flag_set,
+                "tck.itemAllowed": _item_allowed,
                 "tck.holdOnMarker": _hold_on_marker,
                 "tck.codelessHold": _codeless_hold,
             },
             obligations=self._obligations,
-            # v0.6.1 (CS-041): a driver claiming CAP_CLOSURE must supply the
+            # v0.3 (CS-041): a driver claiming CAP_CLOSURE must supply the
             # gateway's own decision history — what it refused earlier for the
             # same actor and run, read from its own audit and nothing else.
             history=AuditDecisionHistory(self._audit),
+            # CS-044: one settable source per declared name (docs/12 §3).
+            sources=self._sources,
         )
         self._registry = registry
         scopes = make_scope_resolver(policy, _tck_scope_registry())
@@ -308,9 +363,9 @@ class ReferenceDriver:
             outbox=self._outbox,
             kill=self._kill,
             env_factory=self._env_factory,
-            freshness=_TCK_FRESHNESS,  # v0.4 CS-017: TTL stamped at staging
-            obligations=self._obligations,  # v0.6 CS-035: reserve at staging
-            # v0.6 CS-031: the REQUIRED TCK dedupe window — one hour, like the
+            freshness=_TCK_FRESHNESS,  # v0.2 CS-017: TTL stamped at staging
+            obligations=self._obligations,  # v0.3 CS-035: reserve at staging
+            # v0.3 CS-031: the REQUIRED TCK dedupe window — one hour, like the
             # freshness TTLs a fixture semantics the J6 check counts on.
             dedupe_window_s=3600.0,
             agent=policy.agent,
@@ -325,7 +380,7 @@ class ReferenceDriver:
             )
         except DigestMismatchError as exc:
             return LoadResult(ok=False, errors=[str(exc)])
-        # v0.4 wiring: the worker re-checks TTL + volatile gates inside the
+        # v0.2 wiring: the worker re-checks TTL + volatile gates inside the
         # claim (CS-017) and re-asserts scope at dispatch (CS-018).
         self._worker = DispatchWorker(
             self._outbox,
@@ -335,7 +390,7 @@ class ReferenceDriver:
             clock=self._worker_clock,
             revalidate=self._make_revalidator(engine, policy),
             scopes=scopes,
-            obligations=self._obligations,  # v0.6 CS-035: consume/release
+            obligations=self._obligations,  # v0.3 CS-035: consume/release
         )
         return LoadResult(ok=True, warnings=warnings)
 
@@ -395,6 +450,14 @@ class ReferenceDriver:
             reason_code=result.reason_code,
             retry_class=result.retry_class.value if result.retry_class else None,
             agent_view=json.dumps(result.model_dump(mode="json"), default=str),
+            # v0.3 CS-043: per-item verdicts, in submission order
+            items=[
+                {"item": v.item, "decision": v.decision.value, "reasonCode": v.reason_code,
+                 "retryClass": v.retry_class.value if v.retry_class else None,
+                 "ticket": v.ticket}
+                for v in result.items
+            ],
+            applied=list(result.applied),
         )
 
     @staticmethod
@@ -481,6 +544,12 @@ class ReferenceDriver:
         self, registry: str, records: Mapping[str, Mapping[str, Any]]
     ) -> None:
         self._obligations[registry].reset(records)
+
+    def set_source_age(self, source: str, days: float | None) -> None:
+        self._sources[source].age_days = days
+
+    def set_source_outage(self, source: str, active: bool) -> None:
+        self._sources[source].outage = active
 
     def set_obligation_outage(self, registry: str, active: bool) -> None:
         self._obligations[registry].outage = active

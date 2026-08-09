@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""SCOPE profile — enforcement below the model (RFC §6.3).
+"""SCOPE profile — enforcement below the model (spec §6.3).
 
 Failure messages state the violation observed, not the expectation.
 """

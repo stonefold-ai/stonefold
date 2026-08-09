@@ -168,7 +168,7 @@ class PostgresOutboxStore:
                     self._write(cur, cancelled)
                     return None
                 if stale_check is not None and (stale := stale_check(row)) is not None:
-                    # stale inside the claim (v0.4 CS-017): cancel + audit commit
+                    # stale inside the claim (v0.2 CS-017): cancel + audit commit
                     # together, then scan for the next fresh row.
                     cancelled = row.model_copy(
                         update={"state": PendingState.CANCELLED, "reason": stale}

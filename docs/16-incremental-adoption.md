@@ -5,7 +5,7 @@ this page narrates them as the ramp an organisation actually walks, with the cov
 guarantee at each stage stated honestly. The principle: enterprises adopt ramps, not
 cliffs. Nothing here asks anyone to rewrite their agent on day one.*
 
-The two transport bindings this builds on are normative (RFC §7): **interception**
+The two transport bindings this builds on are normative (spec §7): **interception**
 (the tools you already have, mapped to declared actions; an unmapped call MUST be
 denied) and **the declared surface** (the agent's tools are generated from the
 registry, so a tool exists only because an action was declared). The ramp is simply:
@@ -33,7 +33,7 @@ connector/predicate implementations are the real work and arrive in later stages
 
 Terminate the agent's existing tool/MCP transport at the gateway. Each incoming call is
 mapped to a declared action, enforced (authorize → scope → gates), then forwarded or
-refused. **Unmapped calls are denied** (RFC §7) — never silently passed — and the
+refused. **Unmapped calls are denied** (spec §7) — never silently passed — and the
 startup **coverage check** fails if the agent holds any tool endpoint that does not go
 through the gateway (architecture decision 1). The agent itself is unchanged.
 
@@ -100,7 +100,7 @@ gateways offer, which is exactly the point: the entry cost matches the market's
 afternoon-sized expectation, and the differentiated guarantees are bought entity by
 entity where an auditor actually demands them — never as a leap of faith.
 
-*See also:* [`00-RFC-sif-intent-format.md`](00-RFC-sif-intent-format.md) §7 (the two
+*See also:* [`00-sif-wire-format.md`](00-sif-wire-format.md) §7 (the two
 bindings, normative), [`17-interception-mapping.md`](17-interception-mapping.md) (how the
 Stage 1 mapping actually interprets a tool call, and why mapping wins),
 [`06-registry-domain-model.md`](06-registry-domain-model.md)

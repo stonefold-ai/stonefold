@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Postgres ``AuditSink`` (RFC §11, design §11) — the durable, append-only record.
+"""Postgres ``AuditSink`` (spec §11, design §11) — the durable, append-only record.
 
 The ``audit_log`` table (shared with the outbox's settle writes, see
 ``outbox_pg``) is **append-only**: the gateway DB role is granted INSERT/SELECT
@@ -41,7 +41,7 @@ class PostgresAuditSink:
     """Append-only audit sink backed by the durable ``audit_log`` table.
 
     Satisfies the ``AuditSink`` protocol (``write``); ``by_correlation`` provides
-    the replay query (RFC §11). Each ``write`` is its own committed transaction —
+    the replay query (spec §11). Each ``write`` is its own committed transaction —
     the *settle* path writes its audit in the **same** transaction as the state
     change via the outbox store (invariant 6); this sink serves the refusal/hold
     paths, where there is no accompanying state change to share a tx with.
@@ -61,7 +61,7 @@ class PostgresAuditSink:
             )
 
     def by_correlation(self, correlation_id: str) -> list[AuditRecord]:
-        """Replay one agent run as an ordered query (RFC §11)."""
+        """Replay one agent run as an ordered query (spec §11)."""
         with self._conn.cursor() as cur:
             cur.execute(
                 f"""SELECT record FROM {self._table}

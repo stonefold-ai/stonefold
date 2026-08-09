@@ -1,6 +1,6 @@
-# Stonefold Implementation Design — Engineering Companion to the RFC
+# Stonefold Implementation Design — Engineering Companion to the specification
 
-*The Stele RFC says **what** a policy means. This paper says **how** the gateway actually executes it — data structures, control flow, where state lives, how each gate is computed, and (worked in full) how the kill-switch operates. It is written so an engineer can build from it and a reviewer can tell whether a given claim in the RFC is mechanically real. Throughout, **Design notes** flag specific decisions, trade-offs, and failure modes to engineer against.*
+*The Stele specification says **what** a policy means. This paper says **how** the gateway actually executes it — data structures, control flow, where state lives, how each gate is computed, and (worked in full) how the kill-switch operates. It is written so an engineer can build from it and a reviewer can tell whether a given claim in the specification is mechanically real. Throughout, **Design notes** flag specific decisions, trade-offs, and failure modes to engineer against.*
 
 Reference stack (pinned in `docs/03`): a **Python** gateway (FastAPI + pydantic), PostgreSQL for durable state (audit, outbox, approvals, kill orders), and Redis for hot counters and kill propagation. None of it is load-bearing — swap equivalents freely. **The code snippets below are illustrative pseudocode** (written in a record/`switch` style for clarity); realise them in the pinned Python stack — records → `pydantic`/`dataclass` models, sealed interfaces → `typing.Protocol` + `enum`, the `switch` in §10 → a tree-walk over the AST. The *mechanism* is what matters, not the syntax.
 
@@ -8,15 +8,15 @@ Reference stack (pinned in `docs/03`): a **Python** gateway (FastAPI + pydantic)
 
 ## 0. The single most important implementation fact
 
-Everything below depends on one property: **the gateway is the only path from the agent to any connector.** Every guarantee in the RFC — scope, gates, kill — is really a check performed at that one chokepoint. So the first job of an implementation is to *physically guarantee the chokepoint*, and the second is to make the checks at it correct and fast.
+Everything below depends on one property: **the gateway is the only path from the agent to any connector.** Every guarantee in the specification — scope, gates, kill — is really a check performed at that one chokepoint. So the first job of an implementation is to *physically guarantee the chokepoint*, and the second is to make the checks at it correct and fast.
 
-If an agent has any route to a side effect that does not pass through the gateway, none of the RFC applies to that route. This is why §1 (topology) comes before everything else.
+If an agent has any route to a side effect that does not pass through the gateway, none of the specification applies to that route. This is why §1 (topology) comes before everything else.
 
 ---
 
 ## 1. Where the gateway runs, and how actions are intercepted
 
-There are two integration modes (RFC §3). They differ entirely in *how the action reaches the gateway*, which determines coverage.
+There are two integration modes (spec §3). They differ entirely in *how the action reaches the gateway*, which determines coverage.
 
 ### 1.1 The declared surface
 The agent's tools are **generated from the registry** — one typed tool per declared
@@ -86,7 +86,7 @@ The **registry** is loaded once at startup (and on change) into an in-memory, in
 
 ## 3. The enforcement pipeline (the spine)
 
-This is the literal control flow for one action. It is the implementation of RFC §12.
+This is the literal control flow for one action. It is the implementation of spec §12.
 
 ```java
 EvalResult enforce(RawCall call, Actor actor, Session s) {
@@ -110,7 +110,7 @@ EvalResult enforce(RawCall call, Actor actor, Session s) {
 
 Key implementation points:
 - Steps 1–5 are pure and fast (in-memory + a couple of store reads). **No model is invoked anywhere in here.**
-- The function is total: every path ends in an audited terminal decision (RFC §11 requires a record for *every* outcome, including refusals).
+- The function is total: every path ends in an audited terminal decision (spec §11 requires a record for *every* outcome, including refusals).
 - `terminal(...)` and `hold(...)` both write the audit record before returning.
 
 > **Design note.** The ordering of step 4 vs 5 matters. Killing *before* gates would waste no work, but killing *after* gates means the audit shows "this would have passed/failed, and then was halted," which is better forensics. The adopted compromise: a **cheap global kill pre-check** at the very top (is the whole agent/session killed?) to short-circuit, plus the **authoritative per-action kill check at step 5** and again at dispatch. So kill is effectively checked three times; that's deliberate (see §8.4).
@@ -125,15 +125,15 @@ Parsing YAML per request is too slow and too error-prone. At policy load the gat
 Map<(Kind, Resource, ActionOrStar), Rule>   // for allow and deny separately
 ```
 
-Matching an action is then: look up `(kind, resource, action)`, then `(kind, resource, *)`, then `(kind, *, *)` — most-specific first. `deny` is consulted first and wins unconditionally (RFC §6.2). `extends` fragments are merged at compile time with the "more restrictive wins / deny wins" rule, so runtime sees one flattened, validated policy.
+Matching an action is then: look up `(kind, resource, action)`, then `(kind, resource, *)`, then `(kind, *, *)` — most-specific first. `deny` is consulted first and wins unconditionally (spec §6.2). `extends` fragments are merged at compile time with the "more restrictive wins / deny wins" rule, so runtime sees one flattened, validated policy.
 
-> **Design note.** Compilation is also where the **linter** (RFC §13) runs. A policy that fails validation must not load — the gateway should refuse to start with a bad policy rather than fall back to defaults, because a silently-degraded policy is the classic way a control plane fails open by accident.
+> **Design note.** Compilation is also where the **linter** (spec §13) runs. A policy that fails validation must not load — the gateway should refuse to start with a bad policy rather than fall back to defaults, because a silently-degraded policy is the classic way a control plane fails open by accident.
 
 ---
 
 ## 5. Scope injection: turning a predicate into a real filter
 
-This is the implementation of the RFC's "enforcement below the model." The agent's intent contains **no** scope; the gateway adds it.
+This is the implementation of the specification's "enforcement below the model." The agent's intent contains **no** scope; the gateway adds it.
 
 1. The actor identity comes from the **session/transport** (an authenticated header / token verified by the gateway), never from the agent's payload. The agent literally cannot set `actor`.
 2. `policy.scopeFor(resource, actor)` returns a **named, registered** `ScopePredicate` (not a free expression) — e.g. `assignedToCurrentUser`.
@@ -151,7 +151,7 @@ sql = scope.applyTo(sql, actor);                    // appends AND owner_id = :p
 return jdbc.query(sql, bind(actor));
 ```
 
-> **Design note.** Scope on **reads** (`observe`) is a query filter, which is clean. Scope on **effects** is different — there's often nothing to "filter," the scope is really an authorization predicate ("may this actor act on this resolved target?"). Implementation: for effects, resolve the target first (a scoped `observe` under the hood), and if the target isn't in the actor's scoped set, DENY before dispatch. So scope-for-effects = a pre-resolution check, not a WHERE clause. This should be stated explicitly; the RFC currently blurs it.
+> **Design note.** Scope on **reads** (`observe`) is a query filter, which is clean. Scope on **effects** is different — there's often nothing to "filter," the scope is really an authorization predicate ("may this actor act on this resolved target?"). Implementation: for effects, resolve the target first (a scoped `observe` under the hood), and if the target isn't in the actor's scoped set, DENY before dispatch. So scope-for-effects = a pre-resolution check, not a WHERE clause. This should be stated explicitly; the specification currently blurs it.
 
 ---
 
@@ -166,7 +166,7 @@ Each gate is a small deterministic function `GateResult eval(ResolvedAction, Act
 | `valueLimit` | none (stateless) | read `data.field`, compare | in-memory |
 | `spendLimit` | Redis accumulator per session | add estimated cost, compare | ~1 op |
 | `allowlist`/`denylist` | named sets cached in memory (refreshed) | set membership on `data.field` | in-memory |
-| `precondition` | registry (transition from-states) + registered check fns | call check(s) — three-valued since v0.6 CS-026 (pass/fail/hold; bool stays valid; crash ⇒ fail, code-less hold ⇒ fail); transition: read current state, test ∈ from | 0–1 read |
+| `precondition` | registry (transition from-states) + registered check fns | call check(s) — three-valued since v0.3 CS-026 (pass/fail/hold; bool stays valid; crash ⇒ fail, code-less hold ⇒ fail); transition: read current state, test ∈ from | 0–1 read |
 | `contentCheck` | external hook (DLP svc) | sync call, deterministic verdict pass/block | network call |
 | `requireApproval` | DB (approval request) | returns HOLD; resolved out-of-band (§7) | 1 DB write |
 | `dualAuthorization` | DB (2 approvals, distinct ids) | returns HOLD until 2 distinct approve | DB |
@@ -180,7 +180,7 @@ Two gates need special implementation care:
 
 **`disclosure` runs around the result, not just the request.** For an `observe`, you often can't know the result's sensitivity until you've fetched it. Implementation: execute the read, then before returning the result to the agent, the gate inspects the result's classification (from the registry or row-level labels) against the allowed sink; if it fails, the gateway **drops the result and returns a refusal**, and the audit records "read executed, result withheld." This is the anti-exfiltration control and it must sit on the *return* path.
 
-> **Design note.** That means the read *did* hit the database even when disclosure fails. For most cases fine; for the most sensitive data you want to avoid even executing. So `disclosure` should support a *pre-check* form when sensitivity is known from the registry (block before execution) and a *post-check* form when it's row-dependent (block on return). The RFC should distinguish these two; right now it implies one.
+> **Design note.** That means the read *did* hit the database even when disclosure fails. For most cases fine; for the most sensitive data you want to avoid even executing. So `disclosure` should support a *pre-check* form when sensitivity is known from the registry (block before execution) and a *post-check* form when it's row-dependent (block on return). The specification should distinguish these two; right now it implies one.
 
 **`contentCheck` is the only gate that calls out synchronously.** That makes it the latency and availability risk. Implementation: bounded timeout; on timeout/error apply `failureMode` (closed ⇒ treat as block). Cache verdicts by content hash where safe.
 
@@ -207,13 +207,13 @@ agent ──submit──▶ gateway ──HOLD──▶ pending_actions[PENDING_
 human ──approve──▶ approvals API ──┘ ──▶ [PENDING] ──▶ dispatch worker ──▶ connector ──▶ audit
 ```
 
-> **Design note.** This unification is the key insight of the whole implementation: **approvals and kill are both just transitions on staged actions.** Approval = a human releases it; kill = an operator cancels it. Once you model every consequential effect as a staged row with a lifecycle, both features fall out of the same table. That's why effects must be staged (RFC §4.4) — not only for durability, but because staging is the substrate for approval *and* kill.
+> **Design note.** This unification is the key insight of the whole implementation: **approvals and kill are both just transitions on staged actions.** Approval = a human releases it; kill = an operator cancels it. Once you model every consequential effect as a staged row with a lifecycle, both features fall out of the same table. That's why effects must be staged (spec §4.4) — not only for durability, but because staging is the substrate for approval *and* kill.
 
 ---
 
 ## 8. The kill-switch, in full (the part that was unclear)
 
-The kill-switch is the question the RFC left as a one-liner. Here is the actual mechanism.
+The kill-switch is the question the specification left as a one-liner. Here is the actual mechanism.
 
 ### 8.1 What "kill" is
 A kill is **a flag, checked at the chokepoint, that turns matching actions into an audited `HALT` and prevents any not-yet-dispatched effect from dispatching.** Its strength comes from §0: the gateway is the only path to effects. It is *not* the ability to reverse what already happened.
@@ -302,15 +302,15 @@ Effects can't be transaction-rolled-back, so they're staged:
 
 This gives at-least-once dispatch with idempotency (effectively once), a cancellation window for kill, an approval hold point, and a durable audit of attempts — all from one table.
 
-> **Design note.** The cost is that effects are now **asynchronous**: the agent gets "accepted/pending," not "sent," on the first turn. For most enterprise actions that's correct (and matches how humans work). For the rare effect that must be synchronous and is safely cancellable, allow an inline fast-path that still writes the audit — but default to staging. The RFC should make "effects are staged by default, inline is an opt-in for cancellable effects" explicit.
+> **Design note.** The cost is that effects are now **asynchronous**: the agent gets "accepted/pending," not "sent," on the first turn. For most enterprise actions that's correct (and matches how humans work). For the rare effect that must be synchronous and is safely cancellable, allow an inline fast-path that still writes the audit — but default to staging. The specification should make "effects are staged by default, inline is an opt-in for cancellable effects" explicit.
 
-### 9.1 Decision freshness (v0.4 CS-017) — what, why, how
+### 9.1 Decision freshness (v0.2 CS-017) — what, why, how
 
 **What.** Staging opens a time gap between *decision* and *dispatch*, and a fact that was true at decision time can stop being true inside it (a payee newly sanctioned, an approval granted days ago). CS-017 closes that gap two ways: every staged row carries an **`expires_at`** (a decision TTL, set from deployment configuration — never policy syntax), and the dispatch claim **re-validates the volatile gates** — `allowlist`/`denylist`, `window`, `precondition`, `emissionControl` — against dispatch-time state. A lapsed row settles `CANCELLED`/`stale-decision`; a dispatch-time gate failure settles `CANCELLED`/`stale-guard:<gate>`. Both are audited in the same transaction as the cancel, and the scan continues so a stale row never blocks the queue. Check order inside the claim: **kill → TTL → volatile gates → connector**. Non-volatile gates are *not* re-run, by definition: counters (`rate`/`quota`/`quantityCap`/`spendLimit`) were consumed at decision time, `valueLimit`/`contentCheck` judge the frozen payload, and an approval grant *is* the release — its freshness is bounded by the TTL. A late approval promotes the row, but the TTL still cancels it at claim; the intent must be re-submitted.
 
-**Why.** It is the question a payments/healthcare buyer opens with: "what if the world changes after you decide but before you act?" v0.3 answered it only with the kill switch; CS-017 makes the answer structural — no staged decision can outlive its TTL, and set-membership/time/world-state guards are as fresh as the dispatch itself.
+**Why.** It is the question a payments/healthcare buyer opens with: "what if the world changes after you decide but before you act?" v0.2 answered it only with the kill switch; CS-017 makes the answer structural — no staged decision can outlive its TTL, and set-membership/time/world-state guards are as fresh as the dispatch itself.
 
-**How.** Freshness is opt-in and off by default (v0.3 behaviour is unchanged when it's not configured). Wiring it takes three pieces:
+**How.** Freshness is opt-in and off by default (v0.2 behaviour is unchanged when it's not configured). Wiring it takes three pieces:
 
 ```python
 from stonefold_core import FreshnessConfig, enforce
@@ -337,16 +337,16 @@ worker = DispatchWorker(
 )
 ```
 
-The agent sees a cancelled ticket resolve to a recoverable refusal (`stale-decision` / `stale-guard:<gate>`); nothing is ever partially dispatched. Spec text and acceptance scenarios: `docs/RFC-changeset-v0.3-to-v0.4.md` (CS-017), scenarios D5/D6, tests in `tests/test_v04_freshness.py`.
+The agent sees a cancelled ticket resolve to a recoverable refusal (`stale-decision` / `stale-guard:<gate>`); nothing is ever partially dispatched. Spec text and acceptance scenarios: `docs/changeset-v0.1-to-v0.2.md` (CS-017), scenarios D5/D6, tests in `tests/test_v04_freshness.py`.
 
-### 9.2 Scope no-race (v0.4 CS-018) — what, why, how
+### 9.2 Scope no-race (v0.2 CS-018) — what, why, how
 
 **What.** Scope-on-effect (§5) is a *decision-time* pre-check, and staging widens the gap to the effect's commit: the target can be reassigned to another tenant in between, and the effect lands on state the actor was never authorized for — a classic TOCTOU race. CS-018 closes it where it can be closed and prices it where it can't, keyed on a capability **each connector declares once** (`ScopeCapability`, connector metadata in gateway code — like the scope-predicate bindings, never policy syntax):
 
 - **`transactional`** (SQL-class): the dispatch worker calls `dispatch_scoped(…)`, and the connector ANDs the predicate's constraint into the effect's own write (`UPDATE … WHERE id = %(target)s AND tenant_id = %(scope_tenant_id)s`). Zero rows affected ⇒ the transaction rolls back and the row settles `FAILED`/`scope-lost` — the write commits against authorized state **or not at all**, the same shape as the kill no-race (§8.4). No compensation is staged: nothing landed, so there is nothing to undo.
 - **`window`** (HTTP, email, device): the predicate cannot ride into the upstream's transaction. The worker re-resolves the target under scope (`fetch_target`) immediately before the call — shrinking the race to connector latency; a vanished target settles `FAILED`/`scope-lost` with nothing sent — and the connector's *declared* residual window is written into the audit's `scopeApplied` (`reassertion:window:<declared>`), so the residual risk is priced, not hidden. An undeclared connector is treated as `window:undeclared` — fail-safe, and honestly labelled in the audit.
 
-**Why.** Together with CS-017 this closes the second half of the decide→act gap a payments/healthcare buyer asks about: freshness covers *facts that move* (sanctions lists, time, world state); scope no-race covers *authorization that moves* (the target itself changing hands). v0.3 documented the window and offered only the kill switch; v0.4 makes the guarantee structural for transactional connectors and auditable for the rest.
+**Why.** Together with CS-017 this closes the second half of the decide→act gap a payments/healthcare buyer asks about: freshness covers *facts that move* (sanctions lists, time, world state); scope no-race covers *authorization that moves* (the target itself changing hands). v0.2 documented the window and offered only the kill switch; v0.2 makes the guarantee structural for transactional connectors and auditable for the rest.
 
 **How.** Opt-in like freshness: give the dispatch worker the same scope resolver the pipeline uses, and nothing else changes.
 
@@ -367,7 +367,7 @@ worker = DispatchWorker(
 )
 ```
 
-Shipped declarations: `SqlConnector` and `InMemoryConnector` are `transactional`; `HttpConnector` (`http round-trip`) and `EmailConnector` (`smtp accept`) declare their windows. A custom transactional connector implements the `TransactionalDispatch` protocol and raises `ScopeLostError` when the re-asserted predicate selects nothing; one that declares `transactional` without implementing it fails closed (`scope-unavailable`). Spec text and acceptance scenarios: `docs/RFC-changeset-v0.3-to-v0.4.md` (CS-018), scenarios B4/B5, tests in `tests/test_v04_scope_norace.py` + the Postgres B4 test in `tests/test_m4_pg_integration.py`.
+Shipped declarations: `SqlConnector` and `InMemoryConnector` are `transactional`; `HttpConnector` (`http round-trip`) and `EmailConnector` (`smtp accept`) declare their windows. A custom transactional connector implements the `TransactionalDispatch` protocol and raises `ScopeLostError` when the re-asserted predicate selects nothing; one that declares `transactional` without implementing it fails closed (`scope-unavailable`). Spec text and acceptance scenarios: `docs/changeset-v0.1-to-v0.2.md` (CS-018), scenarios B4/B5, tests in `tests/test_v04_scope_norace.py` + the Postgres B4 test in `tests/test_m4_pg_integration.py`.
 
 Both §9.1 and §9.2 are wired live in everything this repo ships: the scripted demo (`stonefold_demo`), the Accounts-Payable demo (`stonefold_ap_demo`), and the TCK reference adapter — where the TCK's `freshness` profile certifies the behaviour black-box (docs/12 §4).
 
@@ -375,7 +375,7 @@ Both §9.1 and §9.2 are wired live in everything this repo ships: the scripted 
 
 ## 10. The condition engine (`when:`)
 
-`when:` expressions (RFC §8) are compiled once into an AST and evaluated against a context map; there is **no `eval`, no host-language execution** — it's a tiny tree-walk interpreter over a frozen grammar, which is what keeps it safe and deterministic.
+`when:` expressions (spec §8) are compiled once into an AST and evaluated against a context map; there is **no `eval`, no host-language execution** — it's a tiny tree-walk interpreter over a frozen grammar, which is what keeps it safe and deterministic.
 
 ```java
 boolean eval(Expr e, Ctx ctx) {
@@ -389,7 +389,7 @@ boolean eval(Expr e, Ctx ctx) {
   };
 }
 ```
-`resolve` looks up `action.*`, `data.*`, `resource.*`, `actor.*`, `context.*` from the context the pipeline already built. Unknown paths ⇒ validation error at load (RFC §13.9), not a runtime surprise. The four allowed functions (`count`, `now`, `window`, `spend`) are registered host functions with fixed signatures.
+`resolve` looks up `action.*`, `data.*`, `resource.*`, `actor.*`, `context.*` from the context the pipeline already built. Unknown paths ⇒ validation error at load (spec §13.9), not a runtime surprise. The four allowed functions (`count`, `now`, `window`, `spend`) are registered host functions with fixed signatures.
 
 > **Design note.** Because conditions can gate safety decisions, the engine must treat a *resolution error at runtime* (e.g., a missing `resource.field`) as **fail-closed for that gate**, not "condition false." The compile-time check catches unknown paths, but a null value at runtime still needs a defined, conservative behavior.
 
@@ -397,7 +397,7 @@ boolean eval(Expr e, Ctx ctx) {
 
 ## 11. Audit implementation
 
-The audit record (RFC §11) is written by `terminal()`/`hold()`/settle on **every** outcome. It's append-only (Postgres table, no UPDATE/DELETE grant for the app role; or an append-only log/WORM store for regulated tiers). Records carry a `correlationId` (session) and an action `id` so a full agent run replays as one ordered query. The record is written **before** the result is returned to the agent for refusals/holds, and **after** settle for executed effects (with the connector outcome).
+The audit record (spec §11) is written by `terminal()`/`hold()`/settle on **every** outcome. It's append-only (Postgres table, no UPDATE/DELETE grant for the app role; or an append-only log/WORM store for regulated tiers). Records carry a `correlationId` (session) and an action `id` so a full agent run replays as one ordered query. The record is written **before** the result is returned to the agent for refusals/holds, and **after** settle for executed effects (with the connector outcome).
 
 > **Design note.** "The audit is the product's evidence" — so the write must be on the same transaction as the state change wherever possible (e.g., the dispatch settle writes outcome + audit in one tx), so you can never have an effect that happened with no record, or a record of something that didn't. No best-effort logging on a side channel.
 
@@ -405,7 +405,7 @@ The audit record (RFC §11) is written by `terminal()`/`hold()`/settle on **ever
 
 ## 12. Failure mode implementation (`failureMode`)
 
-A "dependency failure" is concretely: registry unavailable, scope-resolution failure, a `contentCheck` hook timeout/error, the kill store unreachable, or the outbox DB unavailable. For each, `failureMode: closed` (default) ⇒ the action resolves DENY/HALT and is audited with the failure reason. `open` ⇒ allow (only sane for low-stakes deployments). The override granularity is per kind/action; an `open` override on an `irreversible` action is a load-time error unless explicitly acknowledged (RFC §13.5). Implementation: wrap each external dependency call in a typed result (`Ok | Unavailable`) and branch on `failureMode` — never let an exception bubble into an implicit allow.
+A "dependency failure" is concretely: registry unavailable, scope-resolution failure, a `contentCheck` hook timeout/error, the kill store unreachable, or the outbox DB unavailable. For each, `failureMode: closed` (default) ⇒ the action resolves DENY/HALT and is audited with the failure reason. `open` ⇒ allow (only sane for low-stakes deployments). The override granularity is per kind/action; an `open` override on an `irreversible` action is a load-time error unless explicitly acknowledged (spec §13.5). Implementation: wrap each external dependency call in a typed result (`Ok | Unavailable`) and branch on `failureMode` — never let an exception bubble into an implicit allow.
 
 ---
 
@@ -418,18 +418,18 @@ A "dependency failure" is concretely: registry unavailable, scope-resolution fai
 
 ---
 
-## 14. Engineering review — issues found and recommended RFC changes
+## 14. Engineering review — issues found and recommended spec changes
 
-Consolidated findings from the implementation review (all incorporated into RFC v0.2):
+Consolidated findings from the implementation review (all incorporated into spec v0.2):
 
-1. **Scope means two different things** (read filter vs. effect authorization). *Recommend:* the RFC should define scope-on-effect as a pre-resolution authorization check, distinct from the WHERE-clause form. (§5)
-2. **`disclosure` has a pre-check and a post-check form.** *Recommend:* the RFC should name both — block-before-execution when sensitivity is known from the registry; withhold-on-return when it's row-dependent. (§6)
-3. **Effects are asynchronous by default.** *Recommend:* the RFC should state that effects are staged (accepted/pending) by default, with an inline fast-path only for cancellable effects — because approvals and kill both depend on staging. (§7, §9)
-4. **Kill needs three check points and a transactional dispatch.** *Recommend:* the RFC's §9 should reference the staged-row + `FOR UPDATE` mechanism and explicitly scope the guarantee: prevents new/un-dispatched actions; cancels cancellable in-flight; compensates declared irreversibles; never reverses committed effects. (§8)
-5. **Runtime condition resolution errors must fail closed per-gate.** *Recommend:* add to RFC §8/§10 that a null/missing path at runtime denies the gate, distinct from "condition evaluated false." (§10)
-6. **Unmapped tools in interception mode must deny, and free-form-string tools must be flagged.** *Recommend:* add an interception-coverage section to the RFC: unmapped ⇒ deny; pass-through tools require explicit acknowledgement; startup coverage check. (§1)
-7. **Audit must be transactional with state changes.** *Recommend:* RFC §11 should require the audit write to share the transaction with the state change for executed/settled effects, forbidding side-channel best-effort logging. (§11)
-8. **Kill propagation needs pub/sub + polling.** *Recommend:* RFC §9 should specify both fast propagation and a self-healing authoritative reload (epoch), not pub/sub alone. (§8.9)
+1. **Scope means two different things** (read filter vs. effect authorization). *Recommend:* the specification should define scope-on-effect as a pre-resolution authorization check, distinct from the WHERE-clause form. (§5)
+2. **`disclosure` has a pre-check and a post-check form.** *Recommend:* the specification should name both — block-before-execution when sensitivity is known from the registry; withhold-on-return when it's row-dependent. (§6)
+3. **Effects are asynchronous by default.** *Recommend:* the specification should state that effects are staged (accepted/pending) by default, with an inline fast-path only for cancellable effects — because approvals and kill both depend on staging. (§7, §9)
+4. **Kill needs three check points and a transactional dispatch.** *Recommend:* the specification's §9 should reference the staged-row + `FOR UPDATE` mechanism and explicitly scope the guarantee: prevents new/un-dispatched actions; cancels cancellable in-flight; compensates declared irreversibles; never reverses committed effects. (§8)
+5. **Runtime condition resolution errors must fail closed per-gate.** *Recommend:* add to spec §8/§10 that a null/missing path at runtime denies the gate, distinct from "condition evaluated false." (§10)
+6. **Unmapped tools in interception mode must deny, and free-form-string tools must be flagged.** *Recommend:* add an interception-coverage section to the specification: unmapped ⇒ deny; pass-through tools require explicit acknowledgement; startup coverage check. (§1)
+7. **Audit must be transactional with state changes.** *Recommend:* spec §11 should require the audit write to share the transaction with the state change for executed/settled effects, forbidding side-channel best-effort logging. (§11)
+8. **Kill propagation needs pub/sub + polling.** *Recommend:* spec §9 should specify both fast propagation and a self-healing authoritative reload (epoch), not pub/sub alone. (§8.9)
 
 None of these change the *policy language*; they sharpen the *guarantees and mechanics* behind it — which was exactly the gap the owner pointed at with the kill question.
 
@@ -437,4 +437,4 @@ None of these change the *policy language*; they sharpen the *guarantees and mec
 
 ## 15. One-paragraph mental model
 
-Build one chokepoint and make it the only way out. Compile the policy to a fast matcher; resolve every action to a typed object with declared attributes; run a pure, model-free pipeline (resolve → authorize → scope → gates → kill → execute) that always ends in an audited decision. Make every consequential effect a **staged row with a lifecycle**, because that single design choice is what makes durability, **approvals**, and **kill** all work: approval releases the row, kill cancels it, the dispatch worker sends it under a row lock with an idempotency key so the kill/send race has no gap. Everything the RFC promises is, mechanically, a check at the chokepoint plus a transition on a staged row — and the honest boundary of the kill is precisely the boundary of that staging: it stops anything not yet sent, and compensates, but does not reverse, anything already gone.
+Build one chokepoint and make it the only way out. Compile the policy to a fast matcher; resolve every action to a typed object with declared attributes; run a pure, model-free pipeline (resolve → authorize → scope → gates → kill → execute) that always ends in an audited decision. Make every consequential effect a **staged row with a lifecycle**, because that single design choice is what makes durability, **approvals**, and **kill** all work: approval releases the row, kill cancels it, the dispatch worker sends it under a row lock with an idempotency key so the kill/send race has no gap. Everything the specification promises is, mechanically, a check at the chokepoint plus a transition on a staged row — and the honest boundary of the kill is precisely the boundary of that staging: it stops anything not yet sent, and compensates, but does not reverse, anything already gone.

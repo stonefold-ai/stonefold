@@ -14,7 +14,7 @@ Each section names the agent work being deployed, the risk that blocks deploymen
 
 **The blocking risk:** an agent that can *pay* can be defrauded — a fraudulent invoice, a payee swapped after approval, a sanctions hit landing between decision and dispatch. One wrong payment is direct, quantifiable loss; a pattern of them is a regulatory event.
 
-**What answers it:** tiered `valueLimit`/`spendLimit`, `denylist` over sanctions sets, `requireApproval`/`dualAuthorization` above thresholds, rate caps per payee, staged effects with a kill-switch — and the v0.4 timing guarantees exist *because of this buyer*: decision freshness (a payee sanctioned after approval is caught at dispatch, RFC §12) and scope no-race (a payment can't land on an account that changed tenants, RFC §6.3). The audit record maps onto obligations these firms already carry (SOX, DORA, PSD2, EBA outsourcing guidelines) — the gateway produces the evidence they must file anyway.
+**What answers it:** tiered `valueLimit`/`spendLimit`, `denylist` over sanctions sets, `requireApproval`/`dualAuthorization` above thresholds, rate caps per payee, staged effects with a kill-switch — and the v0.2 timing guarantees exist *because of this buyer*: decision freshness (a payee sanctioned after approval is caught at dispatch, spec §12) and scope no-race (a payment can't land on an account that changed tenants, spec §6.3). The audit record maps onto obligations these firms already carry (SOX, DORA, PSD2, EBA outsourcing guidelines) — the gateway produces the evidence they must file anyway.
 
 **In the spec:** worked example §14.4 (payments-ops); the runnable real-LLM demo (`demo/`, docs/05) is exactly this — a forwarder agent, a fraudulent-invoice attack, a held $6,000, a denied sanctioned payment.
 
@@ -38,7 +38,7 @@ Each section names the agent work being deployed, the risk that blocks deploymen
 
 **The blocking risk:** prompt injection through customer-supplied content (the README's attack example), data exfiltration across customer boundaries, and money leaking one small refund at a time.
 
-**What answers it:** scope injection below the model (only *this* customer's rows exist, RFC §6.3), recipient `allowlist`s, `contentCheck` on outbound text, `rate`/`quota`/`spendLimit` on refund-class effects, export forbidden by default. Lower stakes per action than the two above — but the largest deployment volume, and the controls are the cheap, deterministic ones.
+**What answers it:** scope injection below the model (only *this* customer's rows exist, spec §6.3), recipient `allowlist`s, `contentCheck` on outbound text, `rate`/`quota`/`spendLimit` on refund-class effects, export forbidden by default. Lower stakes per action than the two above — but the largest deployment volume, and the controls are the cheap, deterministic ones.
 
 **In the spec:** worked examples §14.1 (support assistant) and §14.5 (legal matter assistant — same shape with privilege boundaries); the scripted adversarial demo (`make demo`) runs the attack battery against exactly this policy.
 
@@ -94,18 +94,18 @@ In every regulated vertical the economic buyer is usually **not the AI team**. T
 
 Everything above is what the gateway *does*. Just as important for an evaluator is what it deliberately does **not** do. The enforcement core is deterministic by invariant — no model, no heuristics, no judgment calls inside `enforce()`. That is what makes its decisions predictable and auditable, and it draws a hard line: **the gateway never judges meaning itself.** It cannot read an email body and know it contains PII, look at an invoice and sense fraud, or decide whether a clinical judgment is sound.
 
-The design answer is not to pretend otherwise but to give each of those judgments a **declared hook** — a registered function the gateway calls at its chokepoint, whose verdict enters the pipeline as an ordinary deterministic gate result, and whose *failure* triggers the fail-closed discipline like any other dependency (RFC §10):
+The design answer is not to pretend otherwise but to give each of those judgments a **declared hook** — a registered function the gateway calls at its chokepoint, whose verdict enters the pipeline as an ordinary deterministic gate result, and whose *failure* triggers the fail-closed discipline like any other dependency (spec §10):
 
 | The gateway cannot itself… | The hook where a specialist system plugs in | Who plugs in |
 |---|---|---|
-| judge **content** — PII in an outbound email, fraudulent wording, toxic or off-policy text | the `contentCheck` gate is a registered content hook (RFC §7.7); `disclosure` adds pre/post result-flow checks (§7.12) | your DLP, moderation service, or classifier |
-| verify **world truth** — is the drug discontinued? has the payee's cooling-off elapsed? | `precondition` / `emissionControl` named checks (§7.6, §7.13) — re-validated at dispatch since v0.4 | the system of record |
+| judge **content** — PII in an outbound email, fraudulent wording, toxic or off-policy text | the `contentCheck` gate is a registered content hook (spec §7.7); `disclosure` adds pre/post result-flow checks (§7.12) | your DLP, moderation service, or classifier |
+| verify **world truth** — is the drug discontinued? has the payee's cooling-off elapsed? | `precondition` / `emissionControl` named checks (§7.6, §7.13) — re-validated at dispatch since v0.2 | the system of record |
 | hold the **organization's authorization model** — roles, entitlement graphs, org hierarchies | registered scope predicates (§6.3) and the authorization seam (docs/10 — OPA/Cedar/IAM compose behind it) | your IAM / policy engine |
 | make the agent's choice **good** — a permitted-but-wrong action stays possible | `requireApproval` / `dualAuthorization` / `requireExplanation`; the audit record as reviewable evidence | humans; downstream review and SIEM |
 
 Two things keep this from being a hand-wave. First, the hooks are held to a contract: registered functions are **policy-grade code** — reviewed and versioned like the policy itself, and the reference ships a conformance harness (determinism, totality, fail-closed; docs/06 §6) to hold them to it. Second, the placement matters: the external check runs *at the gateway's chokepoint, under the gateway's failure mode, onto the gateway's audit record* — so "the gateway can't check content" resolves to "your content checker runs where it can't be bypassed and its verdict is on the record".
 
-What remains genuinely open even with every hook plugged: an action whose content passes every check can still be a bad idea (that is what the approval gates and the audit trail are for), and the gateway governs the agent's *direct* effects, never the downstream cascade a committed effect triggers (RFC §11 scope boundary).
+What remains genuinely open even with every hook plugged: an action whose content passes every check can still be a bad idea (that is what the approval gates and the audit trail are for), and the gateway governs the agent's *direct* effects, never the downstream cascade a committed effect triggers (spec §11 scope boundary).
 
 ## The trust boundary: declared vs. actual behaviour
 
@@ -114,8 +114,8 @@ One more line an evaluator should see drawn before they draw it themselves: **th
 Three things keep this boundary from being a defeat:
 
 1. **The attack does not go through the agent.** Tampered executing code compromises a human clicking the same button identically. It is a supply-chain attack on the substrate, orthogonal to agent security. The gateway's claim was never "nothing bad can happen"; it is "**the agent being fooled cannot be the cause**" — and that claim survives intact.
-2. **The TCB is small by construction.** In a tool-sprawl deployment the trusted executing code is hundreds of third-party servers, silently updatable, pulled from public registries. Here it is a handful of first-party connectors and registered functions at one chokepoint, reviewed and versioned like the policy itself (§6 of docs/06), and pinnable by content digest in the registry (docs/06 §5) — a mismatch at load or dispatch fails closed like any other dependency failure (RFC §10). Changing connector code then requires a registry change: a reviewed, versioned artifact.
-3. **Divergence is detectable even when not preventable.** Connectors should run with least-privilege credentials scoped to their declared reach (IAM as the outer ring, docs/10 §3), and the transactional audit record is an independent statement of what was *supposed* to happen — reconciled against downstream truth (`resultRefs`, RFC §11), a divergence between declared and actual effects surfaces. One caveat stated plainly: a compromised connector can lie in the outcome it reports, so reconciliation MUST use telemetry the connector does not control, or it is testimony from the suspect.
+2. **The TCB is small by construction.** In a tool-sprawl deployment the trusted executing code is hundreds of third-party servers, silently updatable, pulled from public registries. Here it is a handful of first-party connectors and registered functions at one chokepoint, reviewed and versioned like the policy itself (§6 of docs/06), and pinnable by content digest in the registry (docs/06 §5) — a mismatch at load or dispatch fails closed like any other dependency failure (spec §10). Changing connector code then requires a registry change: a reviewed, versioned artifact.
+3. **Divergence is detectable even when not preventable.** Connectors should run with least-privilege credentials scoped to their declared reach (IAM as the outer ring, docs/10 §3), and the transactional audit record is an independent statement of what was *supposed* to happen — reconciled against downstream truth (`resultRefs`, spec §11), a divergence between declared and actual effects surfaces. One caveat stated plainly: a compromised connector can lie in the outcome it reports, so reconciliation MUST use telemetry the connector does not control, or it is testimony from the suspect.
 
 Deliberately out of scope: attestation infrastructure (artifact signing chains, provenance frameworks, SLSA levels) is an existing product category the gateway composes with, not one it contains. And trust bottoms out somewhere — a compromised system of record or a rooted gateway host is beneath every declaration scheme. The claim that remains is the strongest an enforcement architecture can make: **the trusted base is small, named, pinned by digest, and everything outside it — including the intelligent part — can be arbitrarily malicious without consequence.**
 
@@ -123,10 +123,10 @@ Deliberately out of scope: attestation infrastructure (artifact signing chains, 
 
 - **Read-only, low-stakes agents** (internal search, summarization, analytics over non-sensitive data): default-deny scoping is cheap insurance but the full gateway is overkill; a thin allowlist proxy may do.
 - **Creative/content workflows** with a human already reviewing every output: the human *is* the gateway.
-- **Agent orchestration, planning, memory, multi-step workflow engines:** explicitly out of scope (RFC non-goals) — Stonefold governs the actions, not the agent's reasoning loop.
+- **Agent orchestration, planning, memory, multi-step workflow engines:** explicitly out of scope (spec non-goals) — Stonefold governs the actions, not the agent's reasoning loop.
 
 ## Recommended beachhead
 
-If forced to pick one entry point: **mid-market fintech and AP-automation vendors** — the pain is monetary and immediate, the sales cycle is the shortest of the regulated verticals, the shipped demo (docs/05) already speaks their language, and the v0.4 guarantees were built from their opening questions. **Healthcare second** — slower to enter, hardest to displace once in.
+If forced to pick one entry point: **mid-market fintech and AP-automation vendors** — the pain is monetary and immediate, the sales cycle is the shortest of the regulated verticals, the shipped demo (docs/05) already speaks their language, and the v0.2 guarantees were built from their opening questions. **Healthcare second** — slower to enter, hardest to displace once in.
 
 *See also:* [`04-domains-and-use-cases.md`](04-domains-and-use-cases.md) (the same recipe across technical substrates), [`10-positioning-policy-engines.md`](10-positioning-policy-engines.md) (why a policy engine alone doesn't cover this), [`12-conformance-tck.md`](12-conformance-tck.md) (how an embedder certifies their own implementation).

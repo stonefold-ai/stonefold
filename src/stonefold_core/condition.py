@@ -1,14 +1,14 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The condition expression language (RFC §8, design §10).
+"""The condition expression language (spec §8, design §10).
 
 A *small, frozen* boolean language used by gate ``when:`` clauses. This module
 provides the tokenizer, a recursive-descent parser producing an immutable AST,
-and a static validator for RFC §13.9 (paths reference only known namespaces;
+and a static validator for spec §13.9 (paths reference only known namespaces;
 functions are from the fixed set). The tree-walk **evaluator** is added in M2;
 keeping parse/validate here lets the M1 linter check every condition at load.
 
 There is **no ``eval``/``exec``/``compile``** of policy expressions anywhere —
-ever (CLAUDE.md). The grammar (RFC §8 EBNF)::
+ever (CLAUDE.md). The grammar (spec §8 EBNF)::
 
     condition  := orExpr
     orExpr     := andExpr ("or" andExpr)*
@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, time
 from typing import Any, Union
 
-# --- namespaces & functions frozen by RFC §8 ---
+# --- namespaces & functions frozen by spec §8 ---
 NAMESPACES = frozenset({"action", "data", "resource", "actor", "context"})
 FUNCTIONS = frozenset({"count", "now", "window", "spend"})
 
@@ -40,7 +40,7 @@ _COMPARE_OPS = frozenset({"==", "!=", "<", "<=", ">", ">=", "matches"})
 
 
 class ConditionError(ValueError):
-    """A condition that fails to tokenize, parse, or validate (RFC §13.9)."""
+    """A condition that fails to tokenize, parse, or validate (spec §13.9)."""
 
 
 # --------------------------------------------------------------------------
@@ -49,7 +49,7 @@ class ConditionError(ValueError):
 @dataclass(frozen=True)
 class Path:
     """A dotted reference, e.g. ``action.reversibility``. A single segment whose
-    root is not a known namespace is an *implicit string literal* (RFC examples
+    root is not a known namespace is an *implicit string literal* (spec examples
     write ``== restricted`` / ``== irreversible`` unquoted)."""
 
     parts: tuple[str, ...]
@@ -279,7 +279,7 @@ class _Parser:
         )
 
     def _rhs_collection(self) -> Union[Literal, Operand]:
-        # RFC §8 (v0.3, CS-013): the right side of `in` is a list literal OR a
+        # spec §8 (v0.2, CS-013): the right side of `in` is a list literal OR a
         # function returning a collection/range (e.g. `in window("08:00-18:00")`).
         if self._peek().type == "lbrack":
             return self._list()
@@ -355,14 +355,14 @@ def parse(src: str) -> Expr:
 
 
 # --------------------------------------------------------------------------
-# Static validation (RFC §13.9)
+# Static validation (spec §13.9)
 # --------------------------------------------------------------------------
 def _check_operand(
     op: "Operand", problems: list[str], namespaces: frozenset[str]
 ) -> None:
     if isinstance(op, Path):
         # A single-segment non-namespace ident is an implicit string literal
-        # (RFC examples: `== restricted`). Multi-segment paths MUST root in a
+        # (spec examples: `== restricted`). Multi-segment paths MUST root in a
         # known namespace.
         if len(op.parts) > 1 and op.parts[0] not in namespaces:
             problems.append(
@@ -399,12 +399,12 @@ def _walk(node: object, problems: list[str], namespaces: frozenset[str]) -> None
 def validate(
     expr: Expr, *, extra_namespaces: frozenset[str] = frozenset()
 ) -> list[str]:
-    """Return a list of RFC §13.9 problems (unknown namespace roots, unknown
+    """Return a list of spec §13.9 problems (unknown namespace roots, unknown
     functions). Empty list ⇒ the condition is structurally valid.
 
     ``extra_namespaces`` admits a context-specific read-only namespace beyond
     the frozen five — today only ``obligation`` inside ``requireMatch``'s
-    ``match``/``provenance`` clauses (RFC §8 note, v0.6 CS-036); it is not
+    ``match``/``provenance`` clauses (spec §8 note, v0.3 CS-036); it is not
     available anywhere else a condition appears."""
     problems: list[str] = []
     _walk(expr, problems, NAMESPACES | extra_namespaces)
@@ -476,7 +476,7 @@ def _to_minutes(value: object) -> int | None:
 
 
 def make_window(spec: object) -> WindowRange:
-    """Host implementation of the ``window()`` function (RFC §8)."""
+    """Host implementation of the ``window()`` function (spec §8)."""
     if not isinstance(spec, str) or "-" not in spec:
         raise ConditionRuntimeError(f"window() expects 'HH:MM-HH:MM', got {spec!r}")
     lo, _, hi = spec.partition("-")
@@ -556,7 +556,7 @@ def resolve_operand(op: Operand, ctx: EvalContext) -> Any:
     """Resolve one parsed operand against a runtime context — the public form
     of the evaluator's own resolution, used by ``requireMatch`` to make the
     intent side of an equality clause concrete for the typed selector
-    (RFC §7.16 semantics 1). Raises ``ConditionRuntimeError`` fail-closed."""
+    (spec §7.16 semantics 1). Raises ``ConditionRuntimeError`` fail-closed."""
     return _resolve(op, ctx)
 
 
@@ -565,7 +565,7 @@ def _resolve(op: Operand, ctx: EvalContext) -> Any:
         return _literal_value(op)
     if isinstance(op, Path):
         # A single-segment non-namespace ident is an implicit string literal
-        # (RFC examples: ``== restricted``). Anything else is a real lookup.
+        # (spec examples: ``== restricted``). Anything else is a real lookup.
         if len(op.parts) == 1 and op.parts[0] not in NAMESPACES:
             return op.parts[0]
         return ctx.lookup(op.parts)

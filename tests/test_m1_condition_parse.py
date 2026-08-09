@@ -1,4 +1,4 @@
-"""M1 — condition parser + §13.9 validation (RFC §8, design §10)."""
+"""M1 — condition parser + §13.9 validation (spec §8, design §10)."""
 
 from __future__ import annotations
 

@@ -57,7 +57,7 @@ class SubmitIntentBody(BaseModel):
 
 class SubmitBatchBody(BaseModel):
     """The SIF wire form (SIF §5): ``{"operations": [...]}``. Decided atomically
-    per RFC §12 / CS-023 — any DENY/HALT refuses the whole batch before anything
+    per spec §12 / CS-023 — any DENY/HALT refuses the whole batch before anything
     commits or stages."""
 
     operations: list[SubmitIntentBody] = Field(min_length=1)
@@ -74,10 +74,10 @@ class McpCallBody(BaseModel):
 def _render(result: Any) -> dict[str, Any]:
     """One operation's result in the wire shape (shared by single and batch).
 
-    ``reasonCode``/``retryClass`` are the v0.6 (CS-029) convergence signal —
+    ``reasonCode``/``retryClass`` are the v0.3 (CS-029) convergence signal —
     an HTTP agent needs them to tell fix-and-resubmit from give-up; the result
     arriving here is already the redacted agent view (CS-030)."""
-    return {
+    body: dict[str, Any] = {
         "decision": result.decision.value,
         "rule": result.rule,
         "ticket": result.ticket,
@@ -86,6 +86,31 @@ def _render(result: Any) -> dict[str, Any]:
         "reasonCode": result.reason_code,
         "retryClass": result.retry_class.value if result.retry_class else None,
     }
+    if result.items:
+        # CS-043: an item-bearing action answers per item. ``applied`` and the
+        # note are what stop an actor reading the envelope alone — a `deny` here
+        # can sit above nine items that did take effect, and silence about that
+        # would be the CS-029 mistake one level up.
+        body["items"] = [
+            {
+                "item": v.item,
+                "decision": v.decision.value,
+                "rule": v.rule,
+                "reasonCode": v.reason_code,
+                "retryClass": v.retry_class.value if v.retry_class else None,
+                "ticket": v.ticket,
+            }
+            for v in result.items
+        ]
+        body["applied"] = list(result.applied)
+        if result.partially_applied():
+            body["status"] = "PARTIALLY_APPLIED"
+            body["note"] = (
+                f"{len(result.applied)} of {len(result.items)} items took effect; "
+                "the rest are listed in items[] with their own reason codes. Do not "
+                "resubmit the whole call — resubmit only the items you can fix."
+            )
+    return body
 
 
 def create_app(

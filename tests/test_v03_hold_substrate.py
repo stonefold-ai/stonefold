@@ -1,6 +1,6 @@
-"""v0.6 hold substrate — CS-026/027/028 (changeset docs/RFC-changeset-v0.5-to-v0.6.md).
+"""v0.3 hold substrate — CS-026/027/028 (changeset docs/changeset-v0.2-to-v0.2.md).
 
-Preconditions may resolve HOLD (three-valued checks, RFC §7.6); a held row
+Preconditions may resolve HOLD (three-valued checks, spec §7.6); a held row
 carries the release contract of EVERY holding gate and promotes only when all
 are satisfied (§12, CS-027 — the approval-bypass regression); held rows expire
 actively (CS-028). Driven through the in-memory outbox + dispatch worker; the
@@ -285,7 +285,7 @@ def test_deployment_default_resolver_role_makes_hold_resolvable() -> None:
 
 
 def test_precondition_hold_cannot_bypass_dual_authorization() -> None:
-    # THE R1 regression: v0.5-style first-hold-wins let a precondition hold carry
+    # THE R1 regression: v0.2-style first-hold-wins let a precondition hold carry
     # an empty contract that one self-release would promote past a co-holding
     # approval gate. Now every holding gate binds.
     check = ScriptedCheck(check_hold("multiple-candidates"))
@@ -415,8 +415,8 @@ def test_kill_covers_precondition_holds_exactly_like_approval_holds() -> None:
 
 
 def test_emission_control_runs_declared_checks() -> None:
-    # Pre-v0.6 the gate read a "precondition:" key that was never legal syntax,
-    # silently skipping every declared check. RFC §7.13 spells it "checks:".
+    # Pre-v0.3 the gate read a "precondition:" key that was never legal syntax,
+    # silently skipping every declared check. spec §7.13 spells it "checks:".
     failing = ScriptedCheck(check_fail("emcon-denied"))
     reg = full_registry()
     doc = {
@@ -512,7 +512,7 @@ def test_dedupe_disabled_without_a_window() -> None:
     h = harness(HOLD_GATE, check)
     first = _enforce_dedupe(h, window_s=None)
     second = _enforce_dedupe(h, session="s2", window_s=None)
-    assert first.ticket != second.ticket  # pre-v0.6 behaviour when unconfigured
+    assert first.ticket != second.ticket  # pre-v0.3 behaviour when unconfigured
 
 
 def test_settled_hold_does_not_absorb_new_attempts() -> None:

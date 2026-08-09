@@ -11,7 +11,7 @@ scopePredicates: [ownedBy]          # row filters (who sees which rows)
 contentHooks: [no.secrets]          # payload pass/block
 preconditionChecks:
   - targetIsActive                  # plain two-valued check: pass/fail
-  - name: inventoryAvailable        # v0.6 object form: this check MAY hold,
+  - name: inventoryAvailable        # v0.3 object form: this check MAY hold,
     holdCapable: true               # and declares every code it can emit
     reasonCodes:                    # with its retry class (CS-029)
       stock-uncertain: escalate

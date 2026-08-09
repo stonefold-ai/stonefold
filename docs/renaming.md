@@ -7,8 +7,8 @@ saw an old name can translate it, and so the change is not quietly hidden.
 | Layer | Old name | Now |
 |---|---|---|
 | The product / gateway | ACP Gateway ("Agent Control Gateway") | **Stonefold** (the Stonefold Gateway) |
-| The policy language (RFC 01) | Agent Control Policy (ACP) | **Stele** (the Stonefold policy language) |
-| The intent format (RFC 00) | Structured Intent Format (SIF) | unchanged |
+| The policy language (doc 01) | Agent Control Policy (ACP) | **Stele** (the Stonefold policy language) |
+| The intent format (doc 00) | Structured Intent Format (SIF) | unchanged |
 | Policy file `apiVersion` | `acp/v0.1` | `stele/v0.1` |
 | Policy file extension | `*.acp.yaml` | `*.stele.yaml` |
 | Policy JSON Schema | `schema/acp.schema.json` | `schema/stele.schema.json` |
@@ -24,7 +24,7 @@ written in it, so the file extension, the `apiVersion` and the schema carry that
 - **No normative semantics moved.** Identifiers, titles and file names only; no
   MUST/SHOULD/MAY wording changed. Version numbers were not bumped by the rename, and
   `stele/v0.1` accepts exactly the files `acp/v0.1` accepted.
-- **The historical change sets** (`spec/docs/RFC-changeset-*.md`) were swept to the new
+- **The historical change sets** (`spec/docs/changeset-*.md`) were swept to the new
   identifiers as well, for the same reason: the project had no public users of the old
   names, so keeping stale identifiers in them served no reader. The version-to-version
   deltas themselves are unchanged and remain the way to bring an older implementation

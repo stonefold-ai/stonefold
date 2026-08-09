@@ -1,7 +1,7 @@
-"""M6 — audit completeness and replay (RFC §11, design §11).
+"""M6 — audit completeness and replay (spec §11, design §11).
 
 Acceptance **F1**: for each of ALLOW / HOLD / DENY / HALT a corresponding
-append-only record exists, carrying the RFC §11 "required at full" fields. Plus
+append-only record exists, carrying the spec §11 "required at full" fields. Plus
 the replay query: one agent run replays as one ordered query by ``correlationId``
 (design §11). The durable Postgres sink is round-tripped in the integration test.
 """
@@ -28,7 +28,7 @@ from stonefold_store import InMemoryOutboxStore
 from stonefold_store.kill_memory import InMemoryKillStore
 from tests.conftest import full_registry, load_schema
 
-# The RFC §11 "required at full" columns. ``approval`` is excluded: the RFC marks
+# The spec §11 "required at full" columns. ``approval`` is excluded: the specification marks
 # it "if applicable", so ``None`` is a legal value (only HOLD/approval rows carry it).
 _REQUIRED_AT_FULL = (
     "id",

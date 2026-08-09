@@ -71,8 +71,8 @@ def _pay(bundle: APBundle, data: dict[str, Any], *, session: str = "pg") -> Any:
 
 _ACME_800 = {"payeeId": "PE-ACME-SUP", "accountId": "ACME-OPS", "amount": 800.0,
              "currency": "USD", "destinationCountry": "GB", "invoiceId": "INV-1001",
-             # v0.6 requireMatch inputs: the payment must correspond to the
-             # vendor's open purchase order (RFC §7.16).
+             # v0.3 requireMatch inputs: the payment must correspond to the
+             # vendor's open purchase order (spec §7.16).
              "vendorId": "PE-ACME-SUP", "sourceDomain": "acme.example"}
 
 
@@ -107,7 +107,7 @@ def test_attack_denied_over_postgres(bundle: APBundle) -> None:
               "amount": 50_000.0, "currency": "USD", "destinationCountry": "GB",
               "accountId": "ACME-OPS"}
     result = _pay(bundle, attack)
-    # v0.6: refused by matching — the fraudulent invoice corresponds to no
+    # v0.3: refused by matching — the fraudulent invoice corresponds to no
     # purchase order (cooling-off remains behind it as defence in depth).
     assert result.decision is Decision.DENY and "requireMatch" in result.rule
     assert bundle.drain() == 0 and _payment_count(bundle) == 0

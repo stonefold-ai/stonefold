@@ -1,4 +1,4 @@
-"""M3 — scope + execution wired through the pipeline (RFC §6.3/§12, design §5).
+"""M3 — scope + execution wired through the pipeline (spec §6.3/§12, design §5).
 
 Acceptance B1 (read scope injected below the model — in-memory analogue of the
 SQL test), B2 (scope-on-effect is a pre-resolution DENY), B3 (the actor cannot set

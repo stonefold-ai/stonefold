@@ -1,6 +1,6 @@
 """CS-021 — the IdentityProvider seam.
 
-Spec: ``docs/RFC-changeset-v0.4-to-v0.5.md`` §CS-021 + ``docs/03`` key decision 11.
+Spec: ``docs/changeset-v0.1-to-v0.2.md`` §CS-021 + ``docs/03`` key decision 11.
 
 Identity — the authenticated ``actor``/session the pipeline enforces on — enters
 through an ``IdentityProvider`` seam *ahead* of the pipeline, the same shape as the

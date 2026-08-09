@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The operator kill REST surface (design §8, RFC §9, plan M5 task 4).
+"""The operator kill REST surface (design §8, spec §9, plan M5 task 4).
 
 Three endpoints over a ``KillService`` — issue a kill, lift one, list the active
 orders. Issuing/lifting is audited inside the service (an operator action,

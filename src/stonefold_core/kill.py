@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The kill-switch value model and matching (RFC §9, design §8). Pure kernel.
+"""The kill-switch value model and matching (spec §9, design §8). Pure kernel.
 
 A kill is **a flag, checked at the chokepoint, that turns matching actions into
 an audited ``HALT`` and prevents any not-yet-dispatched effect from dispatching**

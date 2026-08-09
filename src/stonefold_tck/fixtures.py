@@ -12,7 +12,7 @@ driver must provide:
 * precondition    ``tck.flagSet``   — pass iff the resolved target's ``flag`` is true
 * disclosure sink ``tckSink``       — the only sink a restricted read may flow to
 
-The v0.6 names (drivers claiming ``hold-precondition`` / ``obligation``) read
+The v0.3 names (drivers claiming ``hold-precondition`` / ``obligation``) read
 the resolved TARGET's fields (like ``tck.flagSet``), so the world — not the
 frozen payload — decides, and a resolved question stays resolved at the
 dispatch-time re-validation:
@@ -40,12 +40,12 @@ domain: tck
 connectors:
   tck-data:    { type: sql }      # serves observe / record / transition
   tck-effects: { type: method }   # every effect binding
-  tck-orders:  { type: method }   # the mock obligation-registry adapter (v0.6)
+  tck-orders:  { type: method }   # the mock obligation-registry adapter (v0.3)
 
 scopePredicates: [ tckOwnedBy, tckTenantOf ]
 preconditionChecks:
   - tck.flagSet
-  # v0.6 (CS-026/CS-029): hold-capable checks declare their codes + classes.
+  # v0.3 (CS-026/CS-029): hold-capable checks declare their codes + classes.
   - name: tck.holdOnMarker
     holdCapable: true
     reasonCodes:
@@ -54,17 +54,32 @@ preconditionChecks:
     holdCapable: true
     reasonCodes:
       tck-never: terminal
-  # v0.6.1 (CS-041): the standard closure check. Named like any other, but the
+  # v0.3 (CS-041): the standard closure check. Named like any other, but the
   # gateway supplies it and §7.6 defines what it does.
+  # v0.3 (CS-043): refuses exactly the items in BLOCKED_ITEMS, so a mixed call
+  # has something to partition.
+  - name: tck.itemAllowed
+    holdCapable: false
+    reasonCodes:
+      tck-item-blocked: terminal
   - name: dispositionIsDeclared
     holdCapable: true
     reasonCodes:
       DISPOSITION_REQUIRED:    retryable
       CLOSED_WITHOUT_THE_WORK: escalate
+# v0.3 (CS-044): sources a gate may declare it reads. The driver controls their
+# reported age and reachability (set_source_age / set_source_outage).
+sources:
+  critical-analyte-list:
+    kind: ruleSet
+    label: "Analytes requiring same-day review"
+  unread-list:
+    kind: ruleSet
+
 hooks:              [ tck.rejectMarker ]
 sinks:              [ tckSink ]
 
-obligationRegistries:               # v0.6 (CS-034): the requireMatch source
+obligationRegistries:               # v0.3 (CS-034): the requireMatch source
   tck.orders:
     connector: tck-orders
     capability: transactional
@@ -110,9 +125,9 @@ entities:
     properties:
       id:      { type: string }
       tenant:  { type: string }
-      hold:    { type: boolean }   # read by tck.holdOnMarker (v0.6)
-      crash:   { type: boolean }   # makes tck.holdOnMarker RAISE (v0.6)
-      badhold: { type: boolean }   # read by tck.codelessHold (v0.6)
+      hold:    { type: boolean }   # read by tck.holdOnMarker (v0.3)
+      crash:   { type: boolean }   # makes tck.holdOnMarker RAISE (v0.3)
+      badhold: { type: boolean }   # read by tck.codelessHold (v0.3)
     actions:
       pay:
         kind: effect
@@ -131,7 +146,7 @@ entities:
         kind: effect
         connector: tck-effects
 
-  # v0.6.1 (CS-041): a queue item whose closing action declares what closing it
+  # v0.3 (CS-041): a queue item whose closing action declares what closing it
   # means. `resolved` claims the work was done; the other three do not, so an
   # actor always has an honest way to close an item it could not handle.
   Task:
@@ -148,6 +163,38 @@ entities:
         closure:
           dispositionField: disposition
           claimsCompletion: [resolved]
+
+  # v0.3 (CS-043): one action, N items, each independently governable. The
+  # `tck.flagSet` check reads the single item the fan-out hands it.
+  Queue:
+    dataSource: tck-data
+    properties:
+      id: { type: string }
+    actions:
+      closeMany:
+        kind: record
+        connector: tck-data
+        data:
+          itemIds: { type: array, required: true }
+        items:
+          field: itemIds
+          independent: true
+          maxItems: 100
+
+  # v0.3 (CS-044): the action whose gate declares what it reads. `flag` is read
+  # by tck.flagSet, so P1 can show the gate's own check running once the source is
+  # trustworthy.
+  Result:
+    dataSource: tck-data
+    properties:
+      id:   { type: string }
+      flag: { type: boolean }
+    actions:
+      dismiss:
+        kind: record
+        connector: tck-data
+        data:
+          resultId: { type: string, required: true }
 
   Email:
     dataSource: tck-data
@@ -272,7 +319,7 @@ gates:
     valueLimit: { field: data.amount, max: 100000, when: "resource.no_such_field == 1" }
 """
 
-# C10 (v0.5 CS-024): disclosure.maxClassification compares by the DECLARED
+# C10 (v0.2 CS-024): disclosure.maxClassification compares by the DECLARED
 # classification order; the ceiling here resolves from the session-supplied
 # actor claim (the §7.12 ``actor.clearance`` form).
 POLICY_CLASSIFICATION = """\
@@ -365,7 +412,7 @@ allow:
   - observe: [Widget]
 """
 
-# --- v0.6 variants ---------------------------------------------------------
+# --- v0.3 variants ---------------------------------------------------------
 # J1–J5 (CS-026/027/028): a hold-capable check gated with a resolver, composed
 # with an approval tier above $1000 so J3 can prove BOTH contracts bind.
 POLICY_HOLD = """\
@@ -446,4 +493,44 @@ gates:
   pay:
     valueLimit: { field: data.amount, max: 1000 }
     spendLimit: "100000/day"
+"""
+
+
+# O1–O4 (CS-043): per-item verdicts. `tck.itemAllowed` refuses exactly the items
+# named BLOCKED_ITEMS below, so a call mixing clean and blocked items must apply
+# the clean ones and refuse the rest.
+POLICY_PER_ITEM = """apiVersion: stele/v0.1
+agent: tck-agent
+defaults: { failureMode: closed, audit: full }
+killable: true
+allow:
+  - record: [closeMany]
+gates:
+  closeMany:
+    precondition: [tck.itemAllowed]
+"""
+
+#: The items ``tck.itemAllowed`` refuses (docs/12 §3 fixture semantics).
+BLOCKED_ITEMS = ("Q-BLOCKED", "Q-ALSO-BLOCKED")
+
+
+# P1–P4 (CS-044): a gate that names what it reads. `onUnavailable: hold` is the
+# declared choice, so P4 can assert that an unavailable guard queues for a human.
+POLICY_READS = """\
+apiVersion: stele/v0.1
+agent: tck-agent
+defaults: { failureMode: closed, audit: full }
+killable: true
+allow:
+  - record: [dismiss]
+gates:
+  dismiss:
+    precondition:
+      checks: [tck.flagSet]
+      reads:
+        - source: critical-analyte-list
+          freshness: 30d
+          onStale: hold
+      onUnavailable: hold
+      resolvers: role:tck-resolver
 """
