@@ -73,6 +73,29 @@ class PropertyDef(BaseModel):
         return node
 
 
+#: CS-041: the reserved name of the standard closure check. Declared here rather
+#: than with its implementation because the linter (core) must know it and core
+#: never imports the gate layer.
+DISPOSITION_IS_DECLARED = "dispositionIsDeclared"
+
+
+class ClosureDef(BaseModel):
+    """What closing this action means (docs/06 §5c, Stele §7.6 CS-041).
+
+    ``dispositionField`` names the ``data`` field carrying the disposition — the
+    declared vocabulary is that field's ``values`` — and ``claimsCompletion``
+    lists the dispositions that assert the work was *done*. It should be a
+    strict subset: if every disposition claims completion there is no honest way
+    to close an item the actor could not handle, which is the situation the
+    declaration exists to remove.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    dispositionField: str
+    claimsCompletion: tuple[str, ...] = ()
+
+
 class ActionDef(BaseModel):
     """A declared action: its kind, governance attributes, and (for a
     transition) its legal from-states (RFC §3–§5, §4.5)."""
@@ -104,6 +127,21 @@ class ActionDef(BaseModel):
     # error), and a populated map is the shape. Conflating the first two would
     # leave "this action takes no arguments" inexpressible.
     data: dict[str, PropertyDef] | None = None
+    # CS-041: what closing this action means. Inert on its own — the standard
+    # ``dispositionIsDeclared`` check is what reads it.
+    closure: ClosureDef | None = None
+
+    def disposition_vocabulary(self) -> tuple[str, ...]:
+        """The declared dispositions, from the ``closure`` field's ``values``.
+
+        Empty when the action declares no closure, or when the named field is
+        undeclared or carries no ``values`` — all of which make the check
+        unsatisfiable rather than permissive (Stele §7.6 rule 1).
+        """
+        if self.closure is None or not self.data:
+            return ()
+        prop = self.data.get(self.closure.dispositionField)
+        return prop.values if prop is not None else ()
 
     def data_schema(self) -> dict[str, Any] | None:
         """This action's ``data`` as JSON Schema, or None if it declares none."""

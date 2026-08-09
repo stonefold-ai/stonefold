@@ -29,6 +29,7 @@ PROFILE_HOLD = "hold-precondition"  # v0.6 CS-026/027/028: three-valued checks, 
 PROFILE_FEEDBACK = "feedback"  # v0.6 CS-029/030: reason codes + retry classes, visibility redaction
 PROFILE_MATCH = "match"  # v0.6 CS-032/033/036: requireMatch decision semantics
 PROFILE_CONSUME = "consume"  # v0.6 CS-035: reservation lifecycle
+PROFILE_CLOSURE = "closure"  # v0.6.1 CS-041: the standard closure check
 
 ALL_PROFILES = (
     PROFILE_CORE,
@@ -44,6 +45,7 @@ ALL_PROFILES = (
     PROFILE_FEEDBACK,
     PROFILE_MATCH,
     PROFILE_CONSUME,
+    PROFILE_CLOSURE,
 )
 
 
@@ -85,6 +87,7 @@ def all_checks() -> tuple[Check, ...]:
     from stonefold_tck.checks import (  # noqa: F401
         audit,
         batch,
+        closure,
         core,
         digest,
         feedback,

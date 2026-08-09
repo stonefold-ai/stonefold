@@ -42,6 +42,7 @@ from stonefold_core.models import RawCall, ResolvedAction
 from stonefold_core.scope import AttributeScope, ScopePredicate, ScopeRegistry, make_scope_resolver
 from stonefold_gates.base import CheckResult, GateContext, check_hold
 from stonefold_gates.content import ContentHookRegistry
+from stonefold_gates.closure import AuditDecisionHistory
 from stonefold_gates.engine import DefaultGateEngine
 from stonefold_gateway.transport import Gateway
 from stonefold_connectors import InMemoryConnector
@@ -84,7 +85,11 @@ def authoring_to_compact(authoring: Mapping[str, Any]) -> dict[str, Any]:
             compact: dict[str, Any] = {"kind": adef["kind"]}
             for attr, value in dict(adef.get("attributes") or {}).items():
                 compact[attr] = value
-            for key in ("from", "compensation", "connector"):
+            # ``data``/``label``/``closure`` are declared identically in both
+            # dialects and were previously dropped here, so an authoring-format
+            # registry silently lost its field shapes (and, from v0.6.1, its
+            # closure vocabulary — which the standard check reads).
+            for key in ("from", "compensation", "connector", "data", "label", "closure"):
                 if adef.get(key) is not None:
                     compact[key] = adef[key]
             actions[aname] = compact
@@ -286,6 +291,10 @@ class ReferenceDriver:
                 "tck.codelessHold": _codeless_hold,
             },
             obligations=self._obligations,
+            # v0.6.1 (CS-041): a driver claiming CAP_CLOSURE must supply the
+            # gateway's own decision history — what it refused earlier for the
+            # same actor and run, read from its own audit and nothing else.
+            history=AuditDecisionHistory(self._audit),
         )
         self._registry = registry
         scopes = make_scope_resolver(policy, _tck_scope_registry())
@@ -513,6 +522,7 @@ class ReferenceDriver:
                 action=r.action,
                 outcome=r.outcome,
                 reason=r.rule or "",
+                reason_code=r.reasonCode or "",
             )
             for r in self._audit.records
         ]

@@ -33,6 +33,7 @@ from stonefold_core.outbox import PendingAction
 from stonefold_store import CounterStore, InMemoryCounterStore
 from stonefold_gates import gates as g
 from stonefold_gates.base import (
+    DecisionHistory,
     GateContext,
     GateFn,
     PreconditionCheck,
@@ -40,6 +41,7 @@ from stonefold_gates.base import (
     passed,
     window_seconds,
 )
+from stonefold_gates.closure import standard_checks
 from stonefold_gates.content import ContentHookRegistry, default_hooks
 
 if TYPE_CHECKING:
@@ -113,12 +115,22 @@ class DefaultGateEngine:
         hooks: ContentHookRegistry | None = None,
         preconditions: Mapping[str, PreconditionCheck] | None = None,
         obligations: Mapping[str, ObligationRegistry] | None = None,
+        history: DecisionHistory | None = None,
         default_resolver_role: str | None = None,
     ) -> None:
         self.registry = registry
         self.counters: CounterStore = counters or InMemoryCounterStore()
         self.hooks: ContentHookRegistry = hooks or default_hooks()
-        self.preconditions: dict[str, PreconditionCheck] = dict(preconditions or {})
+        # v0.6.1 (CS-041): the reserved-name standard checks are merged OVER the
+        # integrator's map, not under it. The name carries normative semantics
+        # (§7.6), so a local implementation of it would silently redefine a
+        # documented guarantee.
+        self.preconditions: dict[str, PreconditionCheck] = {
+            **dict(preconditions or {}), **standard_checks(),
+        }
+        # The gateway's own record of this run, for the closure check. ``None``
+        # ⇒ a completion claim cannot be verified and fails closed (§10).
+        self.history = history
         # v0.6 (CS-034): obligation-registry adapters, keyed by declared
         # registry name. A ``requireMatch`` whose registry has no adapter here
         # is a dependency failure at evaluation time (RFC §10).
@@ -147,6 +159,7 @@ class DefaultGateEngine:
             counters=self.counters,
             hooks=self.hooks,
             preconditions=self.preconditions,
+            history=self.history,
             failure_mode=policy.policy.defaults.failureMode,
             agent=policy.agent,
             obligations=self.obligations,

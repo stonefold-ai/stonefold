@@ -154,6 +154,7 @@ def create_tck_harness(driver: ConformanceDriver, *, implementation: str) -> Fas
                     "action": r.action,
                     "outcome": r.outcome,
                     "reason": r.reason,
+                    "reasonCode": r.reason_code,
                 }
                 for r in driver.audit()
             ]
