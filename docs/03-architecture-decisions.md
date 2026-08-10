@@ -58,7 +58,7 @@ Every place an external system can plug in, and what runs there when nothing doe
 | Content hooks (`contentCheck`, §7.7) | none required by default | DLP, moderation, fraud scoring |
 | Precondition checks (§7.6) | registered functions | the system of record |
 | Outer ring | gateway's own scoped credentials | cloud IAM (docs/10 §3) |
-| Audit out (§11) | Postgres/file sink | SIEM, evidence-pack export |
+| Audit out (§11) | Postgres/file sink | SIEM export |
 | Transport | declared tool surface / interception | any MCP-speaking agent stack |
 
 ## Kill is two axes — operator hard-kill vs `killable`
