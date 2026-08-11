@@ -538,3 +538,20 @@ def test_the_appendix_travels_with_the_page() -> None:
 
     assert "<details>" in page  # no-script collapsible
     assert "advised.decision=&#x27;deny&#x27;" in page or "advised.decision='deny'" in page
+
+
+def test_the_published_sample_is_reproducible() -> None:
+    """The sample on the site is this module's output; anyone can regenerate it
+    and diff. A sample nobody can reproduce is a brochure with charts."""
+    from stonefold_report.sample import build_sample_report
+
+    a, b = build_sample_report(seed=11), build_sample_report(seed=11)
+
+    assert a.coverage.observed == b.coverage.observed
+    assert a.would_have.by_rule == b.would_have.by_rule
+    assert a.activity.by_day == b.activity.by_day
+    # and it exercises the shapes the report exists for
+    assert a.coverage.unjudged > 0
+    assert a.would_have.refused > 0
+    assert a.questions.total_questions > 0
+    assert a.outcomes.settled > 0
