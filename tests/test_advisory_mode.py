@@ -756,3 +756,122 @@ def test_a_cancelled_advisory_row_is_stamped_as_well() -> None:
     assert record.enforcement is EnforcementMode.ADVISORY
     assert record.outcome == "cancelled"
     assert record.rule == "stale-decision"
+
+
+# --- D-A4: measure the narrowing, never apply it -------------------------
+_SCOPED_DOC: dict[str, Any] = {
+    "agent": "support",
+    "allow": [{"observe": ["read"]}],
+    "scope": {"Customer": "assignedToCurrentUser"},
+}
+# alice owns three of the four; the fourth is what scope exists to remove.
+_CUSTOMERS: dict[str, list[dict[str, Any]]] = {
+    "Customer": [
+        {"id": 1, "owner_id": "alice"},
+        {"id": 2, "owner_id": "alice"},
+        {"id": 3, "owner_id": "alice"},
+        {"id": 4, "owner_id": "bob"},
+    ]
+}
+
+
+def _scoped_read(
+    *, enforcement: EnforcementMode, cap: int = 10_000, rows: Any = None
+) -> Any:
+    reg = full_registry()
+    policy = load_policy(
+        _SCOPED_DOC, reg, schema=load_schema(),
+        advisory_permitted=enforcement is EnforcementMode.ADVISORY,
+    )
+    audit = InMemoryAuditSink()
+    mem = InMemoryConnector(tables=rows if rows is not None else _CUSTOMERS)
+    result = enforce(
+        RawCall(resource="Customer", action="read", data={}),
+        Actor(id="alice"), Session(id="s1", correlation_id="corr-1"),
+        registry=reg, audit=audit, policy=policy, gates=DefaultGateEngine(reg),
+        scopes=make_scope_resolver(policy),
+        connectors=Connectors({"sql": mem, "in_memory": mem, "email": mem}),
+        outbox=InMemoryOutboxStore(audit=audit),
+        enforcement=enforcement, scope_measure_cap=cap,
+    )
+    return result, audit
+
+
+def test_enforcement_narrows_the_read() -> None:
+    """The baseline the advisory number is a counterfactual OF."""
+    result, audit = _scoped_read(enforcement=EnforcementMode.ENFORCED)
+
+    assert len(result.output) == 3  # bob's row is gone
+    record = audit.records[-1]
+    assert record.scopeApplied == ["Customer:assignedToCurrentUser"]
+    assert record.scopeWouldRemove is None  # it did not "would" — it did
+
+
+def test_advisory_does_not_narrow_the_read_and_counts_what_it_did_not() -> None:
+    """D-A4: narrowing would hand the agent fewer rows than it gets today, and
+    the traffic being measured would stop being the estate's own."""
+    result, audit = _scoped_read(enforcement=EnforcementMode.ADVISORY)
+
+    assert len(result.output) == 4  # every row, as if we were not here
+    record = audit.records[-1]
+    assert record.scopeApplied == []  # nothing was applied, and the record says so
+    assert record.scopeWouldRemove == {
+        "predicate": "Customer:assignedToCurrentUser",
+        "measured": True,
+        "removed": 1,
+        "evaluated": 4,
+        "returned": 4,
+        "partial": False,
+    }
+
+
+def test_a_wide_read_is_capped_and_says_that_it_was() -> None:
+    """A sampled number presented as a census is exactly the dishonesty the
+    report exists to avoid."""
+    wide = {"Customer": [{"id": i, "owner_id": "bob"} for i in range(50)]}
+    _, audit = _scoped_read(enforcement=EnforcementMode.ADVISORY, cap=10, rows=wide)
+
+    measured = audit.records[-1].scopeWouldRemove
+    assert measured is not None
+    assert measured["partial"] is True
+    assert measured["evaluated"] == 10
+    assert measured["returned"] == 50
+    assert measured["removed"] == 10  # of the ten it looked at
+
+
+def test_the_record_counts_rows_it_never_copies() -> None:
+    """Counts only. The record must not become a copy of the rows the policy
+    was trying to keep out of reach."""
+    _, audit = _scoped_read(enforcement=EnforcementMode.ADVISORY)
+
+    measured = audit.records[-1].scopeWouldRemove
+    assert measured is not None
+    assert all(isinstance(v, (str, int, bool)) for v in measured.values())
+    assert "bob" not in str(measured)
+
+
+def test_a_predicate_that_raises_is_recorded_not_enforced() -> None:
+    """An advisory deployment that turned a broken predicate into a refused read
+    would be enforcing by accident."""
+    from stonefold_core.pipeline import ScopeMeasure, _measure_scope
+
+    class _Broken:
+        name = "broken"
+
+        def matches(self, attrs: Mapping[str, Any], actor: Actor) -> bool:
+            raise RuntimeError("predicate is broken")
+
+        def sql_where(self, actor: Actor) -> tuple[str, dict[str, Any]]:
+            return "1 = 1", {}
+
+        def query_param(self, actor: Actor) -> tuple[str, Any]:
+            return "x", 1
+
+    measured = _measure_scope(
+        ScopeMeasure(_Broken(), "Customer:broken"), [{"id": 1}], Actor(id="alice")
+    )
+    assert measured == {
+        "predicate": "Customer:broken",
+        "measured": False,
+        "reason": "predicate-raised",
+    }

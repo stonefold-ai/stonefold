@@ -106,6 +106,7 @@ def build_record(
     advised: Advice | None = None,
     coverage: Coverage = Coverage.JUDGED,
     batch_advice: dict[str, Any] | None = None,
+    scope_would_remove: dict[str, Any] | None = None,
     record_rule: str | None = None,
 ) -> AuditRecord:
     """Assemble an ``AuditRecord`` from a terminal evaluation.
@@ -145,4 +146,5 @@ def build_record(
         advised=advised,
         coverage=coverage,
         batchAdvice=batch_advice,
+        scopeWouldRemove=scope_would_remove,
     )

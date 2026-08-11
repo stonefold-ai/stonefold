@@ -93,6 +93,70 @@ ADVISORY_RULE = "advisory"
 # ceiling: refused without being evaluated, item by item or at all.
 ITEMS_OVER_CEILING = "items-over-ceiling"
 
+# How many returned rows an advisory deployment evaluates its scope predicate
+# over before it stops and says so (D-A4). A wide read is the one place
+# measurement has a real cost, and a sampled number presented as a census is
+# exactly the dishonesty the report exists to avoid — so the cap is bounded and
+# the record is marked partial, never silently truncated.
+SCOPE_MEASURE_CAP = 10_000
+
+
+@dataclass(frozen=True)
+class ScopeMeasure:
+    """A scope predicate an advisory deployment must MEASURE instead of apply.
+
+    Applying it would give the agent fewer rows than it gets today, which
+    changes what the estate does and stops advisory being advisory (D-A4). So
+    the read runs unscoped and the predicate is evaluated over what came back,
+    to count what it would have removed. Counts only, never values: the record
+    must not become a copy of the rows the policy was trying to keep out of
+    reach.
+    """
+
+    predicate: ScopePredicate
+    label: str  # what ``scopeApplied`` would have said, had it been applied
+    cap: int = SCOPE_MEASURE_CAP
+
+
+def _measure_scope(measure: ScopeMeasure, output: Any, actor: Actor) -> dict[str, Any]:
+    """Count what the scope predicate would have removed from an unscoped read.
+
+    Never raises and never refuses: a measurement that failed is recorded as one
+    (``measured: false`` with the reason), because an advisory deployment that
+    turned a broken predicate into a refused read would be enforcing by
+    accident — and a failed measurement silently reported as zero would be worse
+    than no measurement at all.
+    """
+    if not isinstance(output, (list, tuple)):
+        # a receipt, a scalar, nothing at all: there are no rows to narrow
+        return {"predicate": measure.label, "measured": False, "reason": "output-not-rows"}
+    rows = list(output)
+    evaluated = rows[: measure.cap]
+    removed = 0
+    for row in evaluated:
+        if not isinstance(row, Mapping):
+            return {
+                "predicate": measure.label, "measured": False,
+                "reason": "rows-not-attributes",
+            }
+        try:
+            in_scope = measure.predicate.matches(row, actor)
+        except Exception:
+            return {
+                "predicate": measure.label, "measured": False,
+                "reason": "predicate-raised",
+            }
+        if not in_scope:
+            removed += 1
+    return {
+        "predicate": measure.label,
+        "measured": True,
+        "removed": removed,
+        "evaluated": len(evaluated),
+        "returned": len(rows),
+        "partial": len(evaluated) < len(rows),
+    }
+
 
 def _kill_caused(rule: str) -> bool:
     """Whether a HALT came from the kill machinery — a matched order or an
@@ -108,7 +172,29 @@ def _kill_caused(rule: str) -> bool:
     return rule == "kill-unavailable" or rule.startswith("kill:")
 
 
-def _as_advised(decided: _Decided) -> tuple[_Decided, Advice | None, Coverage]:
+def _unscoped(decided: _Decided, cap: int) -> _Decided:
+    """Move a scope predicate from APPLIED to MEASURED (D-A4).
+
+    An advisory deployment that narrowed a read would hand the agent fewer rows
+    than it gets today, and the traffic being measured would no longer be the
+    estate's own. So the predicate stops being an argument to the connector and
+    becomes something the commit phase counts afterwards. ``scope_applied`` is
+    cleared with it: the record says what was applied, and nothing was.
+    """
+    if decided.scope_pred is None:
+        return decided
+    label = decided.scope_applied[0] if decided.scope_applied else decided.scope_pred.name
+    return replace(
+        decided,
+        scope_pred=None,
+        scope_applied=(),
+        scope_measure=ScopeMeasure(decided.scope_pred, label, cap),
+    )
+
+
+def _as_advised(
+    decided: _Decided, cap: int = SCOPE_MEASURE_CAP
+) -> tuple[_Decided, Advice | None, Coverage]:
     """Translate one verdict for a deployment that does not enforce.
 
     Returns the decision to commit, the advice to record, and the coverage the
@@ -127,7 +213,9 @@ def _as_advised(decided: _Decided) -> tuple[_Decided, Advice | None, Coverage]:
     judged would overstate the one number the report leads with.
     """
     if decided.decision is Decision.ALLOW:
-        return decided, None, Coverage.JUDGED
+        # No divergence in the verdict — but an applied scope is a divergence in
+        # what the estate does, so it is measured rather than applied (D-A4).
+        return _unscoped(decided, cap), None, Coverage.JUDGED
     if decided.decision is Decision.HALT and _kill_caused(decided.rule):
         # A kill halt is enforced for real, and it is a judgement: the operator
         # made it. ``kill-unavailable`` fails closed for real too (D-A2's
@@ -155,13 +243,16 @@ def _as_advised(decided: _Decided) -> tuple[_Decided, Advice | None, Coverage]:
         retry_class=retry_class,
     )
     return (
-        replace(
-            decided,
-            decision=Decision.ALLOW,
-            rule=ADVISORY_RULE,
-            outcome="not_executed",
-            approval=None,
-            releases=(),
+        _unscoped(
+            replace(
+                decided,
+                decision=Decision.ALLOW,
+                rule=ADVISORY_RULE,
+                outcome="not_executed",
+                approval=None,
+                releases=(),
+            ),
+            cap,
         ),
         advice,
         coverage,
@@ -237,6 +328,10 @@ class _Decided:
     releases: tuple[ReleaseContract, ...] = ()
     scope_pred: ScopePredicate | None = None
     scope_applied: tuple[str, ...] = ()
+    # advisory profile (D-A4): the predicate to MEASURE rather than apply. Set
+    # by the translation, read by the commit phase — data, not a mode check, so
+    # the commit phase still cannot tell which deployment it is running in.
+    scope_measure: ScopeMeasure | None = None
     # v0.3: the policy-declared agent-feedback level, stamped on the
     # EvalResult so the transport can redact the return path.
     feedback: FeedbackLevel = FeedbackLevel.CODE_FIELDS
@@ -265,6 +360,7 @@ def enforce(
     dedupe_window_s: float | None = None,
     agent: str = "unknown",
     enforcement: EnforcementMode = EnforcementMode.ENFORCED,
+    scope_measure_cap: int = SCOPE_MEASURE_CAP,
 ) -> EvalResult:
     """Evaluate one attempted action to a terminal, audited decision.
 
@@ -292,6 +388,7 @@ def enforce(
             outbox=outbox, kill=kill, freshness=freshness, obligations=obligations,
             dedupe_window_s=dedupe_window_s, agent_name=agent_name,
             failure_mode=failure_mode, enforcement=enforcement,
+            scope_measure_cap=scope_measure_cap,
         )
     decided = _decide(
         call, actor, session, registry=registry, policy=policy, gates=gates,
@@ -302,7 +399,9 @@ def enforce(
         # The verdict above is computed and recorded exactly as it would be
         # under enforcement; only what happens next differs.
         advisory = _AdvisoryAudit(audit)
-        decided, advisory.advice, advisory.coverage = _as_advised(decided)
+        decided, advisory.advice, advisory.coverage = _as_advised(
+            decided, scope_measure_cap
+        )
         audit = advisory
     result = _commit(
         decided, actor, session, audit=audit, connectors=connectors,
@@ -430,6 +529,7 @@ def _enforce_per_item(
     agent_name: str,
     failure_mode: FailureMode,
     enforcement: EnforcementMode = EnforcementMode.ENFORCED,
+    scope_measure_cap: int = SCOPE_MEASURE_CAP,
 ) -> EvalResult:
     """Decide an item-bearing action item by item.
 
@@ -485,7 +585,7 @@ def _enforce_per_item(
             env=env, scopes=scopes, connectors=connectors, kill=kill,
             agent_name=agent_name, failure_mode=failure_mode,
         )
-        forwarded, _unused, coverage = _as_advised(whole)
+        forwarded, _unused, coverage = _as_advised(whole, scope_measure_cap)
         if forwarded.decision is Decision.ALLOW:
             reason_code, retry_class = classify(Decision.DENY, ITEMS_OVER_CEILING, ())
             advisory.advice = Advice(
@@ -529,7 +629,7 @@ def _enforce_per_item(
     coverages: list[Coverage] = [Coverage.JUDGED] * len(decided)
     if advisory is not None:
         for i, d in enumerate(decided):
-            decided[i], advices[i], coverages[i] = _as_advised(d)
+            decided[i], advices[i], coverages[i] = _as_advised(d, scope_measure_cap)
 
     verdicts: list[ItemVerdict] = []
     applied: list[str] = []
@@ -685,6 +785,7 @@ def enforce_batch(
     dedupe_window_s: float | None = None,
     agent: str = "unknown",
     enforcement: EnforcementMode = EnforcementMode.ENFORCED,
+    scope_measure_cap: int = SCOPE_MEASURE_CAP,
 ) -> BatchResult:
     """Evaluate a SIF batch atomically (spec §12, §?; SIF §5).
 
@@ -758,7 +859,7 @@ def enforce_batch(
             advices: list[Advice | None] = []
             coverages: list[Coverage] = []
             for i, d in enumerate(decided):
-                decided[i], advice, coverage = _as_advised(d)
+                decided[i], advice, coverage = _as_advised(d, scope_measure_cap)
                 advices.append(advice)
                 coverages.append(coverage)
             # ``advisory.advice``/``.coverage`` are set immediately before each
@@ -1351,6 +1452,14 @@ def _commit(
             agent_name, gate_results=gate_trace, scope_applied=decided.scope_applied,
             output=output, outcome="success",
             consumption=_consume_claim(inline_claim, obligations),
+            # D-A4: the read ran unscoped, so the record carries what the
+            # predicate would have taken away. The single most uncomfortable
+            # number in the report, and the most persuasive one.
+            scope_would_remove=(
+                _measure_scope(decided.scope_measure, output, actor)
+                if decided.scope_measure is not None
+                else None
+            ),
         )
 
     return _terminal(
@@ -1550,6 +1659,7 @@ def _terminal(
     outcome: str = "not_executed",
     approval: dict[str, Any] | None = None,
     consumption: dict[str, Any] | None = None,
+    scope_would_remove: dict[str, Any] | None = None,
 ) -> EvalResult:
     """Build the terminal result, write its audit record, and return it.
 
@@ -1579,6 +1689,7 @@ def _terminal(
             outcome=outcome,
             approval=approval,
             consumption=consumption,
+            scope_would_remove=scope_would_remove,
         )
     )
     return result

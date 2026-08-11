@@ -326,6 +326,13 @@ class AuditRecord(BaseModel):
     # whole: {"wouldRefuse": true, "failingIndex": n}. A batch's atomicity is a
     # property of the batch, so it cannot be reconstructed from one operation.
     batchAdvice: dict[str, Any] | None = None
+    # D-A4: what the scope predicate would have removed from a read an advisory
+    # deployment ran unscoped — {"predicate", "removed", "evaluated",
+    # "returned", "partial"}, or {"measured": false, "reason": ...} where it
+    # could not be counted. Counts only, never values. Absent when no scope
+    # predicate applied to the action, and on every enforced record (there the
+    # narrowing HAPPENED, and ``scopeApplied`` says so).
+    scopeWouldRemove: dict[str, Any] | None = None
     # Set on the one record an advised item-bearing call writes:
     # {"wouldApply": n, "wouldRefuse": m, "items": [...]} — counts, and an entry
     # per item enforcement would have refused (its decision, rule, reason code).

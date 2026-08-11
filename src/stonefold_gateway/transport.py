@@ -61,7 +61,7 @@ from stonefold_core.feedback import agent_view, agent_view_batch
 from stonefold_core.freshness import FreshnessConfig
 from stonefold_core.models import Advice
 from stonefold_core.obligation import ObligationRegistry
-from stonefold_core.pipeline import ADVISORY_RULE
+from stonefold_core.pipeline import ADVISORY_RULE, SCOPE_MEASURE_CAP
 from stonefold_core.scope import ScopeResolver
 
 # The structural refusal for a tool the interception mapping does not cover, and
@@ -107,6 +107,7 @@ class Gateway:
         obligations: Mapping[str, ObligationRegistry] | None = None,
         dedupe_window_s: float | None = None,
         agent: str = "unknown",
+        scope_measure_cap: int = SCOPE_MEASURE_CAP,
     ) -> None:
         self._registry = registry
         self._audit = audit
@@ -134,6 +135,11 @@ class Gateway:
         # v0.3: the deployment's hold-dedupe window (seconds); ``None``
         # disables collapsing — deployment configuration, like decision TTLs.
         self._dedupe_window_s = dedupe_window_s
+        # D-A4: how many returned rows an advisory deployment evaluates its
+        # scope predicate over before it stops and marks the record partial.
+        # Deployment configuration, like the dedupe window — an enforcing
+        # gateway never reads it, because it narrows for real.
+        self._scope_measure_cap = scope_measure_cap
         self._agent = policy.agent if policy is not None else agent
         # advisory profile. The mode comes from the compiled policy,
         # which only compiles at all where the deployment permitted advisory
@@ -194,6 +200,7 @@ class Gateway:
             dedupe_window_s=self._dedupe_window_s,
             agent=self._agent,
             enforcement=self._enforcement,
+            scope_measure_cap=self._scope_measure_cap,
         )
         return agent_view(result)
 
@@ -244,6 +251,7 @@ class Gateway:
                 dedupe_window_s=self._dedupe_window_s,
                 agent=self._agent,
                 enforcement=self._enforcement,
+                scope_measure_cap=self._scope_measure_cap,
             )
         )
 
