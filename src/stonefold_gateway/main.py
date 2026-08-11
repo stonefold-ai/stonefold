@@ -162,7 +162,11 @@ def create_app(
     if kill_service is not None:
         app.include_router(create_kill_router(kill_service))
     if audit is not None and outbox is not None:
-        app.include_router(create_admin_router(audit=audit, outbox=outbox))
+        app.include_router(
+            create_admin_router(
+                audit=audit, outbox=outbox, enforcement=gateway.enforcement
+            )
+        )
 
     def _identify(
         actor_id: str,

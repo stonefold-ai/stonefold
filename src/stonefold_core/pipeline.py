@@ -35,6 +35,7 @@ from stonefold_core.compiler import CompiledPolicy
 from stonefold_core.connector import ConnectorRegistry
 from stonefold_core.digest import DIGEST_MISMATCH, pinned_connector_mismatch
 from stonefold_core.enums import (
+    Coverage,
     Decision,
     EnforcementMode,
     FeedbackLevel,
@@ -103,29 +104,43 @@ def _kill_caused(rule: str) -> bool:
     return rule == "kill-unavailable" or rule.startswith("kill:")
 
 
-def _as_advised(decided: _Decided) -> tuple[_Decided, Advice | None]:
+def _as_advised(decided: _Decided) -> tuple[_Decided, Advice | None, Coverage]:
     """Translate one verdict for a deployment that does not enforce.
 
-    Returns the decision to commit and the advice to record. A refusal becomes
-    an ALLOW carrying no approval and no release contract — so a held action
-    stages nothing, which is the whole point: nobody is going to answer it and
-    the effect has already happened.
+    Returns the decision to commit, the advice to record, and the coverage the
+    record must carry. A refusal becomes an ALLOW carrying no approval and no
+    release contract — so a held action stages nothing, which is the whole
+    point: nobody is going to answer it and the effect has already happened.
 
     An ALLOW passes through untouched with no advice: the field marks
     divergence between what the policy said and what the deployment did, not
     the mode itself (the record's ``enforcement`` says the mode).
+
+    Coverage is decided here because only the pre-translation verdict can say
+    it: ``UNJUDGED`` for an unresolvable name and for a decide-phase dependency
+    failure (a ``*-unavailable`` rule) — in both, what enforcement "would have
+    done" is a fail-closed reflex, not a policy judgement, and counting it as
+    judged would overstate the one number the report leads with.
     """
     if decided.decision is Decision.ALLOW:
-        return decided, None
+        return decided, None, Coverage.JUDGED
     if decided.decision is Decision.HALT and _kill_caused(decided.rule):
-        return decided, None
+        # A kill halt is enforced for real, and it is a judgement: the operator
+        # made it. ``kill-unavailable`` fails closed for real too (D-A2's
+        # guarantee outranks transparency), so both stand untranslated.
+        return decided, None, Coverage.JUDGED
     if decided.resolved is None:
         # An unresolvable name has no connector, so there is nothing to let
-        # through: the gateway cannot forward what it cannot address. This is
-        # the coverage case — the gateway saw an action it could not judge —
-        # and it is recorded as such rather than counted as an advisory allow.
-        return decided, None
+        # through: the gateway cannot forward what it cannot address. The deny
+        # stands, marked as the coverage case — the gateway saw an action it
+        # could not judge — never counted as an advisory allow.
+        return decided, None, Coverage.UNJUDGED
 
+    coverage = (
+        Coverage.UNJUDGED
+        if decided.rule.endswith("-unavailable")
+        else Coverage.JUDGED
+    )
     reason_code, retry_class = classify(
         decided.decision, decided.rule, decided.gate_results
     )
@@ -145,6 +160,7 @@ def _as_advised(decided: _Decided) -> tuple[_Decided, Advice | None]:
             releases=(),
         ),
         advice,
+        coverage,
     )
 
 
@@ -166,9 +182,13 @@ class _AdvisoryAudit:
         self._inner = inner
         self.advice: Advice | None = None
         self.batch_advice: dict[str, Any] | None = None
+        self.coverage: Coverage = Coverage.JUDGED
 
     def write(self, record: AuditRecord) -> None:
-        update: dict[str, Any] = {"enforcement": EnforcementMode.ADVISORY}
+        update: dict[str, Any] = {
+            "enforcement": EnforcementMode.ADVISORY,
+            "coverage": self.coverage,
+        }
         if self.advice is not None:
             update["advised"] = self.advice
             # spec §11 wants the deciding rule on the record; the actor-facing
@@ -273,7 +293,7 @@ def enforce(
         # The verdict above is computed and recorded exactly as it would be
         # under enforcement; only what happens next differs.
         advisory = _AdvisoryAudit(audit)
-        decided, advisory.advice = _as_advised(decided)
+        decided, advisory.advice, advisory.coverage = _as_advised(decided)
         audit = advisory
     result = _commit(
         decided, actor, session, audit=audit, connectors=connectors,
@@ -567,7 +587,11 @@ def enforce_batch(
         if kill_halt is not None:
             # The operator's cord is not translated, and a batch is all or
             # nothing: the kill refuses the whole batch, as it would enforcing.
+            # The refusal is still an advisory deployment's refusal — its
+            # records carry the mode stamp, or the report's dataset would show
+            # phantom "enforced" traffic from a deployment that has none.
             failing = decided.index(kill_halt)
+            audit = _AdvisoryAudit(audit)
         else:
             advisory = _AdvisoryAudit(audit)
             if failing is not None:
@@ -577,16 +601,16 @@ def enforce_batch(
                     "decision": decided[failing].decision.value,
                 }
             advices: list[Advice | None] = []
+            coverages: list[Coverage] = []
             for i, d in enumerate(decided):
-                decided[i], advice = _as_advised(d)
+                decided[i], advice, coverage = _as_advised(d)
                 advices.append(advice)
-            audit = advisory
-            failing = None
-            # ``advisory.advice`` is set immediately before each operation's
-            # commit below, so every record gets its own operation's verdict.
+                coverages.append(coverage)
+            # ``advisory.advice``/``.coverage`` are set immediately before each
+            # operation's commit, so every record gets its own operation's.
             return _commit_batch_advisory(
-                decided, advices, advisory, actor, session,
-                audit=audit, connectors=connectors, outbox=outbox,
+                decided, advices, coverages, advisory, actor, session,
+                connectors=connectors, outbox=outbox,
                 freshness=freshness, env_of=env_of, agent_name=agent_name,
                 failure_mode=failure_mode, obligations=obligations,
                 dedupe_window_s=dedupe_window_s,
@@ -712,11 +736,11 @@ def enforce_batch(
 def _commit_batch_advisory(
     decided: list[_Decided],
     advices: list[Advice | None],
+    coverages: list[Coverage],
     advisory: _AdvisoryAudit,
     actor: Actor,
     session: Session,
     *,
-    audit: AuditSink,
     connectors: ConnectorRegistry | None,
     outbox: OutboxStore | None,
     freshness: FreshnessConfig | None,
@@ -728,21 +752,25 @@ def _commit_batch_advisory(
 ) -> BatchResult:
     """Commit every operation of an advisory batch, in submission order.
 
-    Nothing refuses the batch — that is the mode. The advice for each operation
-    is set on the sink immediately before its commit, so each record carries the
-    verdict its own operation earned while ``batchAdvice`` carries the batch's.
+    Nothing refuses the batch — that is the mode. The advice and coverage for
+    each operation are set on the sink immediately before its commit, so each
+    record carries the verdict its own operation earned while ``batchAdvice``
+    carries the batch's.
 
-    A DENY/HALT can still appear here: it comes from the commit phase (a
-    dispatch failure, a lost scope), not from a policy verdict, and it is
-    reported exactly as the enforcing path reports it.
+    A DENY/HALT can still appear here: an unresolvable operation's deny stands
+    (there is no connector to forward to), and the commit phase can fail for
+    real (a dispatch failure, a lost scope). Both are reported exactly as the
+    enforcing path reports them — the effects of the other operations have
+    already happened, which is what the mode means.
     """
     results = []
     for i, d in enumerate(decided):
         advisory.advice = advices[i]
+        advisory.coverage = coverages[i]
         results.append(
             _stamp_feedback(
                 _commit(
-                    d, actor, session, audit=audit, connectors=connectors,
+                    d, actor, session, audit=advisory, connectors=connectors,
                     outbox=outbox, freshness=freshness, env=env_of(i),
                     agent_name=agent_name, failure_mode=failure_mode,
                     obligations=obligations, dedupe_window_s=dedupe_window_s,

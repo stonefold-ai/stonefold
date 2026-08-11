@@ -304,3 +304,68 @@ def test_an_advised_batch_commits_whole_and_records_what_refused_it() -> None:
     assert records[0].advised is None
     assert records[1].advised is not None
     assert records[1].advised.decision is Decision.DENY
+
+
+# --- coverage: the honest number ------------------------------------------
+def test_an_unresolvable_action_is_unjudged_not_allowed() -> None:
+    """The gateway cannot forward what it cannot address: the deny stands,
+    marked as the coverage case — never counted as an advisory allow."""
+    result, audit, _ = _run(
+        _ALLOW_DOC,
+        resource="NoSuchResource",
+        action="frobnicate",
+        enforcement=EnforcementMode.ADVISORY,
+    )
+
+    assert result.decision is Decision.DENY
+    record = audit.records[-1]
+    assert record.enforcement is EnforcementMode.ADVISORY
+    assert record.coverage is Coverage.UNJUDGED
+    assert record.advised is None  # no judgement was reached, so none is advised
+
+
+def test_a_judged_action_says_judged() -> None:
+    for doc, expect_advice in ((_ALLOW_DOC, False), (_DENY_DOC, True)):
+        _, audit, _ = _run(
+            doc,
+            resource="Email",
+            action="sendEmail",
+            enforcement=EnforcementMode.ADVISORY,
+        )
+        record = audit.records[-1]
+        assert record.coverage is Coverage.JUDGED
+        assert (record.advised is not None) is expect_advice
+
+
+def test_a_killed_batch_still_stamps_the_mode() -> None:
+    """A kill refuses an advisory batch for real — and the records still say
+    which deployment they came from, or the dataset shows phantom enforced
+    traffic from a deployment that has none."""
+    from stonefold_core import KillScope
+    from stonefold_store.kill_memory import InMemoryKillStore
+
+    kill = InMemoryKillStore()
+    kill.issue(KillScope.for_session("s1"), issued_by="operator")
+    reg = full_registry()
+    policy = load_policy(_ALLOW_DOC, reg, schema=load_schema())
+    audit = InMemoryAuditSink()
+    result = enforce_batch(
+        [
+            RawCall(resource="Customer", action="read"),
+            RawCall(resource="Email", action="sendEmail"),
+        ],
+        Actor(id="alice"),
+        Session(id="s1", correlation_id="corr-1"),
+        registry=reg,
+        audit=audit,
+        policy=policy,
+        gates=DefaultGateEngine(reg),
+        kill=kill,
+        enforcement=EnforcementMode.ADVISORY,
+    )
+
+    assert result.decision is Decision.HALT
+    assert audit.records, "a refused batch still audits every operation"
+    for record in audit.records:
+        assert record.enforcement is EnforcementMode.ADVISORY
+        assert record.advised is None  # the halt happened; nothing is advice

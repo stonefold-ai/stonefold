@@ -70,7 +70,11 @@ def reason_code_stats(records: list[AuditRecord]) -> list[dict[str, Any]]:
     return out
 
 
-def advisory_stats(records: list[AuditRecord]) -> dict[str, Any]:
+def advisory_stats(
+    records: list[AuditRecord],
+    *,
+    declared: EnforcementMode | None = None,
+) -> dict[str, Any]:
     """The advisory profile's live surface: counts, and nothing else.
 
     Enough to see the instrument is alive; not enough to act on a single
@@ -78,6 +82,11 @@ def advisory_stats(records: list[AuditRecord]) -> dict[str, Any]:
     — a customer who starts enforcing by hand on today's advice is enforcing
     out-of-band, with none of it recorded, which is the failure this whole
     product describes.
+
+    ``declared`` is the gateway's configured mode, which is what ``mode``
+    reports: an advisory deployment is advisory before its first request, not
+    once traffic proves it. Record-derived only as a fallback for callers that
+    have records and no gateway (report tooling over an exported audit).
     """
     advisory = [r for r in records if r.enforcement is EnforcementMode.ADVISORY]
     would_deny = sum(
@@ -86,12 +95,16 @@ def advisory_stats(records: list[AuditRecord]) -> dict[str, Any]:
     would_hold = sum(
         1 for r in advisory if r.advised is not None and r.advised.decision is Decision.HOLD
     )
-    return {
-        "mode": (
+    if declared is not None:
+        mode = declared.value
+    else:
+        mode = (
             EnforcementMode.ADVISORY.value
             if advisory
             else EnforcementMode.ENFORCED.value
-        ),
+        )
+    return {
+        "mode": mode,
         "judged": sum(1 for r in advisory if r.coverage is Coverage.JUDGED),
         "unjudged": sum(1 for r in advisory if r.coverage is Coverage.UNJUDGED),
         "wouldDeny": would_deny,
@@ -112,7 +125,12 @@ class ApproverBody(BaseModel):
     gate: str | None = None
 
 
-def create_admin_router(*, audit: ReplayableAudit, outbox: OutboxStore) -> APIRouter:
+def create_admin_router(
+    *,
+    audit: ReplayableAudit,
+    outbox: OutboxStore,
+    enforcement: EnforcementMode | None = None,
+) -> APIRouter:
     router = APIRouter(prefix="/admin", tags=["admin"])
 
     @router.get("/trace/{correlation_id}")
@@ -129,8 +147,8 @@ def create_admin_router(*, audit: ReplayableAudit, outbox: OutboxStore) -> APIRo
         return reason_code_stats(audit.all_records())
 
     @router.get("/enforcement")
-    def enforcement() -> dict[str, Any]:
-        return advisory_stats(audit.all_records())
+    def enforcement_route() -> dict[str, Any]:
+        return advisory_stats(audit.all_records(), declared=enforcement)
 
     @router.post("/approvals/{action_id}/approve")
     def approve(action_id: str, body: ApproverBody) -> dict[str, Any]:

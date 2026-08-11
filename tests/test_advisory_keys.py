@@ -207,6 +207,20 @@ def test_the_stats_surface_counts_and_stops_there() -> None:
     )
 
 
+def test_mode_is_the_declared_one_not_the_traffic_derived_one() -> None:
+    """An advisory deployment is advisory before its first request. Deriving
+    the mode from records would report 'enforced' on a quiet advisory gateway —
+    exactly the confusion the banner exists to prevent."""
+    assert (
+        advisory_stats([], declared=EnforcementMode.ADVISORY)["mode"] == "advisory"
+    )
+    assert (
+        advisory_stats([], declared=EnforcementMode.ENFORCED)["mode"] == "enforced"
+    )
+    # Fallback for report tooling over an exported audit, with no gateway.
+    assert advisory_stats([])["mode"] == "enforced"
+
+
 def test_mixed_records_are_visible_rather_than_averaged() -> None:
     """No figure may be averaged across the two modes, so the surface says
     plainly that both are present."""
