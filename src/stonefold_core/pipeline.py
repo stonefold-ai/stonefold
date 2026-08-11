@@ -197,8 +197,13 @@ class _AdvisoryAudit:
         if self.advice is not None:
             update["advised"] = self.advice
             # spec §11 wants the deciding rule on the record; the actor-facing
-            # result carries ``ADVISORY_RULE`` instead.
-            update["rule"] = self.advice.rule
+            # result carries ``ADVISORY_RULE`` instead. Only where the
+            # translation actually went through, though: the commit phase can
+            # still refuse for real (a dead outbox, a lost scope), and that
+            # record's deciding rule is the failure's own — the would-have rule
+            # stays in ``advised``, where divergence belongs.
+            if record.decision is Decision.ALLOW:
+                update["rule"] = self.advice.rule
         if self.batch_advice is not None:
             update["batchAdvice"] = self.batch_advice
         if self.item_advice is not None:

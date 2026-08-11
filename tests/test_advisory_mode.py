@@ -633,3 +633,41 @@ def test_one_unjudged_item_makes_the_whole_call_unjudged() -> None:
     assert entry["coverage"] == "unjudged"
     # ...and the items that WERE judged are not tarred with it.
     assert record.itemAdvice["wouldApply"] == 2
+
+
+class _BrokenOutbox:
+    """Every outbox operation raises: the staging store is down."""
+
+    def __getattr__(self, name: str) -> Any:
+        def boom(*args: Any, **kwargs: Any) -> Any:
+            raise RuntimeError("outbox down")
+        return boom
+
+
+def test_a_real_commit_failure_keeps_its_own_rule_on_the_record() -> None:
+    """The commit phase can refuse for real under advisory — a dead outbox, a
+    lost scope. That record's deciding rule is the failure's own (spec §11); the
+    would-have rule stays in ``advised``, where divergence belongs. Overwriting
+    it would misattribute a real refusal to a rule that refused nothing."""
+    reg = full_registry()
+    policy = load_policy(_DENY_DOC, reg, schema=load_schema())
+    audit = InMemoryAuditSink()
+
+    result = enforce(
+        RawCall(resource="Email", action="sendEmail", data={"to": "x@acme.example"}),
+        Actor(id="alice"), Session(id="s1", correlation_id="corr-1"),
+        registry=reg, audit=audit, policy=policy, gates=DefaultGateEngine(reg),
+        outbox=_BrokenOutbox(),
+        connectors=Connectors({"email": InMemoryConnector()}),
+        enforcement=EnforcementMode.ADVISORY,
+    )
+
+    assert result.decision is Decision.DENY  # the refusal happened for real
+    record = audit.records[-1]
+    assert record.decision is Decision.DENY
+    assert record.rule == "outbox-unavailable"  # the failure's own rule
+    assert record.reasonCode == "outbox-unavailable"  # and they agree
+    # The would-have verdict is still there, as divergence, not as the rule.
+    assert record.advised is not None
+    assert record.advised.rule == "default-deny"
+    assert record.enforcement is EnforcementMode.ADVISORY

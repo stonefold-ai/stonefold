@@ -89,11 +89,16 @@ def advisory_stats(
     have records and no gateway (report tooling over an exported audit).
     """
     advisory = [r for r in records if r.enforcement is EnforcementMode.ADVISORY]
+    # Judged records only: an unjudged record can carry ``advised`` too (the
+    # fail-closed reflex enforcement would have had), and counting that reflex
+    # as a would-deny overstates the one number the report leads with. An
+    # unjudged action appears in ``unjudged`` and nowhere else.
+    judged = [r for r in advisory if r.coverage is Coverage.JUDGED]
     would_deny = sum(
-        1 for r in advisory if r.advised is not None and r.advised.decision is Decision.DENY
+        1 for r in judged if r.advised is not None and r.advised.decision is Decision.DENY
     )
     would_hold = sum(
-        1 for r in advisory if r.advised is not None and r.advised.decision is Decision.HOLD
+        1 for r in judged if r.advised is not None and r.advised.decision is Decision.HOLD
     )
     if declared is not None:
         mode = declared.value
@@ -105,7 +110,7 @@ def advisory_stats(
         )
     return {
         "mode": mode,
-        "judged": sum(1 for r in advisory if r.coverage is Coverage.JUDGED),
+        "judged": len(judged),
         "unjudged": sum(1 for r in advisory if r.coverage is Coverage.UNJUDGED),
         "wouldDeny": would_deny,
         "wouldHold": would_hold,

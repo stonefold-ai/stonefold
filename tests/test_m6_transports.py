@@ -274,7 +274,10 @@ def test_a_forward_that_fails_is_the_estates_outage_not_a_verdict() -> None:
     assert record.coverage is Coverage.UNJUDGED
     assert record.decision is Decision.DENY  # it did not happen
     assert record.rule == UPSTREAM_UNAVAILABLE
+    assert record.reasonCode == UPSTREAM_UNAVAILABLE  # the failure's own code
     assert record.outcome == "failure"
+    # ...while the would-have refusal keeps the code it classified.
+    assert record.advised is not None and record.advised.rule == UNMAPPED_TOOL
 
 
 def test_advisory_without_a_forwarder_still_refuses_and_says_so() -> None:

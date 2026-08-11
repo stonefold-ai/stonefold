@@ -238,3 +238,33 @@ def test_mixed_records_are_visible_rather_than_averaged() -> None:
 
     assert stats["advisoryRecords"] == 1
     assert stats["enforcedRecords"] == 1
+
+
+def test_an_unjudged_would_deny_is_not_counted_as_one() -> None:
+    """An unjudged record can carry ``advised`` too — the fail-closed reflex
+    enforcement would have had. Counting that reflex as a would-deny overstates
+    the one number the report leads with; it belongs in ``unjudged`` and
+    nowhere else."""
+    from datetime import datetime, timezone
+
+    from stonefold_core.enums import Coverage
+    from stonefold_core.models import Advice, AuditRecord
+
+    judged = AuditRecord(
+        id="a1", timestamp=datetime(2026, 8, 11, tzinfo=timezone.utc),
+        agent="support", actor="alice",
+        decision=Decision.ALLOW, enforcement=EnforcementMode.ADVISORY,
+        advised=Advice(decision=Decision.DENY, rule="default-deny"),
+        coverage=Coverage.JUDGED,
+    )
+    unjudged = judged.model_copy(update={
+        "id": "a2",
+        "advised": Advice(decision=Decision.DENY, rule="unmapped-tool"),
+        "coverage": Coverage.UNJUDGED,
+    })
+
+    stats = advisory_stats([judged, unjudged])
+
+    assert stats["wouldDeny"] == 1  # the judged one, only
+    assert stats["unjudged"] == 1
+    assert stats["judged"] == 1

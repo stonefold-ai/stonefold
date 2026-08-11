@@ -337,11 +337,16 @@ class Gateway:
             # estate's own outage, not a policy result (D-A3). It is recorded as
             # unjudged rather than as anything the gateway decided, and the
             # caller sees the failure it would have seen without us in the path.
+            # The record's code is the failure's own; the unmapped-tool code
+            # stays on ``advised``, which is the only thing it classified.
+            failure_code, failure_retry = classify(
+                Decision.DENY, UPSTREAM_UNAVAILABLE, ()
+            )
             self._record_unjudged(
                 call, actor, session, advised=advised, outcome="failure",
                 result=EvalResult(
                     decision=Decision.DENY, rule=UPSTREAM_UNAVAILABLE,
-                    reason_code=reason_code, retry_class=retry_class,
+                    reason_code=failure_code, retry_class=failure_retry,
                 ),
             )
             raise
