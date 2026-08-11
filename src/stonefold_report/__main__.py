@@ -57,6 +57,10 @@ def main(argv: list[str] | None = None) -> int:
              "with values legitimate|correct|unsure",
     )
     parser.add_argument("--downstream", type=Path, help="correlation ids also refused")
+    parser.add_argument(
+        "--prepared-for", metavar="NAME",
+        help="addressee for the letterhead; adds a confidentiality line",
+    )
     args = parser.parse_args(argv)
 
     verdicts = (
@@ -83,7 +87,14 @@ def main(argv: list[str] | None = None) -> int:
     form = args.format or (
         "html" if args.out is not None and args.out.suffix == ".html" else "md"
     )
-    text = render_html(report) if form == "html" else render(report)
+    from datetime import datetime, timezone
+
+    stamp = datetime.now(timezone.utc)
+    text = (
+        render_html(report, prepared_for=args.prepared_for, generated_at=stamp)
+        if form == "html"
+        else render(report, prepared_for=args.prepared_for, generated_at=stamp)
+    )
     if args.out is not None:
         args.out.write_text(text, encoding="utf-8", newline="\n")
         print(f"wrote {args.out}", file=sys.stderr)

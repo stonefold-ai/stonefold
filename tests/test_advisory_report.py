@@ -439,3 +439,102 @@ def test_the_html_escapes_what_the_policy_wrote() -> None:
 
     assert "<script>alert(1)</script>" not in page
     assert "&lt;script&gt;" in page
+
+
+def test_both_editions_lead_with_the_computed_summary() -> None:
+    from stonefold_report import render_html
+
+    audit = _run(_DENY_DOC, [_EMAIL, _READ], mode=EnforcementMode.ADVISORY)
+    report = build_report(audit.all_records(), agent="support")
+
+    md, page = render(report), render_html(report)
+
+    for text in (md, page):
+        assert "day(s) with traffic" in text
+        assert "could be judged by the policy" in text
+    # the summary leads, the disclaimer stays — findings before caveats
+    assert page.index("day(s) with traffic") < page.index("Nothing in this window")
+
+
+def test_the_activity_strip_draws_the_silence() -> None:
+    """A burst then a quiet week and steady work all fortnight are different
+    findings; a strip that draws only busy days compresses them into one."""
+    from datetime import datetime, timedelta, timezone
+
+    audit = _run(_DENY_DOC, [_EMAIL, _EMAIL, _EMAIL], mode=EnforcementMode.ADVISORY)
+    start = datetime(2026, 8, 3, 9, 0, tzinfo=timezone.utc)
+    spread = [
+        r.model_copy(update={"timestamp": start + timedelta(days=offset)})
+        for r, offset in zip(audit.all_records(), (0, 0, 4))
+    ]
+
+    report = build_report(spread, agent="support")
+
+    assert report.activity.days_with_traffic == 2
+    assert len(report.activity.by_day) == 5  # the three quiet days are drawn
+    assert [count for _d, count in report.activity.by_day] == [2, 0, 0, 0, 1]
+
+
+def test_the_page_answers_who_when_and_from_what() -> None:
+    """Provenance is table stakes for an evidence document: an auditor's first
+    questions are when this was produced, for whom, and from how much data."""
+    from datetime import datetime, timezone
+
+    from stonefold_report import render_html
+
+    audit = _run(_DENY_DOC, [_EMAIL], mode=EnforcementMode.ADVISORY)
+    report = build_report(audit.all_records(), agent="support")
+
+    page = render_html(
+        report,
+        prepared_for="Meridian Supply GmbH",
+        generated_at=datetime(2026, 8, 11, 15, 0, tzinfo=timezone.utc),
+    )
+
+    assert "prepared for <b>Meridian Supply GmbH</b>" in page
+    assert "Confidential" in page
+    assert "Generated 2026-08-11 15:00 UTC" in page
+    assert "decision record(s)" in page
+
+
+def test_the_worksheet_can_be_completed_with_a_pen() -> None:
+    from stonefold_report import render_html
+
+    audit = _run(_DENY_DOC, [_EMAIL], mode=EnforcementMode.ADVISORY)
+    page = render_html(build_report(audit.all_records(), agent="support"))
+
+    assert "How to complete this" in page
+    assert page.count('class="box"') == 3  # one line, three tick boxes
+    assert "Ordinary work" in page and "Correctly refused" in page
+
+
+def test_rule_codes_carry_plain_words() -> None:
+    """A CFO should not need the policy grammar to read their own report."""
+    from stonefold_report import render_html
+
+    audit = _run(_DENY_DOC, [_EMAIL], mode=EnforcementMode.ADVISORY)
+    page = render_html(build_report(audit.all_records(), agent="support"))
+
+    assert "default-deny" in page  # the code stays, for the engineer
+    assert "not permitted by the policy" in page  # the words, for the reader
+
+
+def test_section_nine_keeps_its_emphasis_in_html() -> None:
+    from stonefold_report import render_html
+
+    audit = _run(_DENY_DOC, [_EMAIL], mode=EnforcementMode.ADVISORY)
+    page = render_html(build_report(audit.all_records(), agent="support"))
+
+    nine = page.split("9 · What we would turn on first")[1]
+    assert "<b>Nothing is ready to enforce yet" in nine
+    assert "**" not in nine  # converted, not leaked
+
+
+def test_the_appendix_travels_with_the_page() -> None:
+    from stonefold_report import render_html
+
+    audit = _run(_DENY_DOC, [_EMAIL], mode=EnforcementMode.ADVISORY)
+    page = render_html(build_report(audit.all_records(), agent="support"))
+
+    assert "<details>" in page  # no-script collapsible
+    assert "advised.decision=&#x27;deny&#x27;" in page or "advised.decision='deny'" in page

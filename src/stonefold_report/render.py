@@ -18,6 +18,8 @@ Two habits are enforced here rather than left to judgement:
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from stonefold_report.figures import Report
 
 _NO_PREVENTION = (
@@ -31,7 +33,41 @@ def _pct(value: float | None) -> str:
     return "not computable" if value is None else f"{value:.1f}%"
 
 
-def render(report: Report) -> str:
+def _summary_md(r: Report) -> str:
+    """The executive summary, computed — the same sentences the HTML edition
+    leads with, from the same figures."""
+    c, w, q = r.coverage, r.would_have, r.questions
+    bits = [
+        f"Over **{r.activity.days_with_traffic}** day(s) with traffic we "
+        f"observed **{c.observed}** action(s) by this agent"
+    ]
+    if c.ratio is not None:
+        bits.append(f"**{c.ratio:.1f}%** could be judged by the policy")
+    verdicts = []
+    if w.refused:
+        verdicts.append(f"refused **{w.refused}**")
+    if q.total_holds:
+        verdicts.append(f"asked a person **{q.total_questions}** question(s)")
+    bits.append(
+        "it would have " + " and ".join(verdicts)
+        if verdicts
+        else "it would have allowed everything it judged"
+    )
+    text = "; ".join(bits) + "."
+    if r.reviewed is None and (w.refused or q.total_holds):
+        text += (
+            " Nothing is recommended for enforcement until the review in §4 "
+            "comes back."
+        )
+    return text
+
+
+def render(
+    report: Report,
+    *,
+    prepared_for: str | None = None,
+    generated_at: datetime | None = None,
+) -> str:
     r = report
     out: list[str] = []
     add = out.append
@@ -44,7 +80,12 @@ def render(report: Report) -> str:
             f"{r.disclosures.first.date().isoformat()} to "
             f"{r.disclosures.last.date().isoformat()}"
         )
-    add(f"*Window: {window}. Mode: advisory throughout.*")
+    line = f"*Window: {window}. Mode: advisory throughout."
+    if prepared_for:
+        line += f" Confidential — prepared for {prepared_for}."
+    add(line + "*")
+    add("")
+    add(_summary_md(r))
     add("")
     add(_NO_PREVENTION)
     add("")
@@ -188,6 +229,15 @@ def render(report: Report) -> str:
             "would have reached a person."
         )
     if r.worksheet:
+        from stonefold_report.figures import verdict_key
+
+        add("")
+        add(
+            "How to complete this: return one ruling per line, keyed "
+            f"`{verdict_key(r.worksheet[0])}`-style, with the values "
+            "`legitimate` (ordinary work the policy would have stopped), "
+            "`correct`, or `unsure`."
+        )
         add("")
         add("| Would have refused | Resource / action | Count | Your verdict |")
         add("|---|---|---|---|")
@@ -315,6 +365,15 @@ def render(report: Report) -> str:
         "Every figure above is reproducible from your own audit export with these "
         "queries. A report you cannot check is a brochure."
     )
+    add("")
+    lifecycle = r.outcomes.settled + r.outcomes.failed + r.outcomes.cancelled
+    provenance = (
+        f"*Produced from {r.coverage.observed} decision record(s) and "
+        f"{lifecycle} settlement record(s), agent `{r.agent}`, window {window}."
+    )
+    if generated_at is not None:
+        provenance += f" Generated {generated_at.strftime('%Y-%m-%d %H:%M UTC')}."
+    add(provenance + "*")
     add("")
     return "\n".join(out)
 

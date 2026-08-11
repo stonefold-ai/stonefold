@@ -364,11 +364,25 @@ def _scope(records: Sequence[AuditRecord]) -> ScopeFigures:
 
 
 def _activity(decisions: Sequence[AuditRecord]) -> ActivityFigures:
-    by_day = Counter(r.timestamp.date().isoformat() for r in decisions)
-    ordered = tuple(sorted(by_day.items()))
-    busiest = max(by_day.items(), key=lambda kv: kv[1]) if by_day else None
+    """Every day of the window, zeros included. A burst followed by a quiet
+    week and steady work all fortnight are different findings, and a strip
+    that draws only the busy days compresses the silence away."""
+    from datetime import timedelta
+
+    by_day = Counter(r.timestamp.date() for r in decisions)
+    if not by_day:
+        return ActivityFigures(days_with_traffic=0, by_day=(), busiest=None)
+    first, last = min(by_day), max(by_day)
+    ordered = tuple(
+        ((first + timedelta(days=offset)).isoformat(),
+         by_day.get(first + timedelta(days=offset), 0))
+        for offset in range((last - first).days + 1)
+    )
+    busiest_day, busiest_count = max(by_day.items(), key=lambda kv: kv[1])
     return ActivityFigures(
-        days_with_traffic=len(by_day), by_day=ordered, busiest=busiest
+        days_with_traffic=len(by_day),
+        by_day=ordered,
+        busiest=(busiest_day.isoformat(), busiest_count),
     )
 
 
