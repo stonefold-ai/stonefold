@@ -17,12 +17,15 @@ plugs into the same slot without touching the route.
 
 from __future__ import annotations
 
+import logging
+
 from typing import Any
 
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
+from stonefold_core.enums import EnforcementMode
 from stonefold_gateway.admin_api import ReplayableAudit, create_admin_router
 from stonefold_gateway.identity import (
     IdentityProvider,
@@ -112,6 +115,14 @@ def _render(result: Any) -> dict[str, Any]:
     return body
 
 
+ADVISORY_BANNER = (
+    "ENFORCEMENT IS OFF: this gateway is running in ADVISORY mode. Every "
+    "verdict is computed and recorded; nothing is refused except a kill order. "
+    "Audit records from this run are marked enforcement=advisory and must not "
+    "be read as evidence that anything was prevented."
+)
+
+
 def create_app(
     gateway: Gateway,
     *,
@@ -121,6 +132,10 @@ def create_app(
     identity: IdentityProvider | None = None,
 ) -> FastAPI:
     app = FastAPI(title="Stonefold Gateway", version="0.1")
+    if gateway.enforcement is EnforcementMode.ADVISORY:
+        # Loud on purpose. An operator who does not know the gateway is
+        # advisory has a control they believe in and do not have.
+        logging.getLogger("stonefold.gateway").warning(ADVISORY_BANNER)
     sif = SifNativeTransport(gateway)
     # The MCP surface (design §1.2): one typed tool per declared action, and a
     # proxy that maps each back to the action it was generated from. Generated

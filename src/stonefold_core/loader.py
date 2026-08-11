@@ -26,6 +26,17 @@ class SchemaError(Exception):
     """Raised when a policy fails JSON-Schema structural validation."""
 
 
+class EnforcementNotPermittedError(Exception):
+    """Raised when a policy declares advisory enforcement that the deployment
+    has not permitted (the advisory profile's second key).
+
+    Refused at LOAD time on purpose: the gateway either starts as the operator
+    intended or does not start. Discovering the disagreement per request would
+    mean a running gateway whose mode nobody has agreed on, which is the one
+    state neither answer is safe in.
+    """
+
+
 def _merge_chain(docs: list[dict[str, Any]]) -> dict[str, Any]:
     """Union allow/deny/gates/scope/standing across a fragment chain
     (spec §3.2). Later docs (the governed document) are applied last; deny is
@@ -81,10 +92,18 @@ def load_policy(
     *,
     schema: dict[str, Any] | None = None,
     fragments: dict[str, dict[str, Any]] | None = None,
+    advisory_permitted: bool = False,
 ) -> CompiledPolicy:
     """Validate, lint, and compile one policy. Raises ``SchemaError`` /
     ``PolicyError`` on failure. Lint *warnings* are attached to the returned
-    ``CompiledPolicy`` (``.lint_report``)."""
+    ``CompiledPolicy`` (``.lint_report``).
+
+    ``advisory_permitted`` is the deployment's half of the advisory profile's
+    two keys: a policy declaring ``defaults.enforcement: advisory`` loads only
+    where the operator has also permitted it. It defaults to ``False``, so a
+    deployment that has never heard of advisory mode cannot be put into it by a
+    policy file alone.
+    """
     merged = merge_extends(data, fragments or {})
 
     if schema is not None:
@@ -94,6 +113,11 @@ def load_policy(
             raise SchemaError(str(exc.message)) from exc
 
     policy = Policy.model_validate(merged)
+    if policy.is_advisory and not advisory_permitted:
+        raise EnforcementNotPermittedError(
+            f"policy for agent {policy.agent!r} declares advisory enforcement, "
+            "which this deployment does not permit"
+        )
     report = lint(policy, registry)
     if report.has_errors:
         raise PolicyError(report)

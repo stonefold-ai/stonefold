@@ -23,8 +23,10 @@ from stonefold_core.freshness import (
     stale_guard_reason,
 )
 from stonefold_core.enums import (
+    Coverage,
     Decision,
     Emission,
+    EnforcementMode,
     Explainability,
     FeedbackLevel,
     Kind,
@@ -36,6 +38,7 @@ from stonefold_core.enums import (
 from stonefold_core.feedback import agent_view, agent_view_batch
 from stonefold_core.models import (
     Actor,
+    Advice,
     Attributes,
     AuditRecord,
     Compensation,
@@ -120,7 +123,13 @@ from stonefold_core.scope import (
     make_scope_resolver,
 )
 from stonefold_core.linter import LintFinding, LintReport, PolicyError, Severity, lint
-from stonefold_core.loader import SchemaError, load_policy, merge_extends, validate_only
+from stonefold_core.loader import (
+    EnforcementNotPermittedError,
+    SchemaError,
+    load_policy,
+    merge_extends,
+    validate_only,
+)
 from stonefold_core.pipeline import enforce, enforce_batch
 from stonefold_core.policy import (
     AuditLevel,
@@ -163,7 +172,11 @@ from stonefold_core.registry import (
 __all__ = [
     # enums
     "Kind",
+    "Advice",
+    "Coverage",
     "Decision",
+    "EnforcementMode",
+    "EnforcementNotPermittedError",
     "Outcome",
     "RetryClass",
     "FeedbackLevel",

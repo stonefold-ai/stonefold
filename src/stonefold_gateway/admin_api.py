@@ -21,7 +21,7 @@ from typing import Any, Protocol
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from stonefold_core.enums import Decision
+from stonefold_core.enums import Coverage, Decision, EnforcementMode
 from stonefold_core.models import AuditRecord
 from stonefold_core.outbox import (
     ApprovalError,
@@ -70,6 +70,41 @@ def reason_code_stats(records: list[AuditRecord]) -> list[dict[str, Any]]:
     return out
 
 
+def advisory_stats(records: list[AuditRecord]) -> dict[str, Any]:
+    """The advisory profile's live surface: counts, and nothing else.
+
+    Enough to see the instrument is alive; not enough to act on a single
+    verdict mid-measurement. Per-action detail is the report's job, at the end
+    — a customer who starts enforcing by hand on today's advice is enforcing
+    out-of-band, with none of it recorded, which is the failure this whole
+    product describes.
+    """
+    advisory = [r for r in records if r.enforcement is EnforcementMode.ADVISORY]
+    would_deny = sum(
+        1 for r in advisory if r.advised is not None and r.advised.decision is Decision.DENY
+    )
+    would_hold = sum(
+        1 for r in advisory if r.advised is not None and r.advised.decision is Decision.HOLD
+    )
+    return {
+        "mode": (
+            EnforcementMode.ADVISORY.value
+            if advisory
+            else EnforcementMode.ENFORCED.value
+        ),
+        "judged": sum(1 for r in advisory if r.coverage is Coverage.JUDGED),
+        "unjudged": sum(1 for r in advisory if r.coverage is Coverage.UNJUDGED),
+        "wouldDeny": would_deny,
+        "wouldHold": would_hold,
+        # An estate running both is a reporting hazard: no figure may be
+        # averaged across the two, so the surface says plainly that it happened.
+        "enforcedRecords": sum(
+            1 for r in records if r.enforcement is EnforcementMode.ENFORCED
+        ),
+        "advisoryRecords": len(advisory),
+    }
+
+
 class ApproverBody(BaseModel):
     approver: str
     # v0.3: target one release contract by its gate key (e.g.
@@ -92,6 +127,10 @@ def create_admin_router(*, audit: ReplayableAudit, outbox: OutboxStore) -> APIRo
     @router.get("/reason-codes")
     def reason_codes() -> list[dict[str, Any]]:
         return reason_code_stats(audit.all_records())
+
+    @router.get("/enforcement")
+    def enforcement() -> dict[str, Any]:
+        return advisory_stats(audit.all_records())
 
     @router.post("/approvals/{action_id}/approve")
     def approve(action_id: str, body: ApproverBody) -> dict[str, Any]:

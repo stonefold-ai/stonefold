@@ -35,6 +35,7 @@ from stonefold_core import (
     CompiledPolicy,
     Connectors,
     Decision,
+    EnforcementMode,
     EvalResult,
     GateEngine,
     InMemoryRegistry,
@@ -104,6 +105,21 @@ class Gateway:
         # disables collapsing — deployment configuration, like decision TTLs.
         self._dedupe_window_s = dedupe_window_s
         self._agent = policy.agent if policy is not None else agent
+        # advisory profile. The mode comes from the compiled policy,
+        # which only compiles at all where the deployment permitted advisory
+        # (``load_policy(advisory_permitted=...)``) — the two keys are checked
+        # at load, so by the time a gateway exists the question is settled.
+        self._enforcement = (
+            policy.policy.effective_enforcement
+            if policy is not None
+            else EnforcementMode.ENFORCED
+        )
+
+    @property
+    def enforcement(self) -> EnforcementMode:
+        """What this gateway does with its verdicts. Read by the startup banner
+        and the stats surface: an advisory deployment is never quiet about it."""
+        return self._enforcement
 
     @property
     def registry(self) -> InMemoryRegistry:
@@ -147,6 +163,7 @@ class Gateway:
             obligations=self._obligations,
             dedupe_window_s=self._dedupe_window_s,
             agent=self._agent,
+            enforcement=self._enforcement,
         )
         return agent_view(result)
 
@@ -196,6 +213,7 @@ class Gateway:
                 obligations=self._obligations,
                 dedupe_window_s=self._dedupe_window_s,
                 agent=self._agent,
+                enforcement=self._enforcement,
             )
         )
 
