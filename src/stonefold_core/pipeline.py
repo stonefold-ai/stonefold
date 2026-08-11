@@ -34,13 +34,21 @@ from stonefold_core.audit import AuditSink, build_record
 from stonefold_core.compiler import CompiledPolicy
 from stonefold_core.connector import ConnectorRegistry
 from stonefold_core.digest import DIGEST_MISMATCH, pinned_connector_mismatch
-from stonefold_core.enums import Decision, FeedbackLevel, Kind, Outcome
+from stonefold_core.enums import (
+    Decision,
+    EnforcementMode,
+    FeedbackLevel,
+    Kind,
+    Outcome,
+)
 from stonefold_core.failure import Unavailable, guard, should_fail_closed
 from stonefold_core.freshness import FreshnessConfig
 from stonefold_core.gating import ApprovalSpec, GateEngine, ReleaseContract, RequestEnv
 from stonefold_core.kill import KillStore, KillTarget
 from stonefold_core.models import (
     Actor,
+    Advice,
+    AuditRecord,
     BatchResult,
     EvalResult,
     GateResult,
@@ -73,6 +81,102 @@ from stonefold_core.scope import ScopePredicate, ScopeResolver
 # (every operation gets its own audit record; the batch refusal is
 # visible on each).
 BATCH_REFUSED = "batch-refused"
+
+# The rule an advisory allow presents to the ACTOR. The rule that actually
+# decided is written to the audit record instead (``_AdvisoryAudit``): an actor
+# that learns which rule would have stopped it has learned that nothing will,
+# and the traffic being measured stops being ordinary traffic.
+ADVISORY_RULE = "advisory"
+
+
+def _kill_caused(rule: str) -> bool:
+    """Whether a HALT came from the kill machinery — a matched order or an
+    unreadable kill store.
+
+    Advisory mode never translates these. A kill order is an operator pulling
+    the cord, not a policy verdict, and an unreadable store means the gateway
+    cannot know whether the cord has been pulled; the enforcing pipeline already
+    fails closed there (step 5) and a watch-only deployment keeps that behaviour.
+    It is the single lever an advisory deployment promises to keep, so it
+    outranks transparency.
+    """
+    return rule == "kill-unavailable" or rule.startswith("kill:")
+
+
+def _as_advised(decided: _Decided) -> tuple[_Decided, Advice | None]:
+    """Translate one verdict for a deployment that does not enforce.
+
+    Returns the decision to commit and the advice to record. A refusal becomes
+    an ALLOW carrying no approval and no release contract — so a held action
+    stages nothing, which is the whole point: nobody is going to answer it and
+    the effect has already happened.
+
+    An ALLOW passes through untouched with no advice: the field marks
+    divergence between what the policy said and what the deployment did, not
+    the mode itself (the record's ``enforcement`` says the mode).
+    """
+    if decided.decision is Decision.ALLOW:
+        return decided, None
+    if decided.decision is Decision.HALT and _kill_caused(decided.rule):
+        return decided, None
+    if decided.resolved is None:
+        # An unresolvable name has no connector, so there is nothing to let
+        # through: the gateway cannot forward what it cannot address. This is
+        # the coverage case — the gateway saw an action it could not judge —
+        # and it is recorded as such rather than counted as an advisory allow.
+        return decided, None
+
+    reason_code, retry_class = classify(
+        decided.decision, decided.rule, decided.gate_results
+    )
+    advice = Advice(
+        decision=decided.decision,
+        rule=decided.rule,
+        reason_code=reason_code,
+        retry_class=retry_class,
+    )
+    return (
+        replace(
+            decided,
+            decision=Decision.ALLOW,
+            rule=ADVISORY_RULE,
+            outcome="not_executed",
+            approval=None,
+            releases=(),
+        ),
+        advice,
+    )
+
+
+class _AdvisoryAudit:
+    """Stamps the advisory profile's fields onto every record written through it.
+
+    Wrapping the sink rather than threading the mode through ``_commit`` keeps
+    the commit phase and every terminal path unchanged — advisory is one
+    translation before the commit and one stamp after it, so an advisory
+    deployment and an enforcing one run the same code and compute the same
+    verdicts. That identity is what lets a report claim what enforcement *would*
+    have done; see the TCK's advisory profile.
+
+    ``advice`` is set per operation before its commit (the pipeline is
+    sequential and single-threaded, so a batch's operations each get their own).
+    """
+
+    def __init__(self, inner: AuditSink) -> None:
+        self._inner = inner
+        self.advice: Advice | None = None
+        self.batch_advice: dict[str, Any] | None = None
+
+    def write(self, record: AuditRecord) -> None:
+        update: dict[str, Any] = {"enforcement": EnforcementMode.ADVISORY}
+        if self.advice is not None:
+            update["advised"] = self.advice
+            # spec §11 wants the deciding rule on the record; the actor-facing
+            # result carries ``ADVISORY_RULE`` instead.
+            update["rule"] = self.advice.rule
+        if self.batch_advice is not None:
+            update["batchAdvice"] = self.batch_advice
+        self._inner.write(record.model_copy(update=update))
 
 
 @dataclass(frozen=True)
@@ -122,6 +226,7 @@ def enforce(
     obligations: Mapping[str, ObligationRegistry] | None = None,
     dedupe_window_s: float | None = None,
     agent: str = "unknown",
+    enforcement: EnforcementMode = EnforcementMode.ENFORCED,
 ) -> EvalResult:
     """Evaluate one attempted action to a terminal, audited decision.
 
@@ -143,6 +248,15 @@ def enforce(
     #, so an item-bearing action inside one stays a single unit.
     items_def = _items_declaration(registry, call)
     if items_def is not None:
+        if enforcement is EnforcementMode.ADVISORY:
+            # Per-item advisory is a separate slice (each item carries its own
+            # verdict, so each needs its own advice). Refusing loudly is the
+            # only safe placeholder: silently enforcing under an advisory
+            # deployment would refuse a customer's action that the deployment
+            # promised never to refuse.
+            raise NotImplementedError(
+                "advisory mode does not yet cover item-bearing actions"
+            )
         return _enforce_per_item(
             call, actor, session, items_def=items_def, registry=registry, audit=audit,
             policy=policy, gates=gates, env=env, scopes=scopes, connectors=connectors,
@@ -155,6 +269,12 @@ def enforce(
         env=env, scopes=scopes, connectors=connectors, kill=kill,
         agent_name=agent_name, failure_mode=failure_mode,
     )
+    if enforcement is EnforcementMode.ADVISORY:
+        # The verdict above is computed and recorded exactly as it would be
+        # under enforcement; only what happens next differs.
+        advisory = _AdvisoryAudit(audit)
+        decided, advisory.advice = _as_advised(decided)
+        audit = advisory
     result = _commit(
         decided, actor, session, audit=audit, connectors=connectors,
         outbox=outbox, freshness=freshness, env=env, agent_name=agent_name,
@@ -389,6 +509,7 @@ def enforce_batch(
     obligations: Mapping[str, ObligationRegistry] | None = None,
     dedupe_window_s: float | None = None,
     agent: str = "unknown",
+    enforcement: EnforcementMode = EnforcementMode.ENFORCED,
 ) -> BatchResult:
     """Evaluate a SIF batch atomically (spec §12, §?; SIF §5).
 
@@ -429,6 +550,48 @@ def enforce_batch(
         (i for i, d in enumerate(decided) if d.decision in (Decision.DENY, Decision.HALT)),
         None,
     )
+
+    if enforcement is EnforcementMode.ADVISORY:
+        # A batch is decided atomically, so its advice is a property of the
+        # batch: enforcement would have refused ALL of it at ``failing``, and no
+        # single operation's record can say that. Every operation carries the
+        # batch advice; each also carries its own.
+        kill_halt = next(
+            (
+                d
+                for d in decided
+                if d.decision is Decision.HALT and _kill_caused(d.rule)
+            ),
+            None,
+        )
+        if kill_halt is not None:
+            # The operator's cord is not translated, and a batch is all or
+            # nothing: the kill refuses the whole batch, as it would enforcing.
+            failing = decided.index(kill_halt)
+        else:
+            advisory = _AdvisoryAudit(audit)
+            if failing is not None:
+                advisory.batch_advice = {
+                    "wouldRefuse": True,
+                    "failingIndex": failing,
+                    "decision": decided[failing].decision.value,
+                }
+            advices: list[Advice | None] = []
+            for i, d in enumerate(decided):
+                decided[i], advice = _as_advised(d)
+                advices.append(advice)
+            audit = advisory
+            failing = None
+            # ``advisory.advice`` is set immediately before each operation's
+            # commit below, so every record gets its own operation's verdict.
+            return _commit_batch_advisory(
+                decided, advices, advisory, actor, session,
+                audit=audit, connectors=connectors, outbox=outbox,
+                freshness=freshness, env_of=env_of, agent_name=agent_name,
+                failure_mode=failure_mode, obligations=obligations,
+                dedupe_window_s=dedupe_window_s,
+            )
+
     if failing is not None:
         # Phase 2a — refuse the whole batch: no record/transition
         # applies, no effect stages. Each operation still gets its own audit
@@ -528,6 +691,65 @@ def enforce_batch(
         )
         for i, d in enumerate(decided)
     ]
+    commit_failure = next(
+        (i for i, r in enumerate(results) if r.decision in (Decision.DENY, Decision.HALT)),
+        None,
+    )
+    if commit_failure is not None:
+        return BatchResult(
+            decision=results[commit_failure].decision,
+            failing_index=commit_failure,
+            results=tuple(results),
+        )
+    decision = (
+        Decision.HOLD
+        if any(r.decision is Decision.HOLD for r in results)
+        else Decision.ALLOW
+    )
+    return BatchResult(decision=decision, failing_index=None, results=tuple(results))
+
+
+def _commit_batch_advisory(
+    decided: list[_Decided],
+    advices: list[Advice | None],
+    advisory: _AdvisoryAudit,
+    actor: Actor,
+    session: Session,
+    *,
+    audit: AuditSink,
+    connectors: ConnectorRegistry | None,
+    outbox: OutboxStore | None,
+    freshness: FreshnessConfig | None,
+    env_of: Any,
+    agent_name: str,
+    failure_mode: FailureMode,
+    obligations: Mapping[str, ObligationRegistry] | None,
+    dedupe_window_s: float | None,
+) -> BatchResult:
+    """Commit every operation of an advisory batch, in submission order.
+
+    Nothing refuses the batch — that is the mode. The advice for each operation
+    is set on the sink immediately before its commit, so each record carries the
+    verdict its own operation earned while ``batchAdvice`` carries the batch's.
+
+    A DENY/HALT can still appear here: it comes from the commit phase (a
+    dispatch failure, a lost scope), not from a policy verdict, and it is
+    reported exactly as the enforcing path reports it.
+    """
+    results = []
+    for i, d in enumerate(decided):
+        advisory.advice = advices[i]
+        results.append(
+            _stamp_feedback(
+                _commit(
+                    d, actor, session, audit=audit, connectors=connectors,
+                    outbox=outbox, freshness=freshness, env=env_of(i),
+                    agent_name=agent_name, failure_mode=failure_mode,
+                    obligations=obligations, dedupe_window_s=dedupe_window_s,
+                ),
+                d,
+            )
+        )
     commit_failure = next(
         (i for i, r in enumerate(results) if r.decision in (Decision.DENY, Decision.HALT)),
         None,

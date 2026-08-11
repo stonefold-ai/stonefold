@@ -14,8 +14,10 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from stonefold_core.enums import (
+    Coverage,
     Decision,
     Emission,
+    EnforcementMode,
     Explainability,
     FeedbackLevel,
     Kind,
@@ -240,6 +242,24 @@ class BatchResult(BaseModel):
     results: tuple[EvalResult, ...] = ()
 
 
+class Advice(BaseModel):
+    """The verdict enforcement would have reached, on a run that did not enforce.
+
+    Advisory mode computes the verdict exactly as an enforcing deployment does
+    and then lets the action through; this is the verdict it computed. It exists
+    only on the audit side — it is deliberately absent from ``EvalResult``, so
+    the advice cannot reach the actor down the return path and change what the
+    actor does next. The measurement depends on the traffic being untouched.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    decision: Decision
+    rule: str
+    reason_code: str = ""
+    retry_class: RetryClass | None = None
+
+
 class AuditRecord(BaseModel):
     """One append-only audit record (spec §11).
 
@@ -289,3 +309,20 @@ class AuditRecord(BaseModel):
     # (terminal non-success). ``None`` when nothing was reserved.
     consumption: dict[str, Any] | None = None
     correlationId: str | None = None
+    # advisory profile. ``enforcement`` is required reading for anyone
+    # who uses these records as evidence: an advisory record documents an action
+    # that HAPPENED, whatever ``advised`` says would have stopped it. There is
+    # deliberately no value that could be mistaken for the other — a record
+    # written before the field existed reads ``enforced``, which is what it was.
+    enforcement: EnforcementMode = EnforcementMode.ENFORCED
+    # The verdict enforcement would have reached. ``None`` on an enforced
+    # record, and also on an advisory record that was going to allow anyway —
+    # the field marks divergence, not mode.
+    advised: Advice | None = None
+    # Whether the gateway could judge this action at all (advisory forwards what
+    # it cannot resolve). An ``unjudged`` record is never counted as an allow.
+    coverage: Coverage = Coverage.JUDGED
+    # Set on every operation of a batch that enforcement would have refused
+    # whole: {"wouldRefuse": true, "failingIndex": n}. A batch's atomicity is a
+    # property of the batch, so it cannot be reconstructed from one operation.
+    batchAdvice: dict[str, Any] | None = None
