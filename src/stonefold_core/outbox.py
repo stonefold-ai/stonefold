@@ -25,7 +25,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from dataclasses import replace
 
-from stonefold_core.enums import Decision
+from stonefold_core.enums import Decision, EnforcementMode
 from stonefold_core.gating import ApprovalSpec, ReleaseContract, contract_from_approval
 from stonefold_core.obligation import ObligationClaim
 from stonefold_core.models import (
@@ -98,6 +98,15 @@ class PendingAction(BaseModel):
     # at the dispatch claim, consumed at settle, released on any terminal
     # non-success. ``None`` when no requireMatch gate matched (or consume: none).
     obligation: ObligationClaim | None = None
+    # advisory profile: the mode the action was DECIDED under, carried so the
+    # records this row writes later — settle, dispatch failure, cancellation —
+    # say which deployment produced them. It belongs on the row rather than on
+    # the audit sink because a deployment may run one agent advisory and another
+    # enforcing (D-A8) through the same outbox and the same sink: a settle is
+    # advisory because the ACTION was, not because of how logging was wired.
+    # Rows staged before the field existed read ``enforced``, which is what they
+    # were.
+    enforcement: EnforcementMode = EnforcementMode.ENFORCED
     result: dict[str, Any] | None = None  # connector result on settle
     reason: str | None = None  # why cancelled/failed
     # Decision TTL (v0.2): the staging-time expiry. A row claimed at or
@@ -300,6 +309,9 @@ def cancellation_record(row: PendingAction, reason: str) -> AuditRecord:
         resolved=row.resolved,
         result=result,
         outcome="cancelled",
+        # the row remembers the mode it was decided under; a cancellation is
+        # part of that action's story, not of the sweeper's deployment.
+        enforcement=row.enforcement,
         approval=releases_audit(row, "cancelled"),
         # a cancelled row's reservation is released — the
         # worker's reconcile sweep guarantees it (idempotent), so the settle
@@ -331,6 +343,7 @@ class OutboxStore(Protocol):
         expires_at: datetime | None = None,
         staged_at: datetime | None = None,
         obligation: ObligationClaim | None = None,
+        enforcement: EnforcementMode = EnforcementMode.ENFORCED,
     ) -> PendingAction:
         """Persist a new staged row and return it (with generated id + key).
 

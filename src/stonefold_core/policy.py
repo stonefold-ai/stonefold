@@ -19,7 +19,7 @@ from typing import Any, Union
 from pydantic import BaseModel, ConfigDict, Field
 from typing_extensions import Literal
 
-from stonefold_core.enums import Kind
+from stonefold_core.enums import EnforcementMode, Kind
 
 # A target under a kind: '*' | [resources-or-actions] | {Resource: [actions]}.
 Targets = Union[Literal["*"], list[str], dict[str, list[str]]]
@@ -45,6 +45,18 @@ class Defaults(BaseModel):
     failureMode: FailureMode = FailureMode.CLOSED
     audit: AuditLevel | None = None
     killable: bool | None = None
+    # advisory profile. Policy-wide by design: an agent's policy is
+    # advisory or enforcing, whole. A document that enforced some of its rules
+    # and advised on others would not produce a counterfactual — the enforced
+    # refusals change what the actor does next, and the record could no longer
+    # say what the traffic looks like unobserved.
+    #
+    # This is one of TWO keys. Declaring it here makes the mode reviewable,
+    # versioned and lintable with the rest of the policy, but it does NOT take
+    # effect on its own: the deployment must also permit advisory for this agent
+    # (see ``load_policy``). A single field in a policy file that silently turns
+    # enforcement off would be a bypass wearing the product's own clothes.
+    enforcement: EnforcementMode = EnforcementMode.ENFORCED
 
 
 class Standing(BaseModel):
@@ -87,3 +99,17 @@ class Policy(BaseModel):
     @property
     def effective_audit(self) -> AuditLevel:
         return self.audit or self.defaults.audit or AuditLevel.FULL
+
+    @property
+    def effective_enforcement(self) -> EnforcementMode:
+        """What this policy asks the deployment to do with its verdicts.
+
+        Enforcing unless the document says otherwise — the safe reading of
+        silence, and the reading every policy written before the advisory
+        profile existed keeps.
+        """
+        return self.defaults.enforcement
+
+    @property
+    def is_advisory(self) -> bool:
+        return self.defaults.enforcement is EnforcementMode.ADVISORY

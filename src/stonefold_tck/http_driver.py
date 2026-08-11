@@ -225,6 +225,12 @@ class HttpDriver:
                 outcome=str(r.get("outcome", "")),
                 reason=str(r.get("reason") or ""),
                 reason_code=str(r.get("reasonCode") or ""),
+                enforcement=str(r.get("enforcement") or "enforced"),
+                advised_decision=str(r.get("advisedDecision") or ""),
+                advised_rule=str(r.get("advisedRule") or ""),
+                coverage=str(r.get("coverage") or "judged"),
+                scope_would_remove=r.get("scopeWouldRemove"),
+                item_advice=r.get("itemAdvice"),
             )
             for r in body.get("records", [])
         ]

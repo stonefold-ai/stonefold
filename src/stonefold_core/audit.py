@@ -12,9 +12,10 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Protocol
 
-from stonefold_core.enums import Decision
+from stonefold_core.enums import Coverage, Decision, EnforcementMode
 from stonefold_core.models import (
     Actor,
+    Advice,
     AuditRecord,
     EvalResult,
     GateResult,
@@ -101,12 +102,23 @@ def build_record(
     approval: dict[str, Any] | None = None,
     result_refs: list[str] | None = None,
     consumption: dict[str, Any] | None = None,
+    enforcement: EnforcementMode = EnforcementMode.ENFORCED,
+    advised: Advice | None = None,
+    coverage: Coverage = Coverage.JUDGED,
+    batch_advice: dict[str, Any] | None = None,
+    scope_would_remove: dict[str, Any] | None = None,
+    record_rule: str | None = None,
 ) -> AuditRecord:
     """Assemble an ``AuditRecord`` from a terminal evaluation.
 
     ``id``/``timestamp`` are generated here (the only non-determinism in the
     audit layer — it sits *outside* ``enforce``'s deterministic decision logic,
     which is what invariant 1 protects).
+
+    ``record_rule`` overrides the rule written to the record. It exists for the
+    advisory profile, where the actor-facing result must not name the rule that
+    would have stopped it but spec §11's "recorded with the deciding rule/gate"
+    still applies to the record.
     """
 
     return AuditRecord(
@@ -121,7 +133,7 @@ def build_record(
         scopeApplied=list(result.scope_applied),
         gates=list(result.gates),
         decision=result.decision,
-        rule=result.rule,
+        rule=record_rule if record_rule is not None else result.rule,
         reasonCode=result.reason_code,
         retryClass=result.retry_class,
         approval=approval,
@@ -130,4 +142,9 @@ def build_record(
         obligationRefs=obligation_refs(result.gates),
         consumption=consumption,
         correlationId=session.correlation_id or session.id,
+        enforcement=enforcement,
+        advised=advised,
+        coverage=coverage,
+        batchAdvice=batch_advice,
+        scopeWouldRemove=scope_would_remove,
     )

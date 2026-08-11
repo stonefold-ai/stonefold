@@ -33,6 +33,32 @@ class Decision(str, Enum):
     HALT = "halt"
 
 
+class EnforcementMode(str, Enum):
+    """Whether a decision was acted on or only recorded (advisory profile).
+
+    Not part of the frozen decision vocabulary: the verdict states above are
+    unchanged and every one of them is still reachable. This says what the
+    gateway *did* with the verdict, which is a deployment property, and it is
+    stamped on every audit record so an advisory record can never be mistaken
+    for an enforced one.
+    """
+
+    ENFORCED = "enforced"
+    ADVISORY = "advisory"
+
+
+class Coverage(str, Enum):
+    """Whether the gateway could judge an action it saw.
+
+    Under enforcement an unjudgeable action is simply denied, so the question
+    never arises. An advisory deployment forwards what it cannot resolve, and
+    then the honest report distinguishes "allowed" from "never judged".
+    """
+
+    JUDGED = "judged"
+    UNJUDGED = "unjudged"
+
+
 class Outcome(str, Enum):
     """A single gate's result (spec §7, design §2). A gate that needs a human
     returns ``HOLD``; a policy failure is ``FAIL``. A *raised* exception is a

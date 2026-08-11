@@ -306,7 +306,12 @@ class ReferenceDriver:
             return LoadResult(ok=False, errors=[str(exc)])
         schema = json.loads(_SCHEMA.read_text(encoding="utf-8"))
         try:
-            policy = load_policy(yaml.safe_load(policy_yaml), registry, schema=schema)
+            # CAP_ADVISORY: this deployment permits advisory, which is the
+            # profile's second key. A policy declaring it still has to ask.
+            policy = load_policy(
+                yaml.safe_load(policy_yaml), registry, schema=schema,
+                advisory_permitted=True,
+            )
         except PolicyError as exc:
             return LoadResult(
                 ok=False,
@@ -592,6 +597,12 @@ class ReferenceDriver:
                 outcome=r.outcome,
                 reason=r.rule or "",
                 reason_code=r.reasonCode or "",
+                enforcement=r.enforcement.value,
+                advised_decision=r.advised.decision.value if r.advised else "",
+                advised_rule=r.advised.rule if r.advised else "",
+                coverage=r.coverage.value,
+                scope_would_remove=r.scopeWouldRemove,
+                item_advice=r.itemAdvice,
             )
             for r in self._audit.records
         ]

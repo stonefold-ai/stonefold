@@ -21,7 +21,7 @@ from typing import Any, Protocol
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from stonefold_core.enums import Decision
+from stonefold_core.enums import Coverage, Decision, EnforcementMode
 from stonefold_core.models import AuditRecord
 from stonefold_core.outbox import (
     ApprovalError,
@@ -70,6 +70,59 @@ def reason_code_stats(records: list[AuditRecord]) -> list[dict[str, Any]]:
     return out
 
 
+def advisory_stats(
+    records: list[AuditRecord],
+    *,
+    declared: EnforcementMode | None = None,
+) -> dict[str, Any]:
+    """The advisory profile's live surface: counts, and nothing else.
+
+    Enough to see the instrument is alive; not enough to act on a single
+    verdict mid-measurement. Per-action detail is the report's job, at the end
+    — a customer who starts enforcing by hand on today's advice is enforcing
+    out-of-band, with none of it recorded, which is the failure this whole
+    product describes.
+
+    ``declared`` is the gateway's configured mode, which is what ``mode``
+    reports: an advisory deployment is advisory before its first request, not
+    once traffic proves it. Record-derived only as a fallback for callers that
+    have records and no gateway (report tooling over an exported audit).
+    """
+    advisory = [r for r in records if r.enforcement is EnforcementMode.ADVISORY]
+    # Judged records only: an unjudged record can carry ``advised`` too (the
+    # fail-closed reflex enforcement would have had), and counting that reflex
+    # as a would-deny overstates the one number the report leads with. An
+    # unjudged action appears in ``unjudged`` and nowhere else.
+    judged = [r for r in advisory if r.coverage is Coverage.JUDGED]
+    would_deny = sum(
+        1 for r in judged if r.advised is not None and r.advised.decision is Decision.DENY
+    )
+    would_hold = sum(
+        1 for r in judged if r.advised is not None and r.advised.decision is Decision.HOLD
+    )
+    if declared is not None:
+        mode = declared.value
+    else:
+        mode = (
+            EnforcementMode.ADVISORY.value
+            if advisory
+            else EnforcementMode.ENFORCED.value
+        )
+    return {
+        "mode": mode,
+        "judged": len(judged),
+        "unjudged": sum(1 for r in advisory if r.coverage is Coverage.UNJUDGED),
+        "wouldDeny": would_deny,
+        "wouldHold": would_hold,
+        # An estate running both is a reporting hazard: no figure may be
+        # averaged across the two, so the surface says plainly that it happened.
+        "enforcedRecords": sum(
+            1 for r in records if r.enforcement is EnforcementMode.ENFORCED
+        ),
+        "advisoryRecords": len(advisory),
+    }
+
+
 class ApproverBody(BaseModel):
     approver: str
     # v0.3: target one release contract by its gate key (e.g.
@@ -77,7 +130,12 @@ class ApproverBody(BaseModel):
     gate: str | None = None
 
 
-def create_admin_router(*, audit: ReplayableAudit, outbox: OutboxStore) -> APIRouter:
+def create_admin_router(
+    *,
+    audit: ReplayableAudit,
+    outbox: OutboxStore,
+    enforcement: EnforcementMode | None = None,
+) -> APIRouter:
     router = APIRouter(prefix="/admin", tags=["admin"])
 
     @router.get("/trace/{correlation_id}")
@@ -92,6 +150,10 @@ def create_admin_router(*, audit: ReplayableAudit, outbox: OutboxStore) -> APIRo
     @router.get("/reason-codes")
     def reason_codes() -> list[dict[str, Any]]:
         return reason_code_stats(audit.all_records())
+
+    @router.get("/enforcement")
+    def enforcement_route() -> dict[str, Any]:
+        return advisory_stats(audit.all_records(), declared=enforcement)
 
     @router.post("/approvals/{action_id}/approve")
     def approve(action_id: str, body: ApproverBody) -> dict[str, Any]:

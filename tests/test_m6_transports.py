@@ -9,6 +9,7 @@ endpoint fails the startup coverage check.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 import pytest
@@ -25,7 +26,11 @@ from stonefold_core import (
 )
 from stonefold_connectors import InMemoryConnector
 from stonefold_gates.engine import DefaultGateEngine
+from stonefold_core.enums import Coverage, EnforcementMode
+from stonefold_core.pipeline import ADVISORY_RULE
 from stonefold_gateway.transport import (
+    UNMAPPED_TOOL,
+    UPSTREAM_UNAVAILABLE,
     CoverageError,
     Gateway,
     MCPProxy,
@@ -161,3 +166,177 @@ def test_coverage_check_passes_when_all_route_through_gateway() -> None:
         ["https://gw.internal", "https://gw.internal"],
         gateway_endpoint="https://gw.internal",
     )
+
+
+# --- the coverage half: what an advisory deployment cannot judge ----------
+# Under enforcement an unmapped tool is denied and the architecture is done.
+# An advisory deployment refuses nothing but a kill order, so the same tool is
+# forwarded to the endpoint it was going to and recorded as never judged — the
+# part of the report that says how much of the estate a policy could see.
+_ADVISORY_DOC: dict[str, Any] = {
+    "agent": "support",
+    "allow": [{"effect": ["sendEmail"]}],
+    "defaults": {"enforcement": "advisory"},
+}
+
+
+def _advisory_gateway(audit: InMemoryAuditSink) -> Gateway:
+    reg = full_registry()
+    policy = load_policy(
+        _ADVISORY_DOC, reg, schema=load_schema(), advisory_permitted=True
+    )
+    return Gateway(
+        registry=reg, audit=audit, policy=policy, gates=DefaultGateEngine(reg),
+        outbox=InMemoryOutboxStore(audit=audit),
+        connectors=Connectors({"email": InMemoryConnector(), "sql": InMemoryConnector(),
+                               "in_memory": InMemoryConnector()}),
+    )
+
+
+class _RecordingUpstream:
+    """The tool endpoint the proxy sits in front of."""
+
+    def __init__(self, fail: bool = False) -> None:
+        self.calls: list[tuple[str, dict[str, Any]]] = []
+        self._fail = fail
+
+    def __call__(self, tool: str, args: Mapping[str, Any]) -> Any:
+        self.calls.append((tool, dict(args)))
+        if self._fail:
+            raise RuntimeError("the real MCP server is down")
+        return {"rows": 1}
+
+
+def test_advisory_forwards_an_unmapped_tool_and_records_it_unjudged() -> None:
+    audit = InMemoryAuditSink()
+    upstream = _RecordingUpstream()
+    proxy = MCPProxy(
+        _advisory_gateway(audit),
+        [ToolMapping(tool="send_mail", resource="Email", action="sendEmail")],
+        upstream=upstream,
+    )
+
+    result = proxy.call_tool(
+        "run_sql", {"q": "select 1"}, actor=ALICE, session=SESSION
+    )
+
+    # it reached the endpoint it was going to, and the agent got its answer
+    assert upstream.calls == [("run_sql", {"q": "select 1"})]
+    assert result.decision is Decision.ALLOW
+    assert result.output == {"rows": 1}
+
+    record = audit.records[-1]
+    assert record.enforcement is EnforcementMode.ADVISORY
+    assert record.coverage is Coverage.UNJUDGED  # never counted as an allow
+    assert record.resource == "run_sql"
+    assert record.outcome == "success"  # it happened
+    # what an enforcing deployment would have done, kept as the reflex it is
+    assert record.advised is not None
+    assert record.advised.decision is Decision.DENY
+    assert record.advised.rule == UNMAPPED_TOOL
+    assert record.rule == UNMAPPED_TOOL  # spec §11: the deciding rule
+
+
+def test_the_agent_is_not_told_its_tool_went_unjudged() -> None:
+    """An agent that learns which of its tools are ungoverned is no longer
+    producing the traffic being measured."""
+    audit = InMemoryAuditSink()
+    proxy = MCPProxy(
+        _advisory_gateway(audit),
+        [ToolMapping(tool="send_mail", resource="Email", action="sendEmail")],
+        upstream=_RecordingUpstream(),
+    )
+
+    result = proxy.call_tool("run_sql", {"q": "select 1"}, actor=ALICE, session=SESSION)
+
+    assert result.rule == ADVISORY_RULE
+    assert UNMAPPED_TOOL not in str(result.rule)
+    assert result.reason_code == ""
+    assert not hasattr(result, "coverage")
+
+
+def test_a_forward_that_fails_is_the_estates_outage_not_a_verdict() -> None:
+    """D-A3: where the failure is what prevents the action, the action fails —
+    the caller sees what it would have seen without us, and the record says the
+    gateway never judged it."""
+    audit = InMemoryAuditSink()
+    proxy = MCPProxy(
+        _advisory_gateway(audit),
+        [ToolMapping(tool="send_mail", resource="Email", action="sendEmail")],
+        upstream=_RecordingUpstream(fail=True),
+    )
+
+    with pytest.raises(RuntimeError):
+        proxy.call_tool("run_sql", {"q": "select 1"}, actor=ALICE, session=SESSION)
+
+    record = audit.records[-1]
+    assert record.enforcement is EnforcementMode.ADVISORY
+    assert record.coverage is Coverage.UNJUDGED
+    assert record.decision is Decision.DENY  # it did not happen
+    assert record.rule == UPSTREAM_UNAVAILABLE
+    assert record.reasonCode == UPSTREAM_UNAVAILABLE  # the failure's own code
+    assert record.outcome == "failure"
+    # ...while the would-have refusal keeps the code it classified.
+    assert record.advised is not None and record.advised.rule == UNMAPPED_TOOL
+
+
+def test_advisory_without_a_forwarder_still_refuses_and_says_so() -> None:
+    """§5's other half: the gateway cannot let through what it cannot address,
+    so the action fails — and the record still carries the mode."""
+    audit = InMemoryAuditSink()
+    proxy = MCPProxy(
+        _advisory_gateway(audit),
+        [ToolMapping(tool="send_mail", resource="Email", action="sendEmail")],
+    )
+
+    result = proxy.call_tool("run_sql", {"q": "select 1"}, actor=ALICE, session=SESSION)
+
+    assert result.decision is Decision.DENY
+    record = audit.records[-1]
+    assert record.enforcement is EnforcementMode.ADVISORY
+    assert record.coverage is Coverage.UNJUDGED
+    assert record.advised is None  # nothing diverged: it was refused for real
+
+
+def test_a_forwarder_on_an_enforcing_gateway_fails_startup() -> None:
+    """The bypass must not be sitting in the configuration when the pilot
+    converts — that is exactly when nobody re-reads the proxy's arguments."""
+    audit = InMemoryAuditSink()
+    gw = _gateway({"agent": "support", "allow": [{"effect": ["sendEmail"]}]}, audit)
+
+    with pytest.raises(CoverageError):
+        MCPProxy(
+            gw,
+            [ToolMapping(tool="send_mail", resource="Email", action="sendEmail")],
+            upstream=_RecordingUpstream(),
+        )
+
+
+def test_an_enforcing_gateway_refuses_to_forward_even_if_asked() -> None:
+    """The check lives in the class that owns the mode, not only in the caller
+    that knows about it today."""
+    audit = InMemoryAuditSink()
+    gw = _gateway({"agent": "support", "allow": [{"effect": ["sendEmail"]}]}, audit)
+    upstream = _RecordingUpstream()
+
+    with pytest.raises(CoverageError):
+        gw.forward_unjudged(
+            tool="run_sql", args={"q": "select 1"}, actor=ALICE, session=SESSION,
+            upstream=upstream,
+        )
+    assert upstream.calls == []  # nothing reached the endpoint
+    assert audit.records == []
+
+
+def test_an_enforcing_unmapped_refusal_is_still_marked_unjudged() -> None:
+    """Coverage is about whether the gateway could judge the call, not about the
+    mode: a structural refusal never judged anything in either deployment."""
+    audit = InMemoryAuditSink()
+    gw = _gateway({"agent": "support", "allow": [{"effect": ["sendEmail"]}]}, audit)
+    proxy = MCPProxy(gw, [ToolMapping(tool="send_mail", resource="Email", action="sendEmail")])
+
+    proxy.call_tool("run_sql", {"q": "select 1"}, actor=ALICE, session=SESSION)
+
+    record = audit.records[-1]
+    assert record.enforcement is EnforcementMode.ENFORCED
+    assert record.coverage is Coverage.UNJUDGED

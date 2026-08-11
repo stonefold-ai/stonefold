@@ -149,12 +149,30 @@ def _all_action_names(registry: InMemoryRegistry) -> set[str]:
 # --------------------------------------------------------------------------
 # the checks
 # --------------------------------------------------------------------------
+def _check_advisory_declared(policy: Policy, report: LintReport) -> None:
+    """A policy that declares advisory enforcement says so in every lint report.
+
+    Not an error — advisory is a legitimate deployment posture, and the
+    deployment key is what actually permits it. But a reader of this policy must
+    never have to infer that none of its gates will stop anything: every rule
+    below is a measurement, not a control.
+    """
+    if policy.is_advisory:
+        report.add(
+            "advisory",
+            Severity.WARN,
+            f"agent {policy.agent!r}: defaults.enforcement is 'advisory' — "
+            "every verdict below is recorded and none is enforced",
+        )
+
+
 def lint(policy: Policy, registry: InMemoryRegistry) -> LintReport:
     report = LintReport()
     resources = registry.file.resources
     known_resources = set(resources)
     known_actions = _all_action_names(registry)
 
+    _check_advisory_declared(policy, report)
     _check_names_exist(policy, registry, known_resources, known_actions, report)
     _check_overlap(policy, report)
     _check_transition_from_states(policy, registry, report)

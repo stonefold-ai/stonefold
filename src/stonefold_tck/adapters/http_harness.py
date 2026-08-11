@@ -157,6 +157,18 @@ def create_tck_harness(driver: ConformanceDriver, *, implementation: str) -> Fas
                     "outcome": r.outcome,
                     "reason": r.reason,
                     "reasonCode": r.reason_code,
+                    # v0.4 advisory profile: the wire binding certifies the
+                    # same checks as the in-process one, so the record's mode,
+                    # its counterfactual and its coverage have to survive the
+                    # hop. A field dropped here would read as a conforming
+                    # gateway that quietly stopped saying which deployment its
+                    # evidence came from.
+                    "enforcement": r.enforcement,
+                    "advisedDecision": r.advised_decision,
+                    "advisedRule": r.advised_rule,
+                    "coverage": r.coverage,
+                    "scopeWouldRemove": r.scope_would_remove,
+                    "itemAdvice": r.item_advice,
                 }
                 for r in driver.audit()
             ]

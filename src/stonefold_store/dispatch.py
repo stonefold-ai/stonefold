@@ -36,10 +36,17 @@ from stonefold_core.connector import (
     TransactionalDispatch,
     scope_capability_of,
 )
-from stonefold_core.enums import Decision, Reversibility
+from stonefold_core.enums import Coverage, Decision, EnforcementMode, Reversibility
 from stonefold_core.freshness import STALE_DECISION, DispatchRevalidator, stale_guard_reason
 from stonefold_core.kill import KillStore, KillTarget
-from stonefold_core.models import AuditRecord, EvalResult, RawCall, ResolvedAction, Session
+from stonefold_core.models import (
+    Advice,
+    AuditRecord,
+    EvalResult,
+    RawCall,
+    ResolvedAction,
+    Session,
+)
 from stonefold_core.obligation import ConsumeOutcome, ObligationRegistry
 from stonefold_core.outbox import (
     KillCheck,
@@ -69,6 +76,19 @@ def _result_refs_of(result: ConnectorResult) -> list[str]:
     if receipt is not None and receipt.get("id") is not None:
         return [str(receipt["id"])]
     return []
+
+
+def _scope_advice(rule: str) -> Advice:
+    """The verdict a dispatch-time scope check reached, as advice rather than a
+    refusal (D-A4). ``*-unavailable`` is a fail-closed reflex rather than a
+    judgement about the effect, which is what the record's coverage says."""
+    from stonefold_core.reasons import classify
+
+    reason_code, retry_class = classify(Decision.DENY, rule, ())
+    return Advice(
+        decision=Decision.DENY, rule=rule,
+        reason_code=reason_code, retry_class=retry_class,
+    )
 
 
 class DispatchWorker:
@@ -304,8 +324,27 @@ class DispatchWorker:
         if self._scopes is not None:
             scope = self._scopes.scope_for(claimed.resolved.resource)
         scope_trace: tuple[str, ...] = ()
+        scope_advice: Advice | None = None
+        scope_coverage: Coverage = Coverage.JUDGED
         txn: TransactionalDispatch | None = None
-        if scope is not None:
+        if scope is not None and claimed.enforcement is EnforcementMode.ADVISORY:
+            # D-A4 at the dispatch boundary. Re-asserting scope here is a
+            # CONTROL, not execution machinery: it narrows the effect, or stops
+            # it outright as scope-lost. Either would be an advisory deployment
+            # preventing a customer's effect — the one thing it promised not to
+            # do, discovered late because this refusal is written by the worker
+            # rather than the pipeline. So the check runs for its verdict, the
+            # effect dispatches unscoped, and the settle record carries what
+            # enforcement would have done.
+            #
+            # Branching on the mode is right HERE and wrong in ``_commit``: this
+            # is after the verdict, so there is no two-modes-compute-the-same-
+            # thing property left to protect, and the alternative is an advisory
+            # deployment that enforces at the last possible moment.
+            scope_advice, scope_coverage = self._measure_dispatch_scope(
+                claimed, connector, scope
+            )
+        elif scope is not None:
             cap = scope_capability_of(connector)
             scope_trace = (f"{claimed.resolved.resource}:{scope.name}", cap.audit_note())
             if cap.reassertion is ScopeReassertion.TRANSACTIONAL:
@@ -381,9 +420,50 @@ class DispatchWorker:
             audit=self._audit_record(
                 claimed, Decision.ALLOW, "success", result_refs=_result_refs_of(result),
                 scope_applied=scope_trace, consumption=consumption,
+                advised=scope_advice, coverage=scope_coverage,
             ),
         )
         return True
+
+    def _measure_dispatch_scope(
+        self, row: PendingAction, connector: Any, scope: ScopePredicate
+    ) -> tuple[Advice | None, Coverage]:
+        """Run the dispatch-time scope check for its VERDICT only (D-A4).
+
+        Returns what an enforcing deployment would have done to this effect
+        (``None`` where scope would have let it through) and whether the
+        gateway could judge it at all. Nothing here refuses, narrows, or
+        raises: the effect dispatches unscoped either way, and the settle
+        record carries the answer.
+
+        Both connector classes are measured by re-resolving the target under
+        the predicate — a read, not a narrowing. For a window connector that is
+        exactly what enforcement does. For a transactional one enforcement
+        would instead carry the predicate into the effect's transaction, where
+        a target the predicate does not select is the ``ScopeLostError`` that
+        refuses the row; asking the same question with the same predicate
+        answers it without touching the estate.
+        """
+        cap = scope_capability_of(connector)
+        transactional = cap.reassertion is ScopeReassertion.TRANSACTIONAL
+        if transactional and not isinstance(connector, TransactionalDispatch):
+            # declared transactional and unable to carry the predicate: this
+            # deployment's enforcing twin refuses every such row, and knows it
+            # without asking the estate anything.
+            return _scope_advice("scope-unavailable"), Coverage.JUDGED
+        try:
+            target = connector.fetch_target(row.resolved, scope, row.actor)
+        except Exception:
+            if transactional:
+                # enforcement would not have asked this question at all, so its
+                # failure says nothing about what enforcement would have done.
+                # Unjudged is the honest answer, not a would-have-refused.
+                return None, Coverage.UNJUDGED
+            # a window connector's enforcing twin fails closed here
+            return _scope_advice("scope-unavailable"), Coverage.UNJUDGED
+        if target is not None:
+            return None, Coverage.JUDGED
+        return _scope_advice(SCOPE_LOST), Coverage.JUDGED
 
     def _settle_scope_failure(
         self, row: PendingAction, reason: str, scope_trace: tuple[str, ...]
@@ -463,6 +543,8 @@ class DispatchWorker:
         *, result_refs: list[str] | None = None, rule: str = "dispatch",
         scope_applied: tuple[str, ...] = (),
         consumption: dict[str, Any] | None = None,
+        advised: Advice | None = None,
+        coverage: Coverage = Coverage.JUDGED,
     ) -> AuditRecord:
         # a terminally non-successful settle of a row holding a
         # reservation records the lifecycle outcome — the release itself is
@@ -488,6 +570,18 @@ class DispatchWorker:
             result=result,
             outcome=outcome,
             result_refs=result_refs,
+            # The row remembers the mode its action was decided under, so the
+            # second half of a staged effect's story cannot read as enforced
+            # traffic from a deployment that enforces nothing. A worker serving
+            # a mixed estate (D-A8) settles rows of both kinds.
+            enforcement=row.enforcement,
+            # D-A4: what the dispatch-time scope check would have done, on an
+            # effect that dispatched anyway. A ``*-unavailable`` verdict is a
+            # fail-closed reflex rather than a judgement of this effect, so the
+            # record says the gateway could not judge it — the same rule the
+            # decide phase follows.
+            advised=advised,
+            coverage=coverage,
             # I7: the settle record carries who released which contract.
             approval=releases_audit(row, "released"),
             consumption=consumption,
