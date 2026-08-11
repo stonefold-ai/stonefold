@@ -88,6 +88,14 @@ CAP_PER_ITEM = "per-item"
 # codes SOURCE_STALE / SOURCE_UNDATED / SOURCE_UNAVAILABLE are normative for
 # drivers claiming this, in the returned verdict and in the audit record.
 CAP_READS = "reads"
+# v0.4 the advisory profile. A driver claiming this MUST permit a policy
+# declaring ``defaults.enforcement: advisory`` to load AND take effect — the
+# deployment half of the profile's two keys, which is why the capability means
+# "this deployment permits advisory", not merely "this policy asked for it". A
+# driver claiming it MUST also populate ``AuditEntry.enforcement`` on every
+# record and ``advised_*``/``coverage`` where the profile requires them; the
+# checks assert on the RECORD, because the record is the deliverable.
+CAP_ADVISORY = "advisory"
 
 ALL_CAPABILITIES = frozenset(
     {
@@ -108,6 +116,7 @@ ALL_CAPABILITIES = frozenset(
         CAP_CLOSURE,
         CAP_PER_ITEM,
         CAP_READS,
+        CAP_ADVISORY,
     }
 )
 
@@ -187,6 +196,23 @@ class AuditEntry:
     # DISPOSITION_REQUIRED / CLOSED_WITHOUT_THE_WORK — MUST populate it, so the
     # kit can assert that the *record* says why, not only the returned verdict.
     reason_code: str = ""
+    # v0.4 advisory profile. ``enforcement`` is "enforced" | "advisory" and is
+    # REQUIRED on every record of a driver claiming CAP_ADVISORY: a record that
+    # could be either is evidence of nothing. ``advised_*`` carry the verdict
+    # enforcement would have reached, empty where the deployment did what the
+    # policy said. ``coverage`` is "judged" | "unjudged" — whether the gateway
+    # could decide the action at all. The default is what a pre-v0.4 record
+    # was: enforced, judged, no divergence.
+    enforcement: str = "enforced"
+    advised_decision: str = ""
+    advised_rule: str = ""
+    coverage: str = "judged"
+    # v0.4, structured advisory detail a single verdict cannot carry:
+    # what scope would have removed from a read the deployment ran unscoped,
+    # and the per-item breakdown of an item-bearing call that applied whole.
+    # ``None`` where the record has neither, which is most records.
+    scope_would_remove: Mapping[str, Any] | None = None
+    item_advice: Mapping[str, Any] | None = None
 
 
 @dataclass(frozen=True)

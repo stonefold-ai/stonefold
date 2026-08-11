@@ -534,3 +534,13 @@ gates:
       onUnavailable: hold
       resolvers: role:tck-resolver
 """
+
+
+# v0.4 advisory profile: the SAME policy, decided the same way, with the
+# deployment doing nothing about the verdicts. The checks run fixtures through
+# both and compare, so the two documents must differ in exactly one line — a
+# second difference would make A-8's identical-verdict claim untestable.
+POLICY_ADVISORY = TCK_POLICY.replace(
+    "defaults: { failureMode: closed, audit: full }",
+    "defaults: { failureMode: closed, audit: full, enforcement: advisory }",
+)

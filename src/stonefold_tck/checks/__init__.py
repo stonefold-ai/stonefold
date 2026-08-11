@@ -32,6 +32,7 @@ PROFILE_CONSUME = "consume"  # v0.3 reservation lifecycle
 PROFILE_CLOSURE = "closure"  # v0.3 the standard closure check
 PROFILE_PER_ITEM = "per-item"  # v0.3 per-item verdicts
 PROFILE_READS = "reads"  # v0.3 what a gate reads, and its freshness
+PROFILE_ADVISORY = "advisory"  # v0.4 decide as if enforcing, refuse nothing
 
 ALL_PROFILES = (
     PROFILE_CORE,
@@ -50,6 +51,7 @@ ALL_PROFILES = (
     PROFILE_CLOSURE,
     PROFILE_PER_ITEM,
     PROFILE_READS,
+    PROFILE_ADVISORY,
 )
 
 
@@ -89,6 +91,7 @@ def check(
 def all_checks() -> tuple[Check, ...]:
     # import for side effects: each module registers its checks
     from stonefold_tck.checks import (  # noqa: F401
+        advisory,
         audit,
         batch,
         closure,
