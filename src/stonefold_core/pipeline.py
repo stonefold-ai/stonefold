@@ -89,6 +89,10 @@ BATCH_REFUSED = "batch-refused"
 # and the traffic being measured stops being ordinary traffic.
 ADVISORY_RULE = "advisory"
 
+# The rule for an item-bearing call whose item count is over its declared
+# ceiling: refused without being evaluated, item by item or at all.
+ITEMS_OVER_CEILING = "items-over-ceiling"
+
 
 def _kill_caused(rule: str) -> bool:
     """Whether a HALT came from the kill machinery — a matched order or an
@@ -182,6 +186,7 @@ class _AdvisoryAudit:
         self._inner = inner
         self.advice: Advice | None = None
         self.batch_advice: dict[str, Any] | None = None
+        self.item_advice: dict[str, Any] | None = None
         self.coverage: Coverage = Coverage.JUDGED
 
     def write(self, record: AuditRecord) -> None:
@@ -196,6 +201,8 @@ class _AdvisoryAudit:
             update["rule"] = self.advice.rule
         if self.batch_advice is not None:
             update["batchAdvice"] = self.batch_advice
+        if self.item_advice is not None:
+            update["itemAdvice"] = self.item_advice
         self._inner.write(record.model_copy(update=update))
 
 
@@ -268,21 +275,12 @@ def enforce(
     #, so an item-bearing action inside one stays a single unit.
     items_def = _items_declaration(registry, call)
     if items_def is not None:
-        if enforcement is EnforcementMode.ADVISORY:
-            # Per-item advisory is a separate slice (each item carries its own
-            # verdict, so each needs its own advice). Refusing loudly is the
-            # only safe placeholder: silently enforcing under an advisory
-            # deployment would refuse a customer's action that the deployment
-            # promised never to refuse.
-            raise NotImplementedError(
-                "advisory mode does not yet cover item-bearing actions"
-            )
         return _enforce_per_item(
             call, actor, session, items_def=items_def, registry=registry, audit=audit,
             policy=policy, gates=gates, env=env, scopes=scopes, connectors=connectors,
             outbox=outbox, kill=kill, freshness=freshness, obligations=obligations,
             dedupe_window_s=dedupe_window_s, agent_name=agent_name,
-            failure_mode=failure_mode,
+            failure_mode=failure_mode, enforcement=enforcement,
         )
     decided = _decide(
         call, actor, session, registry=registry, policy=policy, gates=gates,
@@ -341,6 +339,52 @@ def _item_key(value: Any, declared: Any) -> str:
     return str(value)
 
 
+def _item_advice_entry(name: str, advice: Advice, coverage: Coverage) -> dict[str, Any]:
+    """One item's line in ``itemAdvice``: what enforcement would have done to it."""
+    entry: dict[str, Any] = {
+        "item": name,
+        "decision": advice.decision.value,
+        "rule": advice.rule,
+        "reasonCode": advice.reason_code,
+    }
+    if advice.retry_class is not None:
+        entry["retryClass"] = advice.retry_class.value
+    if coverage is Coverage.UNJUDGED:
+        # this item's verdict was a fail-closed reflex, not a judgement of it
+        entry["coverage"] = coverage.value
+    return entry
+
+
+def _call_advice(
+    entries: Sequence[tuple[str, Advice | None, Coverage]],
+) -> tuple[Advice | None, dict[str, Any] | None]:
+    """The advice for the one record an advised item-bearing call writes.
+
+    Every item is applied, so there is a single record where enforcement would
+    have written one per refusal — and a single ``advised`` cannot hold N
+    verdicts, the same way one operation's record cannot hold a batch's
+    atomicity. So ``advised`` carries what the ACTOR would have been told
+    (``_worst``, exactly as the enforcing envelope reports a partial
+    application), and ``itemAdvice`` carries which items produced it.
+
+    Items enforcement would have applied anyway get no entry: the field marks
+    divergence, item by item, as ``advised`` does for the call. No divergence at
+    all ⇒ both are ``None``, and the record is a plain advisory allow.
+    """
+    divergent = [(name, a, c) for name, a, c in entries if a is not None]
+    if not divergent:
+        return None, None
+    worst = _worst(a.decision for _name, a, _c in divergent)
+    return (
+        next(a for _name, a, _c in divergent if a.decision is worst),
+        {
+            "wouldApply": len(entries) - len(divergent),
+            "wouldRefuse": len(divergent),
+            "items": [_item_advice_entry(n, a, c) for n, a, c in divergent],
+        },
+    )
+
+
 def _worst(decisions: Iterable[Decision]) -> Decision:
     """The call's fate as a whole: ALLOW only if every item was applied.
 
@@ -374,6 +418,7 @@ def _enforce_per_item(
     dedupe_window_s: float | None,
     agent_name: str,
     failure_mode: FailureMode,
+    enforcement: EnforcementMode = EnforcementMode.ENFORCED,
 ) -> EvalResult:
     """Decide an item-bearing action item by item.
 
@@ -390,15 +435,65 @@ def _enforce_per_item(
     * **refused items are each audited on their own**, because each is its own
       decision with its own reason code, and that record is the only place the
       refusal exists.
+
+    Under advisory the fan-out and every verdict are computed identically — the
+    property the report rests on — and then each item's verdict is translated by
+    the §2 seam, so the whole call is applied as one. The refusals that advisory
+    does not translate (an operator's kill, an item the gateway cannot address)
+    still get their own mode-stamped record; the rest are recorded on the applied
+    call's record as ``itemAdvice``. An advised hold stages nothing, which falls
+    out of the translation: it commits as an ALLOW carrying no approval.
     """
+    advisory: _AdvisoryAudit | None = None
+    if enforcement is EnforcementMode.ADVISORY:
+        # One wrapper for the whole call. The pipeline is sequential, so the
+        # advice and coverage set before a write are the ones that write earned.
+        advisory = _AdvisoryAudit(audit)
+        audit = advisory
+
     values = list(call.data[items_def.field])
+    names = [_item_key(value, items_def) for value in values]
     ceiling = getattr(items_def, "maxItems", None)
     if ceiling is not None and len(values) > ceiling:
-        # Refusing on size is honest; quietly evaluating fifty thousand items is
-        # not. One record, one reason, nothing applied.
-        return _terminal(
-            Decision.DENY, "items-over-ceiling", call, None, actor, session, audit,
-            agent_name,
+        if advisory is None:
+            # Refusing on size is honest; quietly evaluating fifty thousand items
+            # is not. One record, one reason, nothing applied.
+            return _terminal(
+                Decision.DENY, ITEMS_OVER_CEILING, call, None, actor, session,
+                audit, agent_name,
+            )
+        # An advisory deployment refuses nothing but a kill order (D-A2), and a
+        # ceiling refusal is not one — a second silent refusal would break the
+        # promise the customer routed their traffic on. So the call goes through
+        # as one unfanned unit. The verdict that unit reaches is NOT the
+        # counterfactual (enforcement would have refused on the ceiling, without
+        # looking), so the ceiling refusal is what ``advised`` carries, and
+        # coverage says the items themselves were never judged.
+        whole = _decide(
+            call, actor, session, registry=registry, policy=policy, gates=gates,
+            env=env, scopes=scopes, connectors=connectors, kill=kill,
+            agent_name=agent_name, failure_mode=failure_mode,
+        )
+        forwarded, _unused, coverage = _as_advised(whole)
+        if forwarded.decision is Decision.ALLOW:
+            reason_code, retry_class = classify(Decision.DENY, ITEMS_OVER_CEILING, ())
+            advisory.advice = Advice(
+                decision=Decision.DENY, rule=ITEMS_OVER_CEILING,
+                reason_code=reason_code, retry_class=retry_class,
+            )
+            advisory.coverage = Coverage.UNJUDGED
+        else:
+            # A kill halt, or a name the gateway cannot address: the refusal
+            # stands, and ``_as_advised`` has already said which coverage it is.
+            advisory.coverage = coverage
+        return _stamp_feedback(
+            _commit(
+                forwarded, actor, session, audit=advisory, connectors=connectors,
+                outbox=outbox, freshness=freshness, env=env, agent_name=agent_name,
+                failure_mode=failure_mode, obligations=obligations,
+                dedupe_window_s=dedupe_window_s,
+            ),
+            forwarded,
         )
 
     decided = [
@@ -415,12 +510,25 @@ def _enforce_per_item(
         for value in values
     ]
 
+    # Advisory translates each item's verdict AFTER every item is decided, so
+    # the decide phase — and therefore the verdicts themselves — is bit-identical
+    # to an enforcing run of the same traffic.
+    advices: list[Advice | None] = [None] * len(decided)
+    coverages: list[Coverage] = [Coverage.JUDGED] * len(decided)
+    if advisory is not None:
+        for i, d in enumerate(decided):
+            decided[i], advices[i], coverages[i] = _as_advised(d)
+
     verdicts: list[ItemVerdict] = []
     applied: list[str] = []
     allowed: list[tuple[int, _Decided]] = []
 
-    for index, (value, d) in enumerate(zip(values, decided)):
-        name = _item_key(value, items_def)
+    for index, d in enumerate(decided):
+        name = names[index]
+        if advisory is not None:
+            # whatever this iteration writes, it is this item's record
+            advisory.advice = advices[index]
+            advisory.coverage = coverages[index]
         if d.decision in (Decision.DENY, Decision.HALT):
             refused = _terminal(
                 d.decision, d.rule, d.call, d.resolved, actor, session, audit,
@@ -455,6 +563,27 @@ def _enforce_per_item(
         # where a gate's *values* differed, that difference is recorded on the
         # items it refused rather than here.
         template = allowed[0][1]
+        if advisory is not None:
+            # Under advisory the subset includes items enforcement would have
+            # refused, and the template's gate results are what the commit acts
+            # on (an obligation reservation, a freshness window). Prefer an item
+            # enforcement would have allowed too, so the merged call commits the
+            # way an enforcing deployment would have committed its applied
+            # subset. All-refused leaves the first item, which is all there is.
+            template = next(
+                (d for i, d in allowed if advices[i] is None), allowed[0][1]
+            )
+            advisory.advice, advisory.item_advice = _call_advice(
+                [(names[i], advices[i], coverages[i]) for i, _ in allowed]
+            )
+            # One unjudged item makes the call's coverage unjudged: the record
+            # covers the whole call, and understating our own reach is the only
+            # safe direction to round. The per-item entries keep which it was.
+            advisory.coverage = (
+                Coverage.UNJUDGED
+                if any(coverages[i] is Coverage.UNJUDGED for i, _ in allowed)
+                else Coverage.JUDGED
+            )
         subset = [values[i] for i, _ in allowed]
         assert template.resolved is not None
         merged_decided = replace(
@@ -485,6 +614,20 @@ def _enforce_per_item(
                     reason_code=merged.reason_code, retry_class=merged.retry_class,
                     ticket=merged.ticket,
                 ) if v.decision is Decision.ALLOW else v
+                for v in verdicts
+            ]
+        elif advisory is not None:
+            # The applied items went through as one call, so they carry the
+            # call's answer — one rule for all of them. Item by item they would
+            # differ (``ADVISORY_RULE`` where a verdict was translated, the
+            # ordinary allow rule where none was), and an actor reading them
+            # side by side would learn exactly which items the policy dislikes:
+            # an enumeration oracle, delivered per call. The call-level
+            # disclosure stands (a translated verdict answers ``advisory``); what
+            # is withheld is WHICH item earned it.
+            verdicts = [
+                v.model_copy(update={"rule": merged.rule})
+                if v.decision is Decision.ALLOW else v
                 for v in verdicts
             ]
 

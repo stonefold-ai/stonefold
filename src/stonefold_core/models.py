@@ -326,3 +326,11 @@ class AuditRecord(BaseModel):
     # whole: {"wouldRefuse": true, "failingIndex": n}. A batch's atomicity is a
     # property of the batch, so it cannot be reconstructed from one operation.
     batchAdvice: dict[str, Any] | None = None
+    # Set on the one record an advised item-bearing call writes:
+    # {"wouldApply": n, "wouldRefuse": m, "items": [...]} — counts, and an entry
+    # per item enforcement would have refused (its decision, rule, reason code).
+    # ``advised`` says what the ACTOR would have been told about the call;
+    # this says which items produced that answer, which the call-level verdict
+    # flattens. (Both counts here; ``batchAdvice``'s ``wouldRefuse`` is a flag —
+    # a batch refuses whole, a set of items does not.)
+    itemAdvice: dict[str, Any] | None = None

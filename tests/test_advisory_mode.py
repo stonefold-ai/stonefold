@@ -26,13 +26,26 @@ from stonefold_core import (
     enforce_batch,
     load_policy,
 )
+from collections.abc import Mapping
+
 from stonefold_core.enums import Coverage, EnforcementMode
-from stonefold_core.pipeline import ADVISORY_RULE
+from stonefold_core.models import ResolvedAction
+from stonefold_core.pipeline import ADVISORY_RULE, ITEMS_OVER_CEILING
+from stonefold_core.registry import load_registry
+from stonefold_core.scope import ScopePredicate, make_scope_resolver
 from stonefold_connectors import InMemoryConnector
 from stonefold_gates.engine import DefaultGateEngine
 from stonefold_store import InMemoryOutboxStore
 from stonefold_store.kill_memory import InMemoryKillStore
 from tests.conftest import full_registry, load_schema
+
+# The item-bearing fixture is the per-item suite's own worklist: same items, same
+# gates, same clinician checks. Sharing it is the point — what differs between
+# that suite and these tests is the mode and nothing else, which is the only way
+# "the verdicts are identical" is worth asserting.
+from tests.test_v03_per_item import ACTOR as WORKLIST_ACTOR
+from tests.test_v03_per_item import RUN as WORKLIST_RUN
+from tests.test_v03_per_item import _mark, _world
 
 
 def _run(
@@ -369,3 +382,254 @@ def test_a_killed_batch_still_stamps_the_mode() -> None:
     for record in audit.records:
         assert record.enforcement is EnforcementMode.ADVISORY
         assert record.advised is None  # the halt happened; nothing is advice
+
+
+# --- item-bearing actions ------------------------------------------------
+# An item-bearing call is where advisory and enforcement look least alike: the
+# enforcing run writes a record per refused item and one for the applied subset,
+# the advisory run applies everything and writes one. The verdicts underneath are
+# still identical, and ``itemAdvice`` is where they survive.
+def _worklist(
+    *items: str,
+    enforcement: EnforcementMode,
+    kill: Any = None,
+    world: dict[str, Any] | None = None,
+) -> Any:
+    world = world if world is not None else _world()
+    result = enforce(
+        _mark(*items), WORKLIST_ACTOR, WORKLIST_RUN, **world,
+        kill=kill, enforcement=enforcement,
+    )
+    return result, world
+
+
+def test_advisory_applies_every_item() -> None:
+    """W-13 needs a clinician and W-15 is ambiguous; under advisory both go
+    through with the rest, because the estate behaves as if we were not there."""
+    result, _ = _worklist(
+        "W-1", "W-13", "W-15", "W-2", enforcement=EnforcementMode.ADVISORY
+    )
+
+    assert result.decision is Decision.ALLOW
+    assert result.applied == ("W-1", "W-13", "W-15", "W-2")
+    assert {v.decision for v in result.items} == {Decision.ALLOW}
+    # No item is distinguishable from the others (TCK A-2, per item): the applied
+    # items went through as one call and answer with the call's rule, so reading
+    # the items side by side does not enumerate the ones the policy dislikes.
+    assert {v.rule for v in result.items} == {result.rule}
+    assert all(v.reason_code == "" and v.ticket is None for v in result.items)
+
+
+def test_an_all_advised_call_does_not_name_the_items_either() -> None:
+    """Every item was refusable, so the call answers ``advisory`` — once, for the
+    call. Which item earned it is in the audit, not in the response."""
+    result, _ = _worklist("W-13", "W-14", enforcement=EnforcementMode.ADVISORY)
+
+    assert result.decision is Decision.ALLOW
+    assert result.rule == ADVISORY_RULE
+    assert {v.rule for v in result.items} == {ADVISORY_RULE}
+
+
+def test_the_applied_call_carries_the_item_breakdown() -> None:
+    """One record for one call — and ``advised`` alone would flatten four
+    verdicts into one, so the items keep their own."""
+    _, world = _worklist(
+        "W-1", "W-13", "W-15", "W-2", enforcement=EnforcementMode.ADVISORY
+    )
+
+    records = world["audit"].records
+    assert len(records) == 1, "every item was applied, so the call is one record"
+    record = records[0]
+    assert record.parameters["itemIds"] == ["W-1", "W-13", "W-15", "W-2"]
+    assert record.enforcement is EnforcementMode.ADVISORY
+    # what the ACTOR would have been told about the call
+    assert record.advised is not None
+    assert record.advised.decision is Decision.DENY
+    # and which items it flattens
+    assert record.itemAdvice is not None
+    assert record.itemAdvice["wouldApply"] == 2
+    assert record.itemAdvice["wouldRefuse"] == 2
+    entries = record.itemAdvice["items"]
+    assert [e["item"] for e in entries] == ["W-13", "W-15"]
+    assert [e["decision"] for e in entries] == ["deny", "hold"]
+    assert [e["reasonCode"] for e in entries] == [
+        "ITEM_NEEDS_CLINICIAN", "ITEM_AMBIGUOUS",
+    ]
+
+
+def test_a_call_no_item_diverges_on_carries_no_item_advice() -> None:
+    """``itemAdvice`` marks divergence, item by item, as ``advised`` does for the
+    call: a clean call is a plain advisory allow."""
+    _, world = _worklist("W-1", "W-2", enforcement=EnforcementMode.ADVISORY)
+
+    record = world["audit"].records[-1]
+    assert record.advised is None
+    assert record.itemAdvice is None
+    assert record.coverage is Coverage.JUDGED
+
+
+def test_an_advised_item_hold_stages_no_ticket() -> None:
+    """D-A5 per item: nobody is going to answer a question about an item that
+    has already gone through."""
+    enforced, enforced_world = _worklist(
+        "W-1", "W-15", enforcement=EnforcementMode.ENFORCED
+    )
+    assert enforced.decision is Decision.HOLD
+    assert enforced_world["outbox"].list_by_state(PendingState.PENDING_APPROVAL)
+
+    result, world = _worklist("W-1", "W-15", enforcement=EnforcementMode.ADVISORY)
+
+    assert result.decision is Decision.ALLOW
+    assert world["outbox"].list_by_state(PendingState.PENDING_APPROVAL) == []
+    assert [v.ticket for v in result.items] == [None, None]
+    # The question is not lost — it is counted, which is what the report needs.
+    assert world["audit"].records[-1].itemAdvice["items"][0]["decision"] == "hold"
+
+
+def test_advisory_and_enforced_item_verdicts_are_identical() -> None:
+    """TCK A-8, per item: same fixture, two modes, the same verdict for every
+    item — including which items would have been applied."""
+    items = ("W-1", "W-13", "W-15", "W-2", "W-14")
+    enforced, _ = _worklist(*items, enforcement=EnforcementMode.ENFORCED)
+    _, world = _worklist(*items, enforcement=EnforcementMode.ADVISORY)
+
+    record = world["audit"].records[-1]
+    assert record.advised is not None
+    assert record.advised.decision is enforced.decision  # the same envelope
+    assert record.itemAdvice is not None
+    assert record.itemAdvice["wouldApply"] == len(enforced.applied)
+
+    advised = {e["item"]: e for e in record.itemAdvice["items"]}
+    refused = {
+        v.item: v for v in enforced.items if v.decision is not Decision.ALLOW
+    }
+    assert advised.keys() == refused.keys()
+    for name, verdict in refused.items():
+        assert advised[name]["decision"] == verdict.decision.value
+        assert advised[name]["rule"] == verdict.rule
+        assert advised[name]["reasonCode"] == verdict.reason_code
+
+
+def test_a_killed_item_still_halts_under_advisory() -> None:
+    """D-A2 reaches the items too: the operator's cord is not a policy verdict,
+    and the records still say which deployment they came from."""
+    kill = InMemoryKillStore()
+    kill.issue(KillScope.for_session(WORKLIST_RUN.id), issued_by="operator")
+
+    result, world = _worklist(
+        "W-1", "W-2", enforcement=EnforcementMode.ADVISORY, kill=kill
+    )
+
+    assert result.decision is Decision.HALT
+    assert result.applied == ()
+    records = world["audit"].records
+    assert len(records) == 2, "each halted item is audited on its own"
+    for record in records:
+        assert record.enforcement is EnforcementMode.ADVISORY
+        assert record.decision is Decision.HALT
+        assert record.advised is None  # the halt happened; nothing is advice
+        assert record.itemAdvice is None
+
+
+def test_a_call_over_the_ceiling_is_forwarded_not_refused() -> None:
+    """A ceiling refusal is not the operator's cord, so advisory does not make
+    it: the call goes through unfanned, and the record says the items were never
+    judged rather than counting them as allowed."""
+    reg = load_registry(
+        {"resources": {"WorklistItem": {"actions": {"markManyReviewed": {
+            "kind": "record",
+            "data": {"itemIds": {"type": "array", "required": True}},
+            "items": {"field": "itemIds", "independent": True, "maxItems": 3},
+        }}}}}
+    )
+    audit = InMemoryAuditSink()
+    result = enforce(
+        _mark("W-1", "W-2", "W-3", "W-4"), WORKLIST_ACTOR, WORKLIST_RUN,
+        registry=reg, audit=audit,
+        policy=load_policy(
+            {"agent": "w", "allow": [{"record": ["markManyReviewed"]}]},
+            reg, schema=load_schema(),
+        ),
+        gates=DefaultGateEngine(reg), outbox=InMemoryOutboxStore(audit=audit),
+        connectors=Connectors({"in_memory": InMemoryConnector()}),
+        enforcement=EnforcementMode.ADVISORY,
+    )
+
+    assert result.decision is Decision.ALLOW
+    record = audit.records[-1]
+    assert record.parameters["itemIds"] == ["W-1", "W-2", "W-3", "W-4"]
+    assert record.enforcement is EnforcementMode.ADVISORY
+    assert record.advised is not None
+    assert record.advised.decision is Decision.DENY
+    assert record.advised.rule == ITEMS_OVER_CEILING
+    # It was refused without being looked at, so nothing about it was judged.
+    assert record.coverage is Coverage.UNJUDGED
+    assert record.itemAdvice is None
+
+
+class _ProbeFailsForOneItem(InMemoryConnector):
+    """Its scope probe cannot reach the store for one payout.
+
+    A dependency failure is a fail-closed reflex, not a judgement of the item —
+    which is what makes the record's coverage the honest half of the report.
+    """
+
+    def fetch_target(
+        self, action: ResolvedAction, scope: ScopePredicate | None, actor: Actor
+    ) -> Mapping[str, Any] | None:
+        if "P-BAD" in (action.data.get("ids") or []):
+            raise RuntimeError("target store unreachable")
+        return {"owner_id": actor.id}
+
+
+_PAYOUT_REGISTRY: dict[str, Any] = {
+    "scopePredicates": ["assignedToCurrentUser"],
+    "resources": {"Payout": {"actions": {"sendMany": {
+        "kind": "effect",
+        "data": {"ids": {"type": "array", "required": True}},
+        "items": {"field": "ids", "independent": True, "maxItems": 10},
+    }}}},
+}
+_PAYOUT_POLICY: dict[str, Any] = {
+    "agent": "payouts",
+    "allow": [{"effect": ["sendMany"]}],
+    "scope": {"Payout": "assignedToCurrentUser"},
+}
+
+
+def _payouts(*ids: str, enforcement: EnforcementMode) -> Any:
+    reg = load_registry(_PAYOUT_REGISTRY)
+    audit = InMemoryAuditSink()
+    policy = load_policy(_PAYOUT_POLICY, reg, schema=load_schema())
+    result = enforce(
+        RawCall(resource="Payout", action="sendMany", data={"ids": list(ids)}),
+        Actor(id="alice"), Session(id="s1"),
+        registry=reg, audit=audit, policy=policy, gates=DefaultGateEngine(reg),
+        scopes=make_scope_resolver(policy),
+        outbox=InMemoryOutboxStore(audit=audit),
+        connectors=Connectors({"in_memory": _ProbeFailsForOneItem()}),
+        enforcement=enforcement,
+    )
+    return result, audit
+
+
+def test_one_unjudged_item_makes_the_whole_call_unjudged() -> None:
+    """The record covers the call, so its coverage is the call's — and rounding
+    against our own reach is the only safe direction. Which item it was survives
+    in the breakdown."""
+    enforced, _ = _payouts("P-1", "P-BAD", "P-2", enforcement=EnforcementMode.ENFORCED)
+    assert enforced.applied == ("P-1", "P-2")  # fail closed: the probe decided nothing
+
+    result, audit = _payouts(
+        "P-1", "P-BAD", "P-2", enforcement=EnforcementMode.ADVISORY
+    )
+
+    assert result.applied == ("P-1", "P-BAD", "P-2")
+    record = audit.records[-1]
+    assert record.coverage is Coverage.UNJUDGED
+    assert record.itemAdvice is not None
+    entry = next(e for e in record.itemAdvice["items"] if e["item"] == "P-BAD")
+    assert entry["rule"] == "scope-unavailable"
+    assert entry["coverage"] == "unjudged"
+    # ...and the items that WERE judged are not tarred with it.
+    assert record.itemAdvice["wouldApply"] == 2
