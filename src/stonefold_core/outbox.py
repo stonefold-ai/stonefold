@@ -138,6 +138,19 @@ def expired_hold_reason(gate: str) -> str:
 def hold_dedupe_key(
     agent: str, resolved: ResolvedAction, gates: tuple[GateResult, ...]
 ) -> tuple[Any, ...] | None:
+    """One agent's hold identity: the question, keyed to who asked it.
+
+    Thin wrapper over :func:`hold_identity` so the live queue and any later
+    reader of the audit compute the same thing from the same code. See there for
+    what the identity is made of and why.
+    """
+    identity = hold_identity(resolved, gates)
+    return None if identity is None else (agent, *identity)
+
+
+def hold_identity(
+    resolved: ResolvedAction, gates: tuple[GateResult, ...]
+) -> tuple[Any, ...] | None:
     """The identity of a hold (sharpened by §?): per holding gate,
     (agent, action, reason code, the gate's EVIDENCE — which carries the
     matched-candidate refs — and the VALUES of the intent fields the gate
@@ -182,7 +195,7 @@ def hold_dedupe_key(
         holds.append((g.gate, g.code, evidence, tuple(compared)))
     if not holds or not any(code for _gate, code, _ev, _cmp in holds):
         return None
-    return (agent, resolved.resource, resolved.action, tuple(holds))
+    return (resolved.resource, resolved.action, tuple(holds))
 
 
 def effective_contracts(row: PendingAction) -> tuple[ReleaseContract, ...]:

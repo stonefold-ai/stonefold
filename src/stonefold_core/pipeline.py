@@ -23,6 +23,7 @@ does not refuse the batch).
 
 from __future__ import annotations
 
+import json
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
@@ -71,6 +72,7 @@ from stonefold_core.outbox import (
     PendingAction,
     PendingState,
     hold_dedupe_key,
+    hold_identity,
 )
 from stonefold_core.policy import FailureMode
 from stonefold_core.reasons import classify
@@ -236,11 +238,21 @@ def _as_advised(
     reason_code, retry_class = classify(
         decided.decision, decided.rule, decided.gate_results
     )
+    # An advised hold stages nothing (D-A5), so this is the ONLY place its
+    # question's identity is ever computed. Stamped from the same function the
+    # live queue collapses on, so a report counting distinct questions and a
+    # running gateway's queue cannot drift apart.
+    identity = (
+        hold_identity(decided.resolved, decided.gate_results)
+        if decided.decision is Decision.HOLD and decided.resolved is not None
+        else None
+    )
     advice = Advice(
         decision=decided.decision,
         rule=decided.rule,
         reason_code=reason_code,
         retry_class=retry_class,
+        dedupe_key=json.dumps(identity, default=str) if identity is not None else None,
     )
     return (
         _unscoped(
@@ -1454,10 +1466,14 @@ def _commit(
             consumption=_consume_claim(inline_claim, obligations),
             # D-A4: the read ran unscoped, so the record carries what the
             # predicate would have taken away. The single most uncomfortable
-            # number in the report, and the most persuasive one.
+            # number in the report, and the most persuasive one. Observe-kind
+            # only: a scoped write returns a receipt, and stamping every one
+            # with "could not count rows" would bury the reads the field is
+            # for under noise that means nothing to a reader.
             scope_would_remove=(
                 _measure_scope(decided.scope_measure, output, actor)
                 if decided.scope_measure is not None
+                and resolved.kind is Kind.OBSERVE
                 else None
             ),
         )

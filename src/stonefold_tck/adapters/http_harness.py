@@ -169,6 +169,7 @@ def create_tck_harness(driver: ConformanceDriver, *, implementation: str) -> Fas
                     "coverage": r.coverage,
                     "scopeWouldRemove": r.scope_would_remove,
                     "itemAdvice": r.item_advice,
+                    "advisedDedupeKey": r.advised_dedupe_key,
                 }
                 for r in driver.audit()
             ]
