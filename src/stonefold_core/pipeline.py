@@ -171,12 +171,18 @@ def _as_advised(decided: _Decided) -> tuple[_Decided, Advice | None, Coverage]:
 class _AdvisoryAudit:
     """Stamps the advisory profile's fields onto every record written through it.
 
-    Wrapping the sink rather than threading the mode through ``_commit`` keeps
-    the commit phase and every terminal path unchanged — advisory is one
-    translation before the commit and one stamp after it, so an advisory
-    deployment and an enforcing one run the same code and compute the same
-    verdicts. That identity is what lets a report claim what enforcement *would*
-    have done; see the TCK's advisory profile.
+    Stamping the sink rather than branching inside ``_commit`` keeps the commit
+    phase and every terminal path unchanged — advisory is one translation before
+    the commit and one stamp after it, so an advisory deployment and an enforcing
+    one run the same code and compute the same verdicts. That identity is what
+    lets a report claim what enforcement *would* have done; see the TCK's
+    advisory profile.
+
+    The commit phase does carry the mode as a *label* (``_commit``'s
+    ``enforcement`` argument), stamped onto the row it stages so the settle and
+    dispatch records written later know which deployment they came from. Nothing
+    there reads it to decide anything, which is what preserves the identity
+    above.
 
     ``advice`` is set per operation before its commit (the pipeline is
     sequential and single-threaded, so a batch's operations each get their own).
@@ -302,7 +308,7 @@ def enforce(
         decided, actor, session, audit=audit, connectors=connectors,
         outbox=outbox, freshness=freshness, env=env, agent_name=agent_name,
         failure_mode=failure_mode, obligations=obligations,
-        dedupe_window_s=dedupe_window_s,
+        dedupe_window_s=dedupe_window_s, enforcement=enforcement,
     )
     return _stamp_feedback(result, decided)
 
@@ -497,6 +503,7 @@ def _enforce_per_item(
                 outbox=outbox, freshness=freshness, env=env, agent_name=agent_name,
                 failure_mode=failure_mode, obligations=obligations,
                 dedupe_window_s=dedupe_window_s,
+                enforcement=EnforcementMode.ADVISORY,
             ),
             forwarded,
         )
@@ -549,7 +556,7 @@ def _enforce_per_item(
                 d, actor, session, audit=audit, connectors=connectors, outbox=outbox,
                 freshness=freshness, env=env, agent_name=agent_name,
                 failure_mode=failure_mode, obligations=obligations,
-                dedupe_window_s=dedupe_window_s,
+                dedupe_window_s=dedupe_window_s, enforcement=enforcement,
             ), d)
             verdicts.append(ItemVerdict(
                 item=name, decision=held.decision, rule=held.rule,
@@ -606,7 +613,7 @@ def _enforce_per_item(
             merged_decided, actor, session, audit=audit, connectors=connectors,
             outbox=outbox, freshness=freshness, env=env, agent_name=agent_name,
             failure_mode=failure_mode, obligations=obligations,
-            dedupe_window_s=dedupe_window_s,
+            dedupe_window_s=dedupe_window_s, enforcement=enforcement,
         ), template)
         if merged.decision is not Decision.ALLOW:
             # The commit phase refused what the decide phase allowed — a
@@ -857,7 +864,7 @@ def enforce_batch(
                 d, actor, session, audit=audit, connectors=connectors, outbox=outbox,
                 freshness=freshness, env=env_of(i), agent_name=agent_name,
                 failure_mode=failure_mode, obligations=obligations,
-                dedupe_window_s=dedupe_window_s,
+                dedupe_window_s=dedupe_window_s, enforcement=enforcement,
             ),
             d,
         )
@@ -922,6 +929,7 @@ def _commit_batch_advisory(
                     outbox=outbox, freshness=freshness, env=env_of(i),
                     agent_name=agent_name, failure_mode=failure_mode,
                     obligations=obligations, dedupe_window_s=dedupe_window_s,
+                    enforcement=EnforcementMode.ADVISORY,
                 ),
                 d,
             )
@@ -1101,8 +1109,16 @@ def _commit(
     failure_mode: FailureMode,
     obligations: Mapping[str, ObligationRegistry] | None = None,
     dedupe_window_s: float | None = None,
+    enforcement: EnforcementMode = EnforcementMode.ENFORCED,
 ) -> EvalResult:
-    """Step 6/7 for one decided operation: stage/execute, then audit (spec §12)."""
+    """Step 6/7 for one decided operation: stage/execute, then audit (spec §12).
+
+    ``enforcement`` is a LABEL, never a branch: it is stamped on the row this
+    step stages so the records that row writes later — settle, dispatch failure,
+    cancellation — say which deployment produced them. Nothing in this function
+    may read it to decide anything, or the two modes stop computing the same
+    thing and the whole counterfactual claim goes with it.
+    """
 
     call, resolved = decided.call, decided.resolved
 
@@ -1183,6 +1199,7 @@ def _commit(
                     expires_at=expires_at,
                     staged_at=env.now if env is not None else None,
                     obligation=claim,
+                    enforcement=enforcement,
                 ),
                 reason="outbox-unavailable",
             )
@@ -1245,6 +1262,7 @@ def _commit(
                     expires_at=effect_expires_at,
                     staged_at=env.now if env is not None else None,
                     obligation=effect_claim,
+                    enforcement=enforcement,
                 ),
                 reason="outbox-unavailable",
             )

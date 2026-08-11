@@ -671,3 +671,88 @@ def test_a_real_commit_failure_keeps_its_own_rule_on_the_record() -> None:
     assert record.advised is not None
     assert record.advised.rule == "default-deny"
     assert record.enforcement is EnforcementMode.ADVISORY
+
+
+# --- the second half of a staged effect's story --------------------------
+def test_a_dispatched_advisory_effect_stamps_its_settle_record_too() -> None:
+    """An effect stages, and the worker settles it later — a second record,
+    written outside the pipeline. Without the mode on the row that record reads
+    as enforced traffic from a deployment that enforces nothing, and the
+    dataset stops being evidence halfway through every effect it contains."""
+    from stonefold_store.dispatch import DispatchWorker
+
+    result, audit, outbox = _run(
+        _ALLOW_DOC,
+        resource="Email",
+        action="sendEmail",
+        enforcement=EnforcementMode.ADVISORY,
+        data={"to": "x@acme.example"},
+    )
+    assert result.decision is Decision.ALLOW
+    assert result.ticket is not None
+    # the row itself remembers what it was decided under
+    row = outbox.get(result.ticket)
+    assert row is not None and row.enforcement is EnforcementMode.ADVISORY
+
+    reg = full_registry()
+    worker = DispatchWorker(
+        outbox,
+        Connectors({"email": InMemoryConnector(), "in_memory": InMemoryConnector(),
+                    "sql": InMemoryConnector()}),
+        registry=reg,
+    )
+    assert worker.drain() == 1
+
+    settle = audit.records[-1]
+    assert settle.rule == "dispatch"  # the worker's record, not the pipeline's
+    assert settle.enforcement is EnforcementMode.ADVISORY
+    # ...and every record of this run agrees about the deployment it came from.
+    assert {r.enforcement for r in audit.records} == {EnforcementMode.ADVISORY}
+
+
+def test_an_enforcing_deployment_settles_enforced() -> None:
+    """The label follows the action, not the wiring: the same worker and the
+    same sink settle an enforcing row as enforced."""
+    from stonefold_store.dispatch import DispatchWorker
+
+    result, audit, outbox = _run(
+        _ALLOW_DOC,
+        resource="Email",
+        action="sendEmail",
+        enforcement=EnforcementMode.ENFORCED,
+        data={"to": "x@acme.example"},
+    )
+    assert result.ticket is not None
+    worker = DispatchWorker(
+        outbox,
+        Connectors({"email": InMemoryConnector(), "in_memory": InMemoryConnector(),
+                    "sql": InMemoryConnector()}),
+        registry=full_registry(),
+    )
+    assert worker.drain() == 1
+    assert {r.enforcement for r in audit.records} == {EnforcementMode.ENFORCED}
+
+
+def test_a_cancelled_advisory_row_is_stamped_as_well() -> None:
+    """The sweeps write records too — a stale decision, an expired hold, a kill
+    inside the claim. Each is part of its action's story, so each carries the
+    mode that action was decided under rather than the sweeper's."""
+    from stonefold_core.outbox import cancellation_record
+
+    reg = full_registry()
+    resolved = reg.resolve(
+        RawCall(resource="Email", action="sendEmail", data={"to": "x@acme.example"})
+    )
+    audit = InMemoryAuditSink()
+    outbox = InMemoryOutboxStore(audit=audit)
+    row = outbox.stage(
+        resolved=resolved, actor=Actor(id="alice"), session_id="s1",
+        agent="support", state=PendingState.PENDING,
+        enforcement=EnforcementMode.ADVISORY,
+    )
+
+    record = cancellation_record(row, "stale-decision")
+
+    assert record.enforcement is EnforcementMode.ADVISORY
+    assert record.outcome == "cancelled"
+    assert record.rule == "stale-decision"

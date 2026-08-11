@@ -488,6 +488,11 @@ class DispatchWorker:
             result=result,
             outcome=outcome,
             result_refs=result_refs,
+            # The row remembers the mode its action was decided under, so the
+            # second half of a staged effect's story cannot read as enforced
+            # traffic from a deployment that enforces nothing. A worker serving
+            # a mixed estate (D-A8) settles rows of both kinds.
+            enforcement=row.enforcement,
             # I7: the settle record carries who released which contract.
             approval=releases_audit(row, "released"),
             consumption=consumption,

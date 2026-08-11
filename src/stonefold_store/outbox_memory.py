@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from stonefold_core.audit import AuditSink
+from stonefold_core.enums import EnforcementMode
 from stonefold_core.gating import ApprovalSpec, ReleaseContract
 from stonefold_core.obligation import ObligationClaim
 from stonefold_core.models import Actor, AuditRecord, Compensation, GateResult, ResolvedAction
@@ -45,6 +46,7 @@ def build_pending(
     releases: tuple[ReleaseContract, ...] = (),
     staged_at: datetime | None = None,
     obligation: ObligationClaim | None = None,
+    enforcement: EnforcementMode = EnforcementMode.ENFORCED,
 ) -> PendingAction:
     """Construct a staged row with generated id + idempotency key. id/clock
     generation lives here (the I/O layer), not in the pure pipeline (invariant
@@ -67,6 +69,7 @@ def build_pending(
         compensation=compensation,
         obligation=obligation,
         expires_at=expires_at,
+        enforcement=enforcement,
         created_at=now,
         updated_at=now,
     )
@@ -96,12 +99,14 @@ class InMemoryOutboxStore:
         expires_at: datetime | None = None,
         staged_at: datetime | None = None,
         obligation: ObligationClaim | None = None,
+        enforcement: EnforcementMode = EnforcementMode.ENFORCED,
     ) -> PendingAction:
         row = build_pending(
             resolved=resolved, actor=actor, session_id=session_id, agent=agent,
             state=state, correlation_id=correlation_id, gates=gates,
             approval=approval, releases=releases, compensation=compensation,
             expires_at=expires_at, staged_at=staged_at, obligation=obligation,
+            enforcement=enforcement,
         )
         self._rows[row.id] = row
         self._order.append(row.id)
