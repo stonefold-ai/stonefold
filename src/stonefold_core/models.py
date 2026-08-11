@@ -258,6 +258,14 @@ class Advice(BaseModel):
     rule: str
     reason_code: str = ""
     retry_class: RetryClass | None = None
+    # The identity of the QUESTION an advised hold would have asked, stamped
+    # here because nothing stages it (D-A5) and so nothing else ever computes
+    # it. A report counts distinct questions rather than raw holds: "27 holds"
+    # that were really 4 questions asked repeatedly is a staffing claim off by
+    # seven times. Stamped at decision time from the same function the live
+    # queue collapses on, so a report and a running gateway cannot drift apart.
+    # ``None`` for anything that is not a dedupable hold.
+    dedupe_key: str | None = None
 
 
 class AuditRecord(BaseModel):

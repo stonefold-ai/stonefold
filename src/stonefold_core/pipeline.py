@@ -23,6 +23,7 @@ does not refuse the batch).
 
 from __future__ import annotations
 
+import json
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
@@ -71,6 +72,7 @@ from stonefold_core.outbox import (
     PendingAction,
     PendingState,
     hold_dedupe_key,
+    hold_identity,
 )
 from stonefold_core.policy import FailureMode
 from stonefold_core.reasons import classify
@@ -236,11 +238,21 @@ def _as_advised(
     reason_code, retry_class = classify(
         decided.decision, decided.rule, decided.gate_results
     )
+    # An advised hold stages nothing (D-A5), so this is the ONLY place its
+    # question's identity is ever computed. Stamped from the same function the
+    # live queue collapses on, so a report counting distinct questions and a
+    # running gateway's queue cannot drift apart.
+    identity = (
+        hold_identity(decided.resolved, decided.gate_results)
+        if decided.decision is Decision.HOLD and decided.resolved is not None
+        else None
+    )
     advice = Advice(
         decision=decided.decision,
         rule=decided.rule,
         reason_code=reason_code,
         retry_class=retry_class,
+        dedupe_key=json.dumps(identity, default=str) if identity is not None else None,
     )
     return (
         _unscoped(

@@ -603,6 +603,9 @@ class ReferenceDriver:
                 coverage=r.coverage.value,
                 scope_would_remove=r.scopeWouldRemove,
                 item_advice=r.itemAdvice,
+                advised_dedupe_key=(
+                    r.advised.dedupe_key or "" if r.advised else ""
+                ),
             )
             for r in self._audit.records
         ]

@@ -231,6 +231,7 @@ class HttpDriver:
                 coverage=str(r.get("coverage") or "judged"),
                 scope_would_remove=r.get("scopeWouldRemove"),
                 item_advice=r.get("itemAdvice"),
+                advised_dedupe_key=str(r.get("advisedDedupeKey") or ""),
             )
             for r in body.get("records", [])
         ]

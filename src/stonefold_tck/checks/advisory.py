@@ -24,6 +24,7 @@ from stonefold_tck.checks._util import SESSION, effects_of, pay, setup, submit
 from stonefold_tck.driver import (
     CAP_ADVISORY,
     CAP_AUDIT,
+    CAP_HOLD,
     CAP_KILL,
     CAP_PER_ITEM,
     CAP_SCOPE_REASSERT,
@@ -31,7 +32,13 @@ from stonefold_tck.driver import (
     ConformanceDriver,
     Operation,
 )
-from stonefold_tck.fixtures import BLOCKED_ITEMS, POLICY_ADVISORY, POLICY_PER_ITEM, TCK_POLICY
+from stonefold_tck.fixtures import (
+    BLOCKED_ITEMS,
+    POLICY_ADVISORY,
+    POLICY_HOLD,
+    POLICY_PER_ITEM,
+    TCK_POLICY,
+)
 
 
 def _advisory_variant(policy: str) -> str:
@@ -452,4 +459,50 @@ def a12_dispatch_scope_is_measured_not_applied(driver: ConformanceDriver) -> Non
         f"{settles[-1].advised_decision!r}; enforcement would have refused this "
         "effect as scope-lost, and a report that cannot say so undercounts what "
         "the policy was worth",
+    )
+
+
+@check(
+    "A13",
+    "an advised hold's record carries the identity of the question it would "
+    "have asked",
+    PROFILE_ADVISORY,
+    requires=[CAP_ADVISORY, CAP_AUDIT, CAP_HOLD],
+)
+def a13_the_question_survives_the_hold_that_never_staged(
+    driver: ConformanceDriver,
+) -> None:
+    """Nothing stages an advised hold (A4), so the record is the only place the
+    question exists. A report that cannot tell one question asked twenty times
+    from twenty questions overstates the staffing cost by twenty, and staffing
+    is what the customer decides on."""
+    setup(driver, policy=_advisory_variant(POLICY_HOLD), seed_world=False)
+    driver.seed("Payment", [{"id": "PQ", "tenant": "t1", "hold": True}])
+    held = Operation(
+        resource="Payment", action="pay",
+        data={"amount": 500, "destinationCountry": "SK", "payeeId": "PY1"},
+        target="PQ",
+    )
+    for _ in range(3):
+        submit(driver, held)
+
+    records = [
+        a for a in driver.audit()
+        if a.action == "pay" and a.advised_decision == "hold"
+    ]
+    expect(
+        len(records) == 3,
+        f"{len(records)} advised holds recorded for 3 attempts — each attempt is "
+        "audited whether or not it queues anything",
+    )
+    keys = {a.advised_dedupe_key for a in records}
+    expect(
+        keys != {""},
+        "no record carries a question identity, so the same question asked three "
+        "times is indistinguishable from three questions",
+    )
+    expect(
+        len(keys) == 1,
+        f"the same question three times produced {len(keys)} identities; a report "
+        "built on this would tell the customer to staff for three",
     )

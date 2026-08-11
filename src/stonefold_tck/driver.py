@@ -213,6 +213,12 @@ class AuditEntry:
     # ``None`` where the record has neither, which is most records.
     scope_would_remove: Mapping[str, Any] | None = None
     item_advice: Mapping[str, Any] | None = None
+    # v0.4: the identity of the question an advised hold would have asked.
+    # Nothing stages an advised hold, so this is the only place it exists, and a
+    # report counts distinct questions rather than raw holds. Empty where the
+    # hold is approval-shaped (a separate question per action by design).
+    advised_dedupe_key: str = ""
+
 
 
 @dataclass(frozen=True)
