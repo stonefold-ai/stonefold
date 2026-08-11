@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Produce an Advisory Report from an exported audit log.
 
-    python -m stonefold_report audit.jsonl --agent ap-desk -o report.md
+    python -m stonefold_report audit.jsonl --agent ap-desk -o report.html
 
 One JSON audit record per line, as ``AuditRecord`` serialises them. Optional
 inputs, both of which the report is honest about lacking:
@@ -24,6 +24,7 @@ from pathlib import Path
 
 from stonefold_core.models import AuditRecord
 from stonefold_report.figures import MixedDatasetError, NotAdvisoryError, build_report
+from stonefold_report.html import render_html
 from stonefold_report.render import render
 
 
@@ -44,7 +45,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("audit", type=Path, help="audit log, one JSON record per line")
     parser.add_argument("--agent", required=True, help="the agent to report on")
     parser.add_argument("-o", "--out", type=Path, help="write here instead of stdout")
-    parser.add_argument("--verdicts", type=Path, help="customer rulings, JSON object")
+    parser.add_argument(
+        "--format", choices=("md", "html"), default=None,
+        help="output form; inferred from -o's suffix, else markdown. The HTML "
+             "edition is the customer-facing page; the Markdown edition carries "
+             "the reproduction queries. Ship both.",
+    )
+    parser.add_argument(
+        "--verdicts", type=Path,
+        help="customer rulings, JSON object keyed '<rule> @ <Resource>.<action>' "
+             "with values legitimate|correct|unsure",
+    )
     parser.add_argument("--downstream", type=Path, help="correlation ids also refused")
     args = parser.parse_args(argv)
 
@@ -69,7 +80,10 @@ def main(argv: list[str] | None = None) -> int:
         # Refusing to report is a result. It is printed like one.
         print(f"no report produced: {exc}", file=sys.stderr)
         return 2
-    text = render(report)
+    form = args.format or (
+        "html" if args.out is not None and args.out.suffix == ".html" else "md"
+    )
+    text = render_html(report) if form == "html" else render(report)
     if args.out is not None:
         args.out.write_text(text, encoding="utf-8", newline="\n")
         print(f"wrote {args.out}", file=sys.stderr)

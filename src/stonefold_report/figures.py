@@ -38,6 +38,20 @@ CAUSE_DEPENDENCY = "a store the decision needed was unreachable"
 CAUSE_OTHER = "other"
 
 
+# A dispatched effect writes two records: the decision that staged it and the
+# settle the worker wrote later. Counting both as "actions" doubles an
+# effect-heavy estate. The settle is not noise, though — it is what actually
+# happened, which is its own section — so the split is a classification, not a
+# filter. An effect's decision record carries outcome staged / not_executed /
+# hold-deduped / halted / batch-refused; success, failure and cancelled on an
+# effect are the worker's, and only effects have a worker.
+_LIFECYCLE_OUTCOMES = frozenset({"success", "failure", "cancelled"})
+
+
+def is_lifecycle(record: AuditRecord) -> bool:
+    return record.kind == "effect" and record.outcome in _LIFECYCLE_OUTCOMES
+
+
 class MixedDatasetError(ValueError):
     """The dataset spans both enforcement modes for one agent.
 
@@ -170,11 +184,42 @@ class ScopeFigures:
 
 
 @dataclass(frozen=True)
+class ActivityFigures:
+    """When the work happened. Four questions in one burst hour and four spread
+    over two weeks are different staffing realities, and the burst is the one a
+    controller plans around."""
+
+    days_with_traffic: int
+    by_day: tuple[tuple[str, int], ...]  # ISO date -> decisions that day
+    busiest: tuple[str, int] | None
+
+
+@dataclass(frozen=True)
+class OutcomeFigures:
+    """What actually happened to the effects that went through — the estate's
+    own behaviour, from the settle records. Not a counterfactual: these are
+    facts, and they are the customer's facts."""
+
+    settled: int
+    failed: int
+    cancelled: int
+    # Dispatch-time scope advice: the target had moved out of scope between
+    # decision and dispatch, and enforcement would have stopped the effect at
+    # the last gate. The advisory deployment let it land and wrote this down.
+    moved_out_of_scope: int
+
+
+@dataclass(frozen=True)
 class Disclosures:
     kill_orders: int
     kill_unavailable: int
     first: datetime | None
     last: datetime | None
+
+
+def verdict_key(line: "WorksheetLine") -> str:
+    """How a customer's ruling names its line: rule and action together."""
+    return f"{line.rule} @ {line.resource}.{line.action}"
 
 
 @dataclass(frozen=True)
@@ -196,6 +241,8 @@ class Report:
     would_have: WouldHaveFigures
     questions: QuestionFigures
     scope: ScopeFigures
+    activity: ActivityFigures
+    outcomes: OutcomeFigures
     disclosures: Disclosures
     worksheet: tuple[WorksheetLine, ...]
     # Present only where the customer supplied verdicts; absent, never zero.
@@ -316,6 +363,27 @@ def _scope(records: Sequence[AuditRecord]) -> ScopeFigures:
     )
 
 
+def _activity(decisions: Sequence[AuditRecord]) -> ActivityFigures:
+    by_day = Counter(r.timestamp.date().isoformat() for r in decisions)
+    ordered = tuple(sorted(by_day.items()))
+    busiest = max(by_day.items(), key=lambda kv: kv[1]) if by_day else None
+    return ActivityFigures(
+        days_with_traffic=len(by_day), by_day=ordered, busiest=busiest
+    )
+
+
+def _outcomes(lifecycle: Sequence[AuditRecord]) -> OutcomeFigures:
+    return OutcomeFigures(
+        settled=sum(1 for r in lifecycle if r.outcome == "success"),
+        failed=sum(1 for r in lifecycle if r.outcome == "failure"),
+        cancelled=sum(1 for r in lifecycle if r.outcome == "cancelled"),
+        moved_out_of_scope=sum(
+            1 for r in lifecycle
+            if r.advised is not None and r.advised.rule == "scope-lost"
+        ),
+    )
+
+
 def _disclosures(records: Sequence[AuditRecord]) -> Disclosures:
     stamps = sorted(r.timestamp for r in records) if records else []
     return Disclosures(
@@ -380,30 +448,45 @@ def build_report(
             "that ever ran."
         )
 
-    worksheet = _worksheet(mine)
+    decisions = [r for r in mine if not is_lifecycle(r)]
+    lifecycle = [r for r in mine if is_lifecycle(r)]
+
+    worksheet = _worksheet(decisions)
     reviewed = false_positives = None
     if verdicts is not None:
-        ruled = [line for line in worksheet if line.rule in verdicts]
+        # keyed by rule AND action: the same rule on two different actions is
+        # two different judgements, and one verdict must not cover both
+        ruled = [
+            line for line in worksheet if verdict_key(line) in verdicts
+        ]
         reviewed = sum(line.count for line in ruled)
         false_positives = sum(
-            line.count for line in ruled if verdicts[line.rule] == "legitimate"
+            line.count
+            for line in ruled
+            if verdicts[verdict_key(line)] == "legitimate"
         )
     exclusive = None
     if downstream_refused is not None:
+        # Joined at RUN level: correlation ids name sessions, not actions, so
+        # one downstream refusal voids every refusal in its run. Coarse, said
+        # out loud in the report, and refined the day a pilot supplies
+        # per-action outcome data to join on instead.
         also = set(downstream_refused)
         exclusive = sum(
             1
-            for r in _judged(mine)
+            for r in _judged(decisions)
             if r.advised is not None
             and r.advised.decision is Decision.DENY
             and r.correlationId not in also
         )
     return Report(
         agent=agent,
-        coverage=_coverage(mine),
-        would_have=_would_have(mine),
-        questions=_questions(mine),
-        scope=_scope(mine),
+        coverage=_coverage(decisions),
+        would_have=_would_have(decisions),
+        questions=_questions(decisions),
+        scope=_scope(decisions),
+        activity=_activity(decisions),
+        outcomes=_outcomes(lifecycle),
         disclosures=_disclosures(mine),
         worksheet=worksheet,
         false_positives=false_positives,

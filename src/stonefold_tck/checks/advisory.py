@@ -20,7 +20,7 @@ verdict must reach the audit and nothing else.
 from __future__ import annotations
 
 from stonefold_tck.checks import PROFILE_ADVISORY, check, expect
-from stonefold_tck.checks._util import SESSION, effects_of, pay, setup, submit
+from stonefold_tck.checks._util import ALICE, SESSION, effects_of, pay, setup, submit
 from stonefold_tck.driver import (
     CAP_ADVISORY,
     CAP_AUDIT,
@@ -313,11 +313,7 @@ def a9_a_refused_batch_commits(driver: ConformanceDriver) -> None:
         resource="Payment", action="pay",
         data={"amount": 10, "destinationCountry": "DE", "payeeId": "PE-9"},
     )
-    batch = driver.submit_batch(
-        __import__("stonefold_tck.checks._util", fromlist=["ALICE"]).ALICE,
-        "tck-s1",
-        [clean, _BLOCKED_PAY],
-    )
+    batch = driver.submit_batch(ALICE, SESSION, [clean, _BLOCKED_PAY])
 
     expect(
         batch.decision == "allow",

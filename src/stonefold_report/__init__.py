@@ -17,6 +17,7 @@ from stonefold_report.figures import (
     Report,
     build_report,
 )
+from stonefold_report.html import render_html
 from stonefold_report.render import render
 
 __all__ = [
@@ -25,4 +26,5 @@ __all__ = [
     "Report",
     "build_report",
     "render",
+    "render_html",
 ]

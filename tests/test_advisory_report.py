@@ -48,7 +48,12 @@ _HOLD_DOC: dict[str, Any] = {
 }
 
 
-def _run(doc: dict[str, Any], calls: list[RawCall], *, mode: EnforcementMode) -> Any:
+def _run(
+    doc: dict[str, Any], calls: list[RawCall], *, mode: EnforcementMode,
+    scoped: bool = False,
+) -> Any:
+    from stonefold_core.scope import make_scope_resolver
+
     reg = full_registry()
     policy = load_policy(
         doc, reg, schema=load_schema(),
@@ -62,6 +67,7 @@ def _run(doc: dict[str, Any], calls: list[RawCall], *, mode: EnforcementMode) ->
         enforce(
             call, Actor(id="alice"), Session(id="s1", correlation_id="corr-1"),
             registry=reg, audit=audit, policy=policy, gates=DefaultGateEngine(reg),
+            scopes=make_scope_resolver(policy) if scoped else None,
             outbox=InMemoryOutboxStore(audit=audit),
             connectors=Connectors({"sql": mem, "in_memory": mem, "email": mem}),
             enforcement=mode,
@@ -178,7 +184,7 @@ def test_verdicts_produce_a_rate_and_downstream_produces_exclusivity() -> None:
 
     report = build_report(
         records, agent="support",
-        verdicts={rule: "legitimate"},
+        verdicts={f"{rule} @ Email.sendEmail": "legitimate"},
         downstream_refused=["corr-1"],
     )
 
@@ -286,3 +292,150 @@ def test_the_same_question_asked_repeatedly_is_one_question() -> None:
     assert report.questions.busiest is not None
     assert report.questions.busiest[1] == 6
     assert "Questions a person would have been asked: **2**" in render(report)
+
+
+def test_a_dispatched_effect_is_one_action_not_two() -> None:
+    """A dispatched effect writes a decision record and a settle record. The
+    review found the report counting both as actions — 2 payments read as 4
+    observed and a scope-refused one as 2 would-refusals. Decisions are the
+    actions; settles are what happened to them."""
+    from stonefold_core.scope import make_scope_resolver
+    from stonefold_store.dispatch import DispatchWorker
+
+    reg = full_registry()
+    doc = {
+        "agent": "pay", "allow": [{"effect": ["pay"]}],
+        "scope": {"Payment": "tenantOf"},
+        "defaults": {"enforcement": "advisory"},
+    }
+    policy = load_policy(doc, reg, schema=load_schema(), advisory_permitted=True)
+    audit = InMemoryAuditSink()
+    outbox = InMemoryOutboxStore(audit=audit)
+    conn = InMemoryConnector({"Payment": [
+        {"id": "P-1", "tenant_id": "T1"}, {"id": "P-2", "tenant_id": "T2"},
+    ]})
+    conns = Connectors({"sql": conn, "in_memory": conn, "email": conn})
+    for pid in ("P-1", "P-2"):  # P-2 is another tenant's: enforcement would refuse
+        enforce(
+            RawCall(resource="Payment", action="pay", data={"id": pid, "amount": 100}),
+            Actor(id="alice", claims={"tenant": "T1"}),
+            Session(id="s1", correlation_id="c1"),
+            registry=reg, audit=audit, policy=policy, gates=DefaultGateEngine(reg),
+            scopes=make_scope_resolver(policy), outbox=outbox, connectors=conns,
+            enforcement=EnforcementMode.ADVISORY,
+        )
+    worker = DispatchWorker(outbox, conns, registry=reg,
+                            scopes=make_scope_resolver(policy))
+    assert worker.drain() == 2
+
+    report = build_report(audit.all_records(), agent="pay")
+
+    assert report.coverage.observed == 2  # actions, not records
+    assert report.would_have.refused == 1  # the tenant-crossing payment, once
+    # the settles are not lost — they are the outcomes view
+    assert report.outcomes.settled == 2
+    assert report.outcomes.moved_out_of_scope == 1
+
+
+def test_a_scoped_write_is_not_reported_as_a_read() -> None:
+    """Section 5 is about reads. A scoped write returns a receipt, and stamping
+    'could not count rows' on every one buries the reads under noise."""
+    doc = {
+        "agent": "support",
+        "allow": [{"record": ["update"]}],
+        "scope": {"Customer": "assignedToCurrentUser"},
+        "defaults": {"enforcement": "advisory"},
+    }
+    audit = _run(doc, [RawCall(resource="Customer", action="update",
+                               data={"id": 1, "status": "vip"})],
+                 mode=EnforcementMode.ADVISORY, scoped=True)
+
+    report = build_report(audit.all_records(), agent="support")
+
+    assert report.scope.reads == 0
+    for record in audit.all_records():
+        assert record.scopeWouldRemove is None
+
+
+def test_the_report_names_when_the_work_happened() -> None:
+    audit = _run(_DENY_DOC, [_EMAIL, _READ], mode=EnforcementMode.ADVISORY)
+
+    report = build_report(audit.all_records(), agent="support")
+
+    assert report.activity.days_with_traffic == 1
+    assert report.activity.busiest is not None
+    assert report.activity.busiest[1] == 2
+
+
+def test_section_nine_recommends_nothing_without_the_review() -> None:
+    """The conversion path is ranked by evidence, and an unreviewed rule has
+    none: its false positives simply have not been looked for."""
+    audit = _run(_DENY_DOC, [_EMAIL], mode=EnforcementMode.ADVISORY)
+
+    text = render(build_report(audit.all_records(), agent="support"))
+
+    assert "## 9. What we would turn on first" in text
+    assert "Nothing is ready to enforce yet" in text
+    assert "Advisory continues to run" in text
+
+
+def test_the_html_edition_is_self_contained_and_leaks_nothing() -> None:
+    from stonefold_report import render_html
+
+    audit = _run(
+        _DENY_DOC,
+        [RawCall(resource="Email", action="sendEmail",
+                 data={"to": "victim@secret-supplier.example", "amount": 4210.55})],
+        mode=EnforcementMode.ADVISORY,
+    )
+
+    page = render_html(build_report(audit.all_records(), agent="support"))
+
+    # one file, mail-room physics: no scripts, no external fetches of any kind
+    assert "<script" not in page.lower()
+    assert "http://" not in page and "https://" not in page
+    # same redaction rules as the figures: no row value reaches the page
+    assert "victim@secret-supplier.example" not in page
+    assert "4210.55" not in page
+    # the charts are real and the absences are stated, not zeroed
+    assert "<svg" in page
+    assert "Not reviewed" in page and "Not joined" in page
+    assert "would have done" in page
+
+
+def test_the_html_escapes_what_the_policy_wrote() -> None:
+    """Rule names come from policy documents; a policy author must not be able
+    to script the customer's report."""
+    from stonefold_report.figures import (
+        ActivityFigures, CoverageFigures, Disclosures, OutcomeFigures,
+        QuestionFigures, Report, RuleLine, ScopeFigures, WouldHaveFigures,
+        WorksheetLine,
+    )
+    from stonefold_report.html import render_html
+
+    hostile = "<script>alert(1)</script>"
+    report = Report(
+        agent=hostile,
+        coverage=CoverageFigures(observed=1, judged=1, unjudged=0, by_cause=()),
+        would_have=WouldHaveFigures(
+            allowed=0, refused=1, held=0, halted=0,
+            by_rule=(RuleLine(rule=hostile, decision="deny", count=1,
+                              actions=(hostile,), examples=()),),
+            batches_refused=0, item_calls=0, item_refusals=0,
+        ),
+        questions=QuestionFigures(distinct=0, total_holds=0, busiest=None, unkeyed=0),
+        scope=ScopeFigures(reads=0, rows_returned=0, rows_removed=0,
+                           widest=None, partial_reads=0, unmeasured=()),
+        activity=ActivityFigures(days_with_traffic=0, by_day=(), busiest=None),
+        outcomes=OutcomeFigures(settled=0, failed=0, cancelled=0,
+                                moved_out_of_scope=0),
+        disclosures=Disclosures(kill_orders=0, kill_unavailable=0,
+                                first=None, last=None),
+        worksheet=(WorksheetLine(rule=hostile, resource="R", action="a", count=1),),
+        false_positives=None, reviewed=None, exclusive=None,
+    )
+
+    page = render_html(report)
+
+    assert "<script>alert(1)</script>" not in page
+    assert "&lt;script&gt;" in page

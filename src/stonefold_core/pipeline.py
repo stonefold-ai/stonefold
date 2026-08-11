@@ -1466,10 +1466,14 @@ def _commit(
             consumption=_consume_claim(inline_claim, obligations),
             # D-A4: the read ran unscoped, so the record carries what the
             # predicate would have taken away. The single most uncomfortable
-            # number in the report, and the most persuasive one.
+            # number in the report, and the most persuasive one. Observe-kind
+            # only: a scoped write returns a receipt, and stamping every one
+            # with "could not count rows" would bury the reads the field is
+            # for under noise that means nothing to a reader.
             scope_would_remove=(
                 _measure_scope(decided.scope_measure, output, actor)
                 if decided.scope_measure is not None
+                and resolved.kind is Kind.OBSERVE
                 else None
             ),
         )

@@ -54,6 +54,13 @@ def render(report: Report) -> str:
     add("")
     c = r.coverage
     add(f"- Actions observed: **{c.observed}**")
+    act = r.activity
+    if act.busiest is not None:
+        day, count = act.busiest
+        add(
+            f"- Traffic on **{act.days_with_traffic}** day(s); busiest {day} "
+            f"with {count} actions"
+        )
     add(f"- Judged by the policy: **{c.judged}** ({_pct(c.ratio)})")
     add(f"- Not judged: **{c.unjudged}**")
     if c.by_cause:
@@ -93,6 +100,21 @@ def render(report: Report) -> str:
             f"- Multi-item calls that would have been partly refused: "
             f"**{w.item_calls}**, covering **{w.item_refusals}** items"
         )
+    o = r.outcomes
+    if o.settled or o.failed or o.cancelled:
+        add("")
+        add(
+            f"What actually happened to the effects that went through: "
+            f"**{o.settled}** landed, **{o.failed}** failed in your systems, "
+            f"**{o.cancelled}** were cancelled before dispatch."
+        )
+        if o.moved_out_of_scope:
+            add(
+                f"On **{o.moved_out_of_scope}** of them the target had moved out "
+                "of scope between the decision and the dispatch — enforcement "
+                "would have stopped those at the last gate, and that near-miss "
+                "window is invisible to any control that checks only once."
+            )
     if w.by_rule:
         add("")
         add("| Rule | Verdict | Actions | Count |")
@@ -181,14 +203,19 @@ def render(report: Report) -> str:
     if s.reads == 0:
         add("No action in this window had a scope rule to apply.")
     else:
-        add(
-            f"Your agent read **{s.rows_returned}** rows across **{s.reads}** "
-            f"scoped reads. The scope rule in this policy would have shown it "
-            f"**{s.rows_returned - s.rows_removed}**."
-        )
         if s.widest is not None:
             action, removed = s.widest
-            add(f"- Widest single read: `{action}`, {removed} rows narrowed away")
+            add(
+                f"The widest single read (`{action}`) returned rows the scope "
+                f"rule would have withheld **{removed}** of."
+            )
+        add(
+            f"Across all **{s.reads}** scoped reads the agent received "
+            f"**{s.rows_returned}** row-results, of which scope would have "
+            f"withheld **{s.rows_removed}**. (Row-results, not distinct rows: "
+            "the same row read twice counts twice, and this report keeps no row "
+            "values to tell them apart — that is deliberate.)"
+        )
         if s.partial_reads:
             add(
                 f"- Reads counted only up to the evaluation cap: "
@@ -216,9 +243,11 @@ def render(report: Report) -> str:
         )
     else:
         add(
-            f"Of the refusals in §2, **{r.exclusive}** were not also refused by "
-            "your own systems. That is this policy's exclusive contribution in "
-            "this window."
+            f"Of the refusals in §2, **{r.exclusive}** were in runs none of your "
+            "own systems refused anything in. Joined at run level — one of your "
+            "refusals clears the whole run it happened in — so this is the "
+            "conservative end of the exclusive contribution. Per-action outcome "
+            "data sharpens it."
         )
     add("")
 
@@ -267,6 +296,12 @@ def render(report: Report) -> str:
         "product in general."
     )
     add("")
+    # --- 9. the decision this report exists to inform -----------------------
+    add("## 9. What we would turn on first")
+    add("")
+    for line in _conversion_path(r):
+        add(line)
+    add("")
     add("---")
     add("")
     add("## Appendix — where each number comes from")
@@ -282,6 +317,67 @@ def render(report: Report) -> str:
     )
     add("")
     return "\n".join(out)
+
+
+def _conversion_path(r: Report) -> list[str]:
+    """The ranking §9 promises: what to enforce, tune, or leave, by evidence.
+
+    Deliberately conservative. Nothing is recommended for enforcement without a
+    completed review — a rule with catches and no verdicts is a rule whose
+    false positives simply have not been looked for yet — and coverage work is
+    always named, because enforcing 94% of a path is a control with a hole in
+    it."""
+    out: list[str] = []
+    ruled = r.reviewed is not None
+    refusing = [line for line in r.worksheet]
+    if not refusing and r.questions.total_holds == 0 and not r.coverage.by_cause:
+        out.append(
+            "Nothing in this window produced evidence to act on: no rule would "
+            "have refused or held anything, and everything the agents did was "
+            "judgeable. Either the policy is not yet written for this traffic, "
+            "or this was a quiet fortnight — a longer window answers which."
+        )
+        return out
+    if refusing and not ruled:
+        out.append(
+            "**Nothing is ready to enforce yet — not because the rules failed, "
+            "but because §4's review has not happened.** A rule with catches and "
+            "no verdicts is a rule whose false positives have not been looked "
+            "for. Completing the worksheet is the single step that unlocks this "
+            "section."
+        )
+    if ruled and refusing:
+        out.append(
+            "**Enforce first:** the reviewed rules with no refusal marked as "
+            "ordinary work. Their behaviour under enforcement is exactly what "
+            "§2 shows, minus nothing."
+            if r.false_positives == 0
+            else "**Tune before enforcing:** the review marked some refusals as "
+            "ordinary work, so those rules would stop real work today. The "
+            "dataset is complete and the decision is deterministic, so an "
+            "amended rule can be re-run against this same window before "
+            "anything is switched on."
+        )
+    if r.questions.total_holds:
+        out.append(
+            f"**The approval load is measured:** {r.questions.total_questions} "
+            "question(s) over the window (§3). Whether the role that would "
+            "answer them can absorb that is a staffing judgement this report "
+            "informs but cannot make — the role is named in the policy beside "
+            "this report."
+        )
+    if r.coverage.by_cause:
+        causes = "; ".join(f"{c} ({n})" for c, n in r.coverage.by_cause)
+        out.append(
+            f"**Coverage work before or alongside any of it:** {causes}. "
+            "Turning enforcement on beside an unjudged path moves the traffic, "
+            "not the risk."
+        )
+    out.append(
+        "Advisory continues to run through any of these steps — every change "
+        "can be measured against live traffic the same way this report was."
+    )
+    return out
 
 
 _QUERIES: tuple[tuple[str, str], ...] = (
