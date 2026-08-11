@@ -875,3 +875,86 @@ def test_a_predicate_that_raises_is_recorded_not_enforced() -> None:
         "measured": False,
         "reason": "predicate-raised",
     }
+
+
+# --- D-A4 at the dispatch boundary ---------------------------------------
+def _payment_world(enforcement: EnforcementMode) -> Any:
+    """A staged effect with a scope predicate the worker re-asserts."""
+    from stonefold_store.dispatch import DispatchWorker
+
+    reg = full_registry()
+    doc = {
+        "agent": "pay",
+        "allow": [{"effect": ["pay"]}],
+        "scope": {"Payment": "tenantOf"},
+    }
+    if enforcement is EnforcementMode.ADVISORY:
+        doc["defaults"] = {"enforcement": "advisory"}
+    policy = load_policy(
+        doc, reg, schema=load_schema(),
+        advisory_permitted=enforcement is EnforcementMode.ADVISORY,
+    )
+    audit = InMemoryAuditSink()
+    outbox = InMemoryOutboxStore(audit=audit)
+    conn = InMemoryConnector({"Payment": [{"id": "P-1", "tenant_id": "T1"}]})
+    connectors = Connectors({"sql": conn, "in_memory": conn, "email": conn})
+    result = enforce(
+        RawCall(resource="Payment", action="pay", data={"id": "P-1", "amount": 100}),
+        Actor(id="alice", claims={"tenant": "T1"}),
+        Session(id="s1", correlation_id="corr-1"),
+        registry=reg, audit=audit, policy=policy,
+        scopes=make_scope_resolver(policy), connectors=connectors, outbox=outbox,
+        enforcement=enforcement,
+    )
+    worker = DispatchWorker(
+        outbox, connectors, registry=reg, scopes=make_scope_resolver(policy)
+    )
+    return result, audit, outbox, conn, worker
+
+
+def test_enforcement_stops_a_reassigned_target_at_dispatch() -> None:
+    """The baseline: scope is re-asserted at dispatch, and the effect never
+    lands on unauthorized state."""
+    result, audit, outbox, conn, worker = _payment_world(EnforcementMode.ENFORCED)
+    assert result.decision is Decision.ALLOW
+    conn.tables["Payment"][0]["tenant_id"] = "T2"  # the race
+
+    assert worker.drain() == 1
+    row = outbox.get(result.ticket)
+    assert row is not None and row.state is PendingState.FAILED
+    assert conn.effects == []
+
+
+def test_advisory_does_not_stop_it_and_records_what_would_have() -> None:
+    """The hole this closes: the dispatch-time scope check is a CONTROL, and an
+    advisory deployment that fired it would refuse a customer's effect at the
+    last possible moment — the one thing it promised not to do, in the one place
+    the pipeline's translation never reaches."""
+    result, audit, outbox, conn, worker = _payment_world(EnforcementMode.ADVISORY)
+    assert result.decision is Decision.ALLOW
+    conn.tables["Payment"][0]["tenant_id"] = "T2"  # the same race
+
+    assert worker.drain() == 1
+    row = outbox.get(result.ticket)
+    assert row is not None and row.state is PendingState.DONE  # it went through
+    assert len(conn.effects) == 1
+
+    settle = audit.records[-1]
+    assert settle.enforcement is EnforcementMode.ADVISORY
+    assert settle.decision is Decision.ALLOW
+    assert settle.advised is not None
+    assert settle.advised.rule == "scope-lost"  # enforcement would have stopped it
+    assert settle.scopeApplied == []  # nothing was applied, and the record says so
+
+
+def test_an_in_scope_advisory_effect_carries_no_scope_advice() -> None:
+    """``advised`` marks divergence: scope that would have let the effect
+    through leaves nothing to say."""
+    result, audit, outbox, conn, worker = _payment_world(EnforcementMode.ADVISORY)
+
+    assert worker.drain() == 1
+    row = outbox.get(result.ticket)
+    assert row is not None and row.state is PendingState.DONE
+    settle = audit.records[-1]
+    assert settle.advised is None
+    assert settle.coverage is Coverage.JUDGED
