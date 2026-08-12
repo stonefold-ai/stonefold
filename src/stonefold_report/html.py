@@ -30,6 +30,7 @@ from datetime import date, datetime
 from html import escape
 
 from stonefold_report.figures import Report, verdict_key
+from stonefold_report.render import plural
 
 # --- brand tokens (site css), chart hues validated for adjacency ----------
 _BG = "#f6f2e9"
@@ -347,8 +348,8 @@ def _summary(r: Report) -> str:
     days = r.activity.days_with_traffic
     bits: list[str] = []
     bits.append(
-        f"Over <b>{days}</b> day(s) with traffic we observed <b>{c.observed}</b> "
-        f"action(s) by this agent"
+        f"Across <b>{days}</b> {plural(days, 'day')} with traffic, the record "
+        f"shows <b>{c.observed}</b> {plural(c.observed, 'action')} by this agent"
     )
     if c.ratio is not None:
         bits.append(f"<b>{c.ratio:.1f}%</b> could be judged by the policy")
@@ -357,7 +358,9 @@ def _summary(r: Report) -> str:
         verdict_bits.append(f"refused <b>{w.refused}</b>")
     if q.total_holds:
         verdict_bits.append(
-            f"asked a person <b>{q.total_questions}</b> question(s)"
+            f"asked a person <b>{q.total_holds}</b> "
+            f"{plural(q.total_holds, 'time')} (<b>{q.total_questions}</b> "
+            f"distinct {plural(q.total_questions, 'question')})"
         )
     if verdict_bits:
         bits.append("it would have " + " and ".join(verdict_bits))
@@ -420,7 +423,7 @@ def render_html(
     add(_tile(str(c.observed), "actions observed", "bronze"))
     add(_tile(ratio, "of them judgeable by policy", "bronze"))
     add(_tile(str(w.refused), "would have been refused", "deny"))
-    add(_tile(str(q.total_questions), "questions for a person", "hold"))
+    add(_tile(str(q.total_questions), "distinct questions for a person", "hold"))
     add("</div>")
 
     # --- 1. coverage -------------------------------------------------------
@@ -452,7 +455,7 @@ def render_html(
         caption = (
             f"Actions per day, empty days and tinted weekends included · "
             f"traffic on {r.activity.days_with_traffic} of "
-            f"{len(r.activity.by_day)} day(s)"
+            f"{len(r.activity.by_day)} {plural(len(r.activity.by_day), 'day')}"
         )
         if r.activity.busiest is not None:
             day, count = r.activity.busiest
@@ -489,12 +492,15 @@ def render_html(
         f"been allowed, <b>{w.refused}</b> refused, <b>{q.total_holds}</b> sent "
         "to a person."
         + (
-            f" <b>{w.batches_refused}</b> batch(es) would have been refused "
-            "whole." if w.batches_refused else ""
+            f" <b>{w.batches_refused}</b> "
+            f"{plural(w.batches_refused, 'batch', 'batches')} would have been "
+            "refused whole." if w.batches_refused else ""
         )
         + (
-            f" <b>{w.item_calls}</b> multi-item call(s) would have been partly "
-            f"refused, covering <b>{w.item_refusals}</b> items."
+            f" <b>{w.item_calls}</b> multi-item "
+            f"{plural(w.item_calls, 'call')} would have been partly refused, "
+            f"covering <b>{w.item_refusals}</b> "
+            f"{plural(w.item_refusals, 'item')}."
             if w.item_calls else ""
         )
         + "</p>"
@@ -514,7 +520,11 @@ def render_html(
             )
         add("</div>")
         add(
-            "<p>That is what actually happened to the effects that went through"
+            "<p>These are the settle reports — what actually happened to the "
+            "effects that went through. Only actions with an external effect "
+            "report one, so reads and record changes do not appear in this "
+            "count; and because nothing was enforced, effects the policy would "
+            "have refused or held ran and settled with the rest"
             + (
                 f" — and on <b>{o.moved_out_of_scope}</b> of them the target "
                 "moved out of scope between decision and dispatch; enforcement "
@@ -602,6 +612,12 @@ def render_html(
     if s.reads == 0:
         add("<p>No action in this window had a scope rule to apply.</p>")
     else:
+        add(
+            "<p>Some rules judge not whether an action may run but how much a "
+            "read returns — which rows of a table the agent gets to see. This "
+            "section measures that narrowing: what the agent received, against "
+            "what a scoped policy would have let it receive.</p>"
+        )
         shown = s.rows_returned - s.rows_removed
         add(
             _stacked_bar(
@@ -633,8 +649,9 @@ def render_html(
             add(f"<p>Could not be counted ({escape(reason)}): <b>{count}</b></p>")
         if s.partial_reads:
             add(
-                f"<p><b>{s.partial_reads}</b> read(s) were counted only up to "
-                "the evaluation cap — those lines are lower bounds.</p>"
+                f"<p>Reads counted only up to the evaluation cap: "
+                f"<b>{s.partial_reads}</b> — those lines are lower bounds, "
+                "not totals.</p>"
             )
         add(
             "<p>The rows it read are not rows it misused. What was done with "
@@ -664,7 +681,8 @@ def render_html(
     d = r.disclosures
     if d.kill_orders:
         add(
-            f"<li><b>The one lever was used:</b> {d.kill_orders} action(s) "
+            f"<li><b>The one lever was used:</b> {d.kill_orders} "
+            f"{plural(d.kill_orders, 'action')} "
             "halted by an operator&#39;s kill order — the only thing an "
             "advisory deployment refuses.</li>"
         )
@@ -672,7 +690,8 @@ def render_html(
         add("<li>No kill order was used. Nothing here was refused by us.</li>")
     if d.kill_unavailable:
         add(
-            f"<li><b>{d.kill_unavailable}</b> action(s) refused because the "
+            f"<li><b>{d.kill_unavailable}</b> "
+            f"{plural(d.kill_unavailable, 'action')} refused because the "
             "kill store was unreachable — nobody ordered these; the gateway "
             "fails closed when it cannot know whether the cord was pulled.</li>"
         )
@@ -722,8 +741,9 @@ def render_html(
     )
     add(
         "Produced from <b>"
-        f"{c.observed}</b> decision record(s) and <b>{lifecycle}</b> "
-        f"settlement record(s), agent <code>{escape(r.agent)}</code>, window "
+        f"{c.observed}</b> decision {plural(c.observed, 'record')} and "
+        f"<b>{lifecycle}</b> settlement {plural(lifecycle, 'record')}, "
+        f"agent <code>{escape(r.agent)}</code>, window "
         f"{escape(window)}."
         + (f" Generated {escape(stamp)}." if stamp else "")
     )
