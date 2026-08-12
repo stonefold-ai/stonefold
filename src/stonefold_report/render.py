@@ -33,13 +33,21 @@ def _pct(value: float | None) -> str:
     return "not computable" if value is None else f"{value:.1f}%"
 
 
+def plural(count: int, noun: str, many: str | None = None) -> str:
+    """``day`` or ``days`` by count — computed text should not read like a
+    form letter, and "9 day(s)" does. ``many`` overrides the ``+s`` default
+    for nouns like batch/batches."""
+    return noun if count == 1 else (many or f"{noun}s")
+
+
 def _summary_md(r: Report) -> str:
     """The executive summary, computed — the same sentences the HTML edition
     leads with, from the same figures."""
     c, w, q = r.coverage, r.would_have, r.questions
+    days = r.activity.days_with_traffic
     bits = [
-        f"Over **{r.activity.days_with_traffic}** day(s) with traffic we "
-        f"observed **{c.observed}** action(s) by this agent"
+        f"Across **{days}** {plural(days, 'day')} with traffic, the record "
+        f"shows **{c.observed}** {plural(c.observed, 'action')} by this agent"
     ]
     if c.ratio is not None:
         bits.append(f"**{c.ratio:.1f}%** could be judged by the policy")
@@ -47,7 +55,11 @@ def _summary_md(r: Report) -> str:
     if w.refused:
         verdicts.append(f"refused **{w.refused}**")
     if q.total_holds:
-        verdicts.append(f"asked a person **{q.total_questions}** question(s)")
+        verdicts.append(
+            f"asked a person **{q.total_holds}** "
+            f"{plural(q.total_holds, 'time')} (**{q.total_questions}** "
+            f"distinct {plural(q.total_questions, 'question')})"
+        )
     bits.append(
         "it would have " + " and ".join(verdicts)
         if verdicts
@@ -99,8 +111,9 @@ def render(
     if act.busiest is not None:
         day, count = act.busiest
         add(
-            f"- Traffic on **{act.days_with_traffic}** day(s); busiest {day} "
-            f"with {count} actions"
+            f"- Traffic on **{act.days_with_traffic}** "
+            f"{plural(act.days_with_traffic, 'day')}; busiest {day} "
+            f"with {count} {plural(count, 'action')}"
         )
     add(f"- Judged by the policy: **{c.judged}** ({_pct(c.ratio)})")
     add(f"- Not judged: **{c.unjudged}**")
@@ -147,7 +160,11 @@ def render(
         add(
             f"What actually happened to the effects that went through: "
             f"**{o.settled}** landed, **{o.failed}** failed in your systems, "
-            f"**{o.cancelled}** were cancelled before dispatch."
+            f"**{o.cancelled}** were cancelled before dispatch. Only actions "
+            "with an external effect report a settlement, so reads and record "
+            "changes do not appear in this count; and because nothing was "
+            "enforced, effects the policy would have refused or held ran and "
+            "settled with the rest."
         )
         if o.moved_out_of_scope:
             add(
@@ -253,6 +270,12 @@ def render(
     if s.reads == 0:
         add("No action in this window had a scope rule to apply.")
     else:
+        add(
+            "Some rules judge not whether an action may run but how much a "
+            "read returns — which rows of a table the agent gets to see. This "
+            "section measures that narrowing."
+        )
+        add("")
         if s.widest is not None:
             action, removed = s.widest
             add(
@@ -307,19 +330,21 @@ def render(
     d = r.disclosures
     if d.kill_orders:
         add(
-            f"- **The one lever was used.** {d.kill_orders} action(s) were halted "
-            "by an operator's kill order. Advisory refuses nothing else, so this "
-            "is the only place the deployment changed what your estate did."
+            f"- **The one lever was used.** {d.kill_orders} "
+            f"{plural(d.kill_orders, 'action')} halted by an operator's kill "
+            "order. Advisory refuses nothing else, so this is the only place "
+            "the deployment changed what your systems did."
         )
     else:
         add("- No kill order was used. Nothing in this window was refused by us.")
     if d.kill_unavailable:
         add(
-            f"- **{d.kill_unavailable} action(s) were refused because the kill "
+            f"- **{d.kill_unavailable} "
+            f"{plural(d.kill_unavailable, 'action')} refused because the kill "
             "store was unreachable.** Nobody ordered these. The gateway cannot "
             "know whether an operator has pulled the cord while that store is "
             "down, and it fails closed there by design — so these are refusals "
-            "your estate experienced and this report does not count as advisory."
+            "your systems experienced and this report does not count as advisory."
         )
     add(
         "- Every record in this report carries `enforcement: advisory`. A figure "
@@ -368,8 +393,9 @@ def render(
     add("")
     lifecycle = r.outcomes.settled + r.outcomes.failed + r.outcomes.cancelled
     provenance = (
-        f"*Produced from {r.coverage.observed} decision record(s) and "
-        f"{lifecycle} settlement record(s), agent `{r.agent}`, window {window}."
+        f"*Produced from {r.coverage.observed} decision "
+        f"{plural(r.coverage.observed, 'record')} and {lifecycle} settlement "
+        f"{plural(lifecycle, 'record')}, agent `{r.agent}`, window {window}."
     )
     if generated_at is not None:
         provenance += f" Generated {generated_at.strftime('%Y-%m-%d %H:%M UTC')}."
@@ -408,7 +434,7 @@ def _conversion_path(r: Report) -> list[str]:
     if ruled and refusing:
         out.append(
             "**Enforce first:** the reviewed rules with no refusal marked as "
-            "ordinary work. Their behaviour under enforcement is exactly what "
+            "ordinary work. Their behavior under enforcement is exactly what "
             "§2 shows, minus nothing."
             if r.false_positives == 0
             else "**Tune before enforcing:** the review marked some refusals as "
@@ -420,8 +446,9 @@ def _conversion_path(r: Report) -> list[str]:
     if r.questions.total_holds:
         out.append(
             f"**The approval load is measured:** {r.questions.total_questions} "
-            "question(s) over the window (§3). Whether the role that would "
-            "answer them can absorb that is a staffing judgement this report "
+            f"{plural(r.questions.total_questions, 'question')} over the "
+            "window (§3). Whether the role that would "
+            "answer them can absorb that is a staffing judgment this report "
             "informs but cannot make — the role is named in the policy beside "
             "this report."
         )

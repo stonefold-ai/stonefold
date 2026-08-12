@@ -450,10 +450,10 @@ def test_both_editions_lead_with_the_computed_summary() -> None:
     md, page = render(report), render_html(report)
 
     for text in (md, page):
-        assert "day(s) with traffic" in text
+        assert "with traffic" in text
         assert "could be judged by the policy" in text
     # the summary leads, the disclaimer stays — findings before caveats
-    assert page.index("day(s) with traffic") < page.index("Nothing in this window")
+    assert page.index("with traffic") < page.index("Nothing in this window")
 
 
 def test_the_activity_strip_draws_the_silence() -> None:
@@ -494,7 +494,7 @@ def test_the_page_answers_who_when_and_from_what() -> None:
     assert "prepared for <b>Meridian Supply GmbH</b>" in page
     assert "Confidential" in page
     assert "Generated 2026-08-11 15:00 UTC" in page
-    assert "decision record(s)" in page
+    assert "decision record" in page
 
 
 def test_the_worksheet_can_be_completed_with_a_pen() -> None:
