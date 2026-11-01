@@ -27,6 +27,6 @@ Retained for context, not required reading or a current comparative assessment:
 - [Positioning against policy engines](10-positioning-policy-engines.md)
 - [Intended audiences](13-who-is-this-for.md)
 - [Why not just tools?](21-why-not-just-tools.md)
-- [Earlier demo specification](05-demo-spec.md): includes an adversarial scenario removed from the current simple walkthrough. Use the demo runbook for current behavior.
+- [Earlier demo specification](05-demo-spec.md): describes additional adversarial checks retained in unit tests but outside the simple walkthrough. Use the demo runbook for the verified entry path.
 
 Historical rationale and runnable reference material will be consolidated separately. Retaining a document preserves context; it does not certify every claim as current.

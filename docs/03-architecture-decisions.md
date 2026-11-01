@@ -1,5 +1,13 @@
 # Architecture Decisions (ADRs) — pinned
 
+> Review status (November 2026): this is a historical design record, not a
+> verified inventory of the current implementation. In particular, the generic
+> gateway currently exposes custom REST tool routes; its dependency manifest
+> does not declare the official MCP SDK claimed below. Validate protocol
+> compatibility separately before using a standard MCP client. Runtime metadata
+> currently supports Python 3.11+, and the Postgres outbox uses psycopg directly.
+
+
 The stack and layout of the reference implementation, which is a proof-of-concept rather than a hardened product. Everything below is a decision that has been made, not a menu.
 
 ## Tech stack (Python)

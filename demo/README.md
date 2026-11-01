@@ -4,7 +4,8 @@
 > The fake-provider walkthrough was reproduced on 2026-11-01: allowed, held,
 > denied, approval-release and audit checks passed. It uses a scripted agent
 > and an in-memory bank; it does not test network failures or production safety.
-> The older adversarial specification linked below is historical context.
+> The design document linked below also describes adversarial payment checks
+> retained in unit tests, outside this simple walkthrough.
 
 
 A **real AI agent** doing accounts-payable work behind the **real Stonefold gateway**,
@@ -18,10 +19,11 @@ small payment, holds the mid-size one for human approval, and records every
 decision. You see the raw prompt, the raw intents the model emitted, the gateway's
 verdicts, and the audit log.
 
-> **Note.** This is the *simple* demo. The original spec
-> ([`docs/05-demo-spec.md`](../docs/05-demo-spec.md)) describes an adversarial
-> version (an indirect-injection attack the gateway blocks); that part has been
-> intentionally removed here for a clean, minimal walkthrough.
+> **Scope.** This is the simple walkthrough: allow, hold, deny, approval, and
+> audit. The [demo design](../docs/05-demo-spec.md) describes additional cases.
+> Two adversarial payment cases remain in `tests/test_ap_demo_core.py` (G2);
+> their presence is not a live-model attack evaluation or a dedicated scenario
+> in this walkthrough. The demo design is being reviewed against the code.
 
 ## What's here
 
