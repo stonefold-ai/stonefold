@@ -1,5 +1,12 @@
 # Accounts-Payable Demo — the Stonefold Gateway in the path
 
+> Research status: this is a control demonstration, not a comparative benchmark.
+> The fake-provider walkthrough was reproduced on 2026-11-01: allowed, held,
+> denied, approval-release and audit checks passed. It uses a scripted agent
+> and an in-memory bank; it does not test network failures or production safety.
+> The older adversarial specification linked below is historical context.
+
+
 A **real AI agent** doing accounts-payable work behind the **real Stonefold gateway**,
 enforcing the **unmodified** [`spec/examples/payments-ops.stele.yaml`](../spec/examples/payments-ops.stele.yaml).
 The bank and ledger are faked (no real money, all data fictional); the agent and

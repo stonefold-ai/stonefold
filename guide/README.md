@@ -2,16 +2,20 @@
 
 *You cloned the repo. Now what?*
 
-Stonefold is a deterministic gateway that stands between an AI agent and
-the systems it can act on: every attempted action is checked against a
-reviewed policy, staged, audited, and — where the policy says so — held for
-a human. This guide shows you, hands on, what that costs to adopt (one HTTP
-call in your agent) and what it buys.
+These tutorials explore the existing Python prototype. They are implementation
+examples, not a production deployment recipe or comparative research results.
+Start with the [simple demonstration](../demo/README.md) if you only want to
+understand the current behavior. Consult the [project README](../README.md) for
+the research purpose and limitations.
 
-Six step-by-step tutorials, each in its own directory with its own README
-and complete files. Every example's `main.py` is executed by the test suite
-on every commit (`tests/test_guide_examples.py`), so the guide cannot drift
-from the code it teaches.
+The six tutorials are retained while the architecture and documentation are
+reviewed. They still use the current intent API and policy vocabulary; removing
+or replacing those interfaces has not happened. Adoption also requires suitable
+connectors, trusted identity, state, and deployment boundaries.
+
+The suite includes executions of example `main.py` files
+(`tests/test_guide_examples.py`). That checks the paths exercised by those tests;
+it does not validate every instruction or deployment assumption.
 
 <a href="architecture.svg"><img src="architecture.svg" alt="How the pieces fit: the agent's only path is a typed submit_intent over HTTP into the deterministic gateway (resolve, authorize, scope, gates, kill, stage, audit); gates call your registered checks/hooks/predicates; allowed effects stage in the outbox and a dispatch worker sends them through your connectors, with the operator holding approvals and the kill switch; v0.3 adds the obligation registry the gateway queries, reserves, consumes and releases; everything lands in the append-only audit log" width="1080"></a>
 
