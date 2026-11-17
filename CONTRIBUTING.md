@@ -46,7 +46,7 @@ proposing.
 *The specification text (in the [spec repo](https://github.com/stonefold-ai/spec)) and
 the enforcement path in this repo: `src/stonefold_core`, `src/stonefold_gates`,
 `src/stonefold_gateway`, `src/stonefold_store`, bound by the invariants in
-[`CLAUDE.md`](CLAUDE.md).*
+`CLAUDE.md` (retired historical document).*
 
 This zone is not closed; it is gated by evidence. There are two lanes.
 

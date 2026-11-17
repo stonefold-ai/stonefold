@@ -155,7 +155,7 @@ def render(
             f"**{w.item_calls}**, covering **{w.item_refusals}** items"
         )
     o = r.outcomes
-    if o.settled or o.failed or o.cancelled:
+    if o.settled or o.failed or o.cancelled or o.unknown:
         add("")
         add(
             f"What actually happened to the effects that went through: "
@@ -166,6 +166,12 @@ def render(
             "enforced, effects the policy would have refused or held ran and "
             "settled with the rest."
         )
+        if o.unknown:
+            add(
+                f"**{o.unknown}** unknown outcome reports require checking the later "
+                "audit history and downstream evidence. These are uncertainty events, "
+                "not confirmed failures or additional policy decisions."
+            )
         if o.moved_out_of_scope:
             add(
                 f"On **{o.moved_out_of_scope}** of them the target had moved out "
@@ -391,7 +397,7 @@ def render(
         "queries. A report you cannot check is a brochure."
     )
     add("")
-    lifecycle = r.outcomes.settled + r.outcomes.failed + r.outcomes.cancelled
+    lifecycle = r.outcomes.settled + r.outcomes.failed + r.outcomes.cancelled + r.outcomes.unknown
     provenance = (
         f"*Produced from {r.coverage.observed} decision "
         f"{plural(r.coverage.observed, 'record')} and {lifecycle} settlement "

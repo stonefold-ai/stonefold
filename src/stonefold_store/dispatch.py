@@ -4,7 +4,7 @@
 Polls the outbox for ``PENDING`` rows, runs the locked ``PENDING → DISPATCHING``
 transition (``claim_next_pending``) — re-evaluating the kill switch **inside** that
 transaction (design §8.4, point 3) — dispatches the effect through the connector
-with the row's **idempotency key**, and settles to ``DONE``/``FAILED``/``CANCELLED``
+with the row's **idempotency key**, and records confirmed outcomes or ``OUTCOME_UNKNOWN``
 — writing the audit in the same transaction as the settle (invariant 6).
 
 While a dispatch is in flight it is recorded in the ``InFlightRegistry`` so a kill
@@ -12,6 +12,9 @@ can abort a cancellable call (design §8.5); a connector that aborts raises
 ``ConnectorCancelled`` and the row settles ``CANCELLED``. A ``FAILED`` *irreversible*
 effect with a declared compensation auto-stages the compensating effect
 (design §9, spec §8.5).
+
+Generic dispatch exceptions and expired claims remain outcome-unknown, without
+resend, compensation, or terminal reservation release. See docs/22-execution-recovery.md.
 
 The worker depends only on ``stonefold_core`` protocols (``OutboxStore``,
 ``ConnectorRegistry``, ``Registry``, ``KillStore``) — the concretes are injected.
@@ -29,6 +32,7 @@ from stonefold_core.digest import DIGEST_MISMATCH, digest_matches
 from stonefold_core.connector import (
     SCOPE_LOST,
     ConnectorCancelled,
+    KnownDispatchFailure,
     ConnectorRegistry,
     ConnectorResult,
     ScopeLostError,
@@ -92,7 +96,7 @@ def _scope_advice(rule: str) -> Advice:
 
 
 class DispatchWorker:
-    """Drains staged effects exactly once (at-least-once dispatch + idempotency).
+    """Dispatch staged effects once; quarantine uncertain or expired attempts.
 
     The settle audit is written by the ``OutboxStore`` (in the same transaction
     as the state change, invariant 6); the worker only *builds* the record, so it
@@ -111,6 +115,7 @@ class DispatchWorker:
         revalidate: DispatchRevalidator | None = None,
         scopes: ScopeResolver | None = None,
         obligations: Mapping[str, ObligationRegistry] | None = None,
+        dispatch_timeout: timedelta = timedelta(minutes=5),
     ) -> None:
         self._store = store
         self._connectors = connectors
@@ -118,6 +123,9 @@ class DispatchWorker:
         self._kill = kill
         self._inflight = inflight
         self._clock = clock
+        if dispatch_timeout <= timedelta(0):
+            raise ValueError("dispatch_timeout must be positive")
+        self._dispatch_timeout = dispatch_timeout
         self._revalidate = revalidate
         # §? scope no-race, opt-in like freshness: with a resolver the worker
         # re-asserts the scope predicate at dispatch — inside the effect's own
@@ -273,6 +281,8 @@ class DispatchWorker:
 
     def run_once(self, kill_check: KillCheck | None = None) -> bool:
         """Process at most one staged row. Returns ``True`` if one was handled."""
+        now = self._clock() if self._clock is not None else datetime.now(timezone.utc)
+        self._store.recover_dispatching(now - self._dispatch_timeout)
         self.sweep_expired_holds()  # the worker's loop is the sweep
         # release claims of rows that went terminal since the last tick
         # (reject, kill-service cancels) — and, in the ``finally``, of rows THIS
@@ -304,7 +314,6 @@ class DispatchWorker:
                 result={"error": str(exc)},
                 audit=self._audit_record(claimed, Decision.DENY, "failure"),
             )
-            self._maybe_compensate(claimed)
             return True
 
         # the pinned connector's artifact must still match its digest at
@@ -396,7 +405,7 @@ class DispatchWorker:
                 audit=self._audit_record(claimed, Decision.HALT, "cancelled"),
             )
             return True
-        except Exception as exc:  # connector failure ⇒ settle FAILED, audit it
+        except KnownDispatchFailure as exc:  # authoritative unsuccessful outcome
             self._store.settle(
                 claimed.id,
                 state=PendingState.FAILED,
@@ -404,6 +413,17 @@ class DispatchWorker:
                 audit=self._audit_record(claimed, Decision.DENY, "failure"),
             )
             self._maybe_compensate(claimed)
+            return True
+        except Exception as exc:
+            # The request may already have committed downstream. Neither retry,
+            # compensation nor reservation release is justified by an exception.
+            self._store.settle(
+                claimed.id, state=PendingState.OUTCOME_UNKNOWN,
+                result={"error": str(exc)}, reason="dispatch-outcome-unknown",
+                audit=self._audit_record(
+                    claimed, Decision.ALLOW, "unknown", rule="dispatch-outcome-unknown",
+                ),
+            )
             return True
         finally:
             if call is not None and self._inflight is not None:

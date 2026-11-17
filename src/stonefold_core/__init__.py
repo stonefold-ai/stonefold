@@ -83,6 +83,7 @@ from stonefold_core.connector import (
     SCOPE_LOST,
     Connector,
     ConnectorCancelled,
+    KnownDispatchFailure,
     ConnectorRegistry,
     ConnectorResult,
     Connectors,
@@ -300,6 +301,7 @@ __all__ = [
     # connector seam
     "Connector",
     "ConnectorCancelled",
+    "KnownDispatchFailure",
     "ConnectorRegistry",
     "ConnectorResult",
     "Connectors",

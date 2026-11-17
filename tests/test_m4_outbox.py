@@ -13,6 +13,7 @@ import pytest
 
 from stonefold_core import (
     Actor,
+    KnownDispatchFailure,
     ConnectorResult,
     Connectors,
     Decision,
@@ -163,7 +164,7 @@ class _FailingConnector:
         return ConnectorResult(kind="receipt", receipt={})
 
     def dispatch(self, action: ResolvedAction, actor: Actor, idempotency_key: str) -> ConnectorResult:
-        raise RuntimeError("downstream rejected the prescription")
+        raise KnownDispatchFailure("downstream confirmed an unsuccessful prescription")
 
     def fetch_target(self, action: ResolvedAction, scope: ScopePredicate | None, actor: Actor) -> dict[str, Any] | None:
         return dict(action.data)

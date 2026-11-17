@@ -269,7 +269,9 @@ class _FailableConnector(InMemoryConnector):
     ) -> ConnectorResult:
         if action.action in self.fail_next:
             self.fail_next.discard(action.action or "")
-            raise RuntimeError(f"TCK-injected dispatch failure for {action.action!r}")
+            from stonefold_core import KnownDispatchFailure
+            # D4 injects a known unsuccessful outcome, not response loss.
+            raise KnownDispatchFailure(f"TCK-injected dispatch failure for {action.action!r}")
         return super()._dispatch(action, actor, idempotency_key, scope)
 
 

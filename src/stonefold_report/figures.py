@@ -45,7 +45,7 @@ CAUSE_OTHER = "other"
 # filter. An effect's decision record carries outcome staged / not_executed /
 # hold-deduped / halted / batch-refused; success, failure and cancelled on an
 # effect are the worker's, and only effects have a worker.
-_LIFECYCLE_OUTCOMES = frozenset({"success", "failure", "cancelled"})
+_LIFECYCLE_OUTCOMES = frozenset({"success", "failure", "cancelled", "unknown"})
 
 
 def is_lifecycle(record: AuditRecord) -> bool:
@@ -207,6 +207,7 @@ class OutcomeFigures:
     # decision and dispatch, and enforcement would have stopped the effect at
     # the last gate. The advisory deployment let it land and wrote this down.
     moved_out_of_scope: int
+    unknown: int = 0  # uncertainty events, possibly followed by a later confirmed outcome
 
 
 @dataclass(frozen=True)
@@ -391,6 +392,7 @@ def _outcomes(lifecycle: Sequence[AuditRecord]) -> OutcomeFigures:
         settled=sum(1 for r in lifecycle if r.outcome == "success"),
         failed=sum(1 for r in lifecycle if r.outcome == "failure"),
         cancelled=sum(1 for r in lifecycle if r.outcome == "cancelled"),
+        unknown=sum(1 for r in lifecycle if r.outcome == "unknown"),
         moved_out_of_scope=sum(
             1 for r in lifecycle
             if r.advised is not None and r.advised.rule == "scope-lost"

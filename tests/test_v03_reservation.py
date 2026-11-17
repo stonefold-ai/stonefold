@@ -62,7 +62,8 @@ class FailingConnector:
     """A connector whose dispatch always fails — the effect never lands."""
 
     def dispatch(self, resolved: Any, actor: Any, idempotency_key: str) -> Any:
-        raise RuntimeError("wire transfer service down")
+        from stonefold_core import KnownDispatchFailure
+        raise KnownDispatchFailure("wire transfer authoritatively rejected")
 
 
 @dataclass

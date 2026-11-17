@@ -24,6 +24,7 @@ from stonefold_core.outbox import (
     UnknownTicketError,
     apply_release,
     cancellation_record,
+    unknown_dispatch_record,
 )
 
 
@@ -117,6 +118,21 @@ class InMemoryOutboxStore:
 
     def list_by_state(self, state: PendingState) -> list[PendingAction]:
         return [self._rows[i] for i in self._order if self._rows[i].state is state]
+
+    def recover_dispatching(self, before: datetime) -> int:
+        recovered = 0
+        for row in self.list_by_state(PendingState.DISPATCHING):
+            if row.updated_at > before:
+                continue
+            # Write first so an audit failure leaves the claim recoverable.
+            if self._audit is not None:
+                self._audit.write(unknown_dispatch_record(row))
+            self._rows[row.id] = row.model_copy(update={
+                "state": PendingState.OUTCOME_UNKNOWN,
+                "reason": "dispatch-expired", "updated_at": _now(),
+            })
+            recovered += 1
+        return recovered
 
     def claim_next_pending(
         self,

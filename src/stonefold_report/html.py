@@ -392,7 +392,7 @@ def render_html(
             f"{r.disclosures.first.date().isoformat()} — "
             f"{r.disclosures.last.date().isoformat()}"
         )
-    lifecycle = o.settled + o.failed + o.cancelled
+    lifecycle = o.settled + o.failed + o.cancelled + o.unknown
 
     add("<!doctype html><html lang='en'><head><meta charset='utf-8'>")
     add(f"<title>Advisory Report — {escape(r.agent)}</title>")
@@ -519,6 +519,12 @@ def render_html(
                 "cancelled before dispatch</span>"
             )
         add("</div>")
+        if o.unknown:
+            add(
+                f"<p><b>{o.unknown}</b> unknown outcome reports require checking later "
+                "audit history and downstream evidence. These are uncertainty events, "
+                "not confirmed failures or additional policy decisions.</p>"
+            )
         add(
             "<p>These are the settle reports — what actually happened to the "
             "effects that went through. Only actions with an external effect "

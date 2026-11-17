@@ -46,6 +46,7 @@ class PendingState(str, Enum):
     PENDING_APPROVAL = "pending_approval"  # held for a human (from a gate HOLD)
     PENDING = "pending"  # ready to dispatch
     DISPATCHING = "dispatching"  # claimed by a worker (inside the FOR UPDATE)
+    OUTCOME_UNKNOWN = "outcome_unknown"  # may have executed; reconcile, never blindly retry
     DONE = "done"  # dispatched successfully
     FAILED = "failed"  # dispatch failed
     CANCELLED = "cancelled"  # killed or rejected before dispatch
@@ -74,7 +75,7 @@ class PendingAction(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     id: str  # ticket, e.g. "act_<hex>"
-    idempotency_key: str  # makes the connector send safe under retries
+    idempotency_key: str  # deduplication requires downstream support; a key alone is insufficient
     state: PendingState
     agent: str
     resolved: ResolvedAction
@@ -335,6 +336,22 @@ def cancellation_record(row: PendingAction, reason: str) -> AuditRecord:
     )
 
 
+def unknown_dispatch_record(row: PendingAction) -> AuditRecord:
+    """Record an expired claim without claiming the effect failed or releasing it."""
+    from stonefold_core.audit import build_record
+
+    return build_record(
+        agent=row.agent, actor=row.actor,
+        session=Session(id=row.session_id, correlation_id=row.correlation_id),
+        call=RawCall(resource=row.resolved.resource, action=row.resolved.action,
+                     data=dict(row.resolved.data)),
+        resolved=row.resolved,
+        result=EvalResult(decision=Decision.ALLOW, rule="dispatch-expired",
+                          ticket=row.id, gates=row.gates),
+        outcome="unknown", enforcement=row.enforcement,
+    )
+
+
 class OutboxStore(Protocol):
     """Durable staging + lifecycle transitions (design §9). The Postgres
     implementation runs ``claim_next_pending`` as a ``SELECT … FOR UPDATE`` so a
@@ -371,6 +388,15 @@ class OutboxStore(Protocol):
     def get(self, action_id: str) -> PendingAction | None: ...
 
     def list_by_state(self, state: PendingState) -> list[PendingAction]: ...
+
+    def recover_dispatching(self, before: datetime) -> int:
+        """Atomically mark claims last updated at/before cutoff OUTCOME_UNKNOWN.
+
+        Write an audit event with each transition. Never requeue or release
+        reservations: expiry cannot prove that an external effect did not occur.
+        Return the number transitioned. Repeated/concurrent sweeps are idempotent.
+        """
+        ...
 
     def claim_next_pending(
         self,

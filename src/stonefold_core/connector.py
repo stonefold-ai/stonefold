@@ -23,10 +23,20 @@ from stonefold_core.models import Actor, ResolvedAction
 from stonefold_core.scope import ScopePredicate
 
 
+class KnownDispatchFailure(Exception):
+    """A confirmed unsuccessful outcome, not a timeout or lost response.
+
+    Adapters may raise this only with authoritative failure evidence. A declared
+    compensation may run and a held obligation may be released. Use an ordinary
+    exception when the downstream outcome is uncertain; it will remain unknown.
+    """
+
+
 class ConnectorCancelled(Exception):
     """Raised by a connector when an in-flight cancellable call is aborted by the
     kill-switch (design §8.5). The dispatch worker maps it to a terminal
-    ``CANCELLED`` settle — distinct from an ordinary dispatch ``FAILED``."""
+    ``CANCELLED`` settle. Raise only when no effect committed; an uncertain
+    cancellation must use an ordinary exception and remain outcome-unknown."""
 
 
 # The settle reason for an effect refused because the scope predicate no longer

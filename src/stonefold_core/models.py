@@ -297,7 +297,7 @@ class AuditRecord(BaseModel):
     reasonCode: str = ""
     retryClass: RetryClass | None = None
     approval: dict[str, Any] | None = None
-    # Connector result: "success" | "failure" | "not_executed".
+    # Connector result includes "unknown" for unconfirmed dispatch outcomes.
     outcome: str = "not_executed"
     # spec §11: the downstream identifier(s) of an executed/settled effect's
     # result — the connector-returned id(s) of the created/changed record(s), the

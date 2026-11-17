@@ -16,7 +16,7 @@ imported lazily so importing this module never requires it.
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from stonefold_core.gating import ApprovalSpec, ReleaseContract
@@ -32,6 +32,7 @@ from stonefold_core.outbox import (
     UnknownTicketError,
     apply_release,
     cancellation_record,
+    unknown_dispatch_record,
 )
 from stonefold_store.outbox_memory import build_pending
 
@@ -142,6 +143,27 @@ class PostgresOutboxStore:
             rows = cur.fetchall()
         return [_from_payload(r[0]) for r in rows]
 
+    def recover_dispatching(self, before: datetime) -> int:
+        # Use the SQL timestamp: older payloads did not update their timestamp
+        # at claim. Locking and a state predicate serialize recovery vs settle.
+        with self._conn.transaction(), self._conn.cursor() as cur:
+            cur.execute(
+                """SELECT payload FROM pending_actions
+                   WHERE state = %s AND updated_at <= %s
+                   ORDER BY seq FOR UPDATE SKIP LOCKED""",
+                (PendingState.DISPATCHING.value, before),
+            )
+            rows = cur.fetchall()
+            for (payload,) in rows:
+                row = _from_payload(payload)
+                recovered = row.model_copy(update={
+                    "state": PendingState.OUTCOME_UNKNOWN,
+                    "reason": "dispatch-expired", "updated_at": datetime.now(timezone.utc),
+                })
+                self._write(cur, recovered)
+                self._write_audit(cur, unknown_dispatch_record(row))
+        return len(rows)
+
     def claim_next_pending(
         self,
         kill_check: KillCheck | None = None,
@@ -179,7 +201,9 @@ class PostgresOutboxStore:
                     self._write(cur, cancelled)
                     self._write_audit(cur, cancellation_record(cancelled, stale))
                     continue
-                claimed = row.model_copy(update={"state": PendingState.DISPATCHING})
+                claimed = row.model_copy(update={
+                    "state": PendingState.DISPATCHING, "updated_at": datetime.now(timezone.utc),
+                })
                 self._write(cur, claimed)
                 return claimed
 
